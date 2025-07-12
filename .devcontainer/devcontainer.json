@@ -1,0 +1,15 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "vscoq.path": "/home/opam/.opam/5.3/bin/vscoqtop"
+            },
+            "extensions": [
+                "maximedenes.vscoq"
+            ]
+        }
+    }
+}
