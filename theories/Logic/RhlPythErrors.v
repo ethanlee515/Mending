@@ -34,12 +34,12 @@ Inductive equiv_with_pythagorean_errors :
     (callrFree (samplee (existT _ supp_t P)))
     (callrFree (samplee (existT _ supp_t Q))) [ ε ]
 | pyth_bind_eq (mem_t: choiceType) (outA_t outB_t : ord_choiceType)
-    (pL pR : @FrStP mem_t outA_t) (qL qR : outA_t -> @FrStP mem_t outB_t)
-    (lst1 lst2 : list R) :
-  equiv_with_pythagorean_errors outA_t mem_t pL pR lst1 →
-  (∀ a, equiv_with_pythagorean_errors outB_t mem_t (qL a) (qR a) lst2) →
+    (progA_L progA_R : @FrStP mem_t outA_t) (progB_L progB_R : outA_t -> @FrStP mem_t outB_t)
+    (ε_L ε_R : list R) :
+  equiv_with_pythagorean_errors outA_t mem_t progA_L progA_R ε_L →
+  (∀ a, equiv_with_pythagorean_errors outB_t mem_t (progB_L a) (progB_R a) ε_R) →
   equiv_with_pythagorean_errors outB_t mem_t
-    (bindrFree pL qL) (bindrFree pR qR) (lst1 ++ lst2).
+    (bindrFree progA_L progB_L) (bindrFree progA_R progB_R) (ε_L ++ ε_R).
 
 Fixpoint sum_squares (lst : list R) :=
   match lst with
