@@ -1,6 +1,8 @@
 From Stdlib Require Import Unicode.Utf8.
+Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra.
 From mathcomp Require Import reals distr.
+Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
