@@ -31,8 +31,6 @@ Definition statistical_distance {T : choiceType} (P Q : {distr T / R}) : R :=
 Lemma up_to_bad (out_t: ord_choiceType)
   {mem_t: choiceType}
   (progL : @FrStP mem_t out_t) (progR : @FrStP mem_t out_t)
-  (pre : pred (mem_t * mem_t))
-  (post : pred ((out_t * mem_t) * (out_t * mem_t)))
   (ε : R) :
   equiv_with_additive_error progL progR
     (fun mems => match mems with (mL, mR) => mL == mR end)

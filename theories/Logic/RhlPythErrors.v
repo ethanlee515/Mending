@@ -27,6 +27,11 @@ Inductive equiv_with_pythagorean_errors :
     @FrStP mem_t out_t -> @FrStP mem_t out_t -> list R -> Prop :=
 | pyth_ret_eq {out_t : ord_choiceType} (mem_t : choiceType) (v : out_t) :
     equiv_with_pythagorean_errors out_t mem_t (retrFree v) (retrFree v) []
+| pyth_same_op {supp_t : choice_type} (mem_t : choiceType)
+  (P : {distr supp_t / R}) :
+  equiv_with_pythagorean_errors _ mem_t
+    (callrFree (samplee (existT _ supp_t P)))
+    (callrFree (samplee (existT _ supp_t P))) [ ]
 | pyth_eps_samp {supp_t : choice_type} (mem_t : choiceType)
     (P Q : {distr supp_t / R}) (ε : R) :
   δ_KL P Q < ε ->
