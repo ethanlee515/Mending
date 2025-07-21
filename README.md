@@ -1,4 +1,5 @@
-# CKKS-Verification
+# Formal Verification of the CKKS Homomorphic Encryption Scheme
+
 Attempts to verify CKKS homomorphic encryption's security using SSProve
 
 Usage:

@@ -1,5 +1,5 @@
 (* CKKS Model *)
-Require Import String.
+From Stdlib Require Import String.
 
 Open Scope string_scope.
 
