@@ -57,7 +57,7 @@ Definition l2_norm (eps_lst : list R) := Num.sqrt (sum_squares eps_lst).
 Theorem mw18 (out_t : ord_choiceType) (mem_t : choiceType)
   (progL progR : @FrStP mem_t out_t) (eps_lst : list R) :
   equiv_with_pythagorean_errors out_t mem_t progL progR eps_lst →
-  equiv_with_additive_error out_t out_t progL progR
+  equiv_with_additive_error progL progR
   (fun mems => match mems with (mL, mR) => mL == mR end)
   (fun results => match results with (resL, resR) => resL == resR end)
   (l2_norm eps_lst).
