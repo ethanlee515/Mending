@@ -24,7 +24,7 @@ Arguments callrFree {_ _ } _.
 
 Inductive equiv_with_pythagorean_errors :
   ∀ (out_t : ord_choiceType) (mem_t : choiceType),
-    @FrStP mem_t out_t -> @FrStP mem_t out_t -> list R -> Prop :=
+    @FrStP mem_t out_t → @FrStP mem_t out_t → list R → Prop :=
 | pyth_ret_eq {out_t : ord_choiceType} (mem_t : choiceType) (v : out_t) :
     equiv_with_pythagorean_errors out_t mem_t (retrFree v) (retrFree v) []
 | pyth_same_op {supp_t : choice_type} (mem_t : choiceType)
@@ -34,12 +34,12 @@ Inductive equiv_with_pythagorean_errors :
     (callrFree (samplee (existT _ supp_t P))) [ ]
 | pyth_eps_samp {supp_t : choice_type} (mem_t : choiceType)
     (P Q : {distr supp_t / R}) (ε : R) :
-  δ_KL P Q < ε ->
+  δ_KL P Q < ε →
   equiv_with_pythagorean_errors _ mem_t
     (callrFree (samplee (existT _ supp_t P)))
     (callrFree (samplee (existT _ supp_t Q))) [ ε ]
 | pyth_bind_eq (mem_t: choiceType) (outA_t outB_t : ord_choiceType)
-    (progA_L progA_R : @FrStP mem_t outA_t) (progB_L progB_R : outA_t -> @FrStP mem_t outB_t)
+    (progA_L progA_R : @FrStP mem_t outA_t) (progB_L progB_R : outA_t → @FrStP mem_t outB_t)
     (ε_L ε_R : list R) :
   equiv_with_pythagorean_errors outA_t mem_t progA_L progA_R ε_L →
   (∀ a, equiv_with_pythagorean_errors outB_t mem_t (progB_L a) (progB_R a) ε_R) →

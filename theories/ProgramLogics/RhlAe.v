@@ -36,7 +36,7 @@ Lemma up_to_bad (out_t: ord_choiceType)
     (fun mems => match mems with (mL, mR) => mL == mR end)
     (fun results => match results with (resL, resR) => resL == resR end)
     ε ->
-  forall s,
+  ∀ s,
     let out1 := thetaFstd out_t progL s in
     let out2 := thetaFstd out_t progR s in
     statistical_distance out1 out2 < ε.
