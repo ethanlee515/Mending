@@ -4,9 +4,10 @@ From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From VerifiedCKKS Require Import ApproxFHE ListExtras.
+From mathcomp Require Import seq.
+
 Import PackageNotation.
 Local Open Scope package_scope.
-From mathcomp Require Import seq.
 
 Module IndCpad(Import S: ApproxFheScheme).
   Definition challenger_table_row := message × message × ciphertext.
@@ -57,7 +58,8 @@ Module IndCpad(Import S: ApproxFheScheme).
         ready ← get ready_addr;;
         #assert (~~ready) ;;
         #put ready_addr := true ;;
-        '(pk, evk, sk) ← keygen ;;
+        keys <$ (pk_t × evk_t × sk_t; keygen) ;;
+        let '(pk, evk, sk) := keys in
         #put pk_addr := pk ;;
         @ret (pk_t × evk_t) (pk, evk)
       } ;
@@ -68,12 +70,12 @@ Module IndCpad(Import S: ApproxFheScheme).
         let (m0, m1) := messages in
         let m := if b then m1 else m0 in
         pk ← get pk_addr ;;
-        c ← encrypt pk m ;;
+        c <$ (ciphertext; encrypt pk m) ;;
         table ← get table_addr ;;
         let updated_table := (table ++ [:: (m0, m1, c)]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
-        ret c
+        @ret ciphertext c
       } ; 
       #def #[oracle_eval1] (a : 'adv_ev1) : 'ciphertext
       {
@@ -86,11 +88,11 @@ Module IndCpad(Import S: ApproxFheScheme).
         evk ← get evk_addr ;;
         let m0' := interpret_unary gate m0 in
         let m1' := interpret_unary gate m1 in
-        c' ← eval1 evk gate c ;;
+        c' <$ (ciphertext; eval1 evk gate c) ;;
         let updated_table := (table ++ [:: (m0', m1', c')]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
-        ret c'
+        @ret ciphertext c'
       } ;
       #def #[oracle_eval2] (a : 'adv_ev2) : 'ciphertext
       {
@@ -105,11 +107,11 @@ Module IndCpad(Import S: ApproxFheScheme).
         let m0' := interpret_binary gate m0i m0j in
         let m1' := interpret_binary gate m1i m1j in
         evk ← get evk_addr ;;
-        c' ← eval2 evk gate ci cj ;;
+        c' <$ (ciphertext; eval2 evk gate ci cj) ;;
         let updated_table := (table ++ [:: (m0', m1', c')]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
-        ret c'
+        @ret ciphertext c'
       } ;
       #def #[oracle_decrypt] (i: 'nat) : 'option_message
       {
@@ -124,7 +126,7 @@ Module IndCpad(Import S: ApproxFheScheme).
           | None =>
             @ret (chOption message) None
           | Some (a, b) =>
-            m ← decrypt sk a ;;
+            m <$ (message; decrypt sk a) ;;
             @ret (chOption message) (Some m)
           end
         else

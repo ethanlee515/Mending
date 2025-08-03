@@ -18,6 +18,7 @@ Module IndCpa(Import S: ApproxFheScheme).
   Definition oracle_encrypt : nat := 201.
   (* Some hack that makes the oracle compile.
    * The parser can go eat it... *)
+  (* Notation " 'keys " := (pk_t × evk_t × sk_t) (in custom pack_type at level 2). *)
   Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
   Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
@@ -40,7 +41,8 @@ Module IndCpa(Import S: ApproxFheScheme).
         a ← get initialized ;;
         #assert (~~a) ;;
         #put initialized := true ;;
-        '(pk, evk, sk) ← keygen ;;
+        keys <$ (pk_t × evk_t × sk_t; keygen) ;;
+        let '(pk, evk, sk) := keys in
         #put pk_addr := pk ;;
         @ret (pk_t × evk_t) (pk, evk)
       } ;
@@ -51,8 +53,8 @@ Module IndCpa(Import S: ApproxFheScheme).
         let (m0, m1) := messages in
         let m := if b then m1 else m0 in
         pk ← get pk_addr ;;
-        c ← encrypt pk m ;;
-        ret c
+        c <$ (ciphertext; encrypt pk m) ;;
+        @ret ciphertext c
       }
     ].
 
