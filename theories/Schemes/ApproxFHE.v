@@ -19,8 +19,8 @@ Module Type ApproxFheScheme.
   Definition ciphertext := 'option (encryption × 'int).
   (* We assume the homomorphic encryption operates over arithmetic circuits.
    * We therefore have a set of gates for building such circuits. *)
-  Parameter unary_gate : Type.
-  Parameter binary_gate : Type.
+  Parameter unary_gate : choice_type.
+  Parameter binary_gate : choice_type.
   Parameter interpret_unary : unary_gate → message → message.
   Parameter interpret_binary : binary_gate → message → message → message.
   (* Now, the "usual" 4-tuple (keygen, enc, eval, dec).
