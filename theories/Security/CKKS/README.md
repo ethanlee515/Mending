@@ -1,1 +1,0 @@
-Here we machine check the analysis given by the [original CKKS paper](https://ia.cr/2016/421), as well as its [follow-up work](https://ia.cr/2018/153) which adds the bootstrapping functionality.

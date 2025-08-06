@@ -8,6 +8,7 @@ From mathcomp Require Import seq.
 
 Import PackageNotation.
 Local Open Scope package_scope.
+Local Open Scope seq_scope.
 
 Module IndCpad(Import S: ApproxFheScheme).
   Definition challenger_table_row := message × message × ciphertext.
@@ -26,10 +27,6 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition oracle_decrypt : nat := 204.
   (* Some hack that makes the oracle compile.
    * The parser can go eat it... *)
-   (**
-  Definition adv_ev1 := unary_gate × 'nat.
-  Definition adv_ev2 := binary_gate × 'nat × 'nat.
-  *)
   Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
   Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
@@ -61,6 +58,8 @@ Module IndCpad(Import S: ApproxFheScheme).
         keys <$ (pk_t × evk_t × sk_t; keygen) ;;
         let '(pk, evk, sk) := keys in
         #put pk_addr := pk ;;
+        #put evk_addr := evk ;;
+        #put sk_addr := sk ;;
         @ret (pk_t × evk_t) (pk, evk)
       } ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
@@ -72,7 +71,7 @@ Module IndCpad(Import S: ApproxFheScheme).
         pk ← get pk_addr ;;
         c <$ (ciphertext; encrypt pk m) ;;
         table ← get table_addr ;;
-        let updated_table := (table ++ [:: (m0, m1, c)]) in
+        let updated_table := (table ++ [ :: (m0,m1, c)]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         @ret ciphertext c
@@ -89,7 +88,7 @@ Module IndCpad(Import S: ApproxFheScheme).
         let m0' := interpret_unary gate m0 in
         let m1' := interpret_unary gate m1 in
         c' <$ (ciphertext; eval1 evk gate c) ;;
-        let updated_table := (table ++ [:: (m0', m1', c')]) in
+        let updated_table := (table ++ [ :: (m0', m1', c')]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         @ret ciphertext c'
@@ -108,7 +107,7 @@ Module IndCpad(Import S: ApproxFheScheme).
         let m1' := interpret_binary gate m1i m1j in
         evk ← get evk_addr ;;
         c' <$ (ciphertext; eval2 evk gate ci cj) ;;
-        let updated_table := (table ++ [:: (m0', m1', c')]) in
+        let updated_table := (table ++ [ :: (m0', m1', c')]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         @ret ciphertext c'
@@ -122,15 +121,10 @@ Module IndCpad(Import S: ApproxFheScheme).
         let '(m0, m1, c) := nth_valid table i i_in_range in
         if m0 == m1 then
           sk ← get sk_addr ;;
-          match c with
-          | None =>
-            @ret (chOption message) None
-          | Some (a, b) =>
-            m <$ (message; decrypt sk a) ;;
-            @ret (chOption message) (Some m)
-          end
+          m <$ (message; decrypt sk c) ;;
+          @ret ('option message) (Some m)
         else
-          @ret (chOption message) None
+          @ret ('option message) None
       }
     ].
 

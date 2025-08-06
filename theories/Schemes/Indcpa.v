@@ -8,6 +8,7 @@ From VerifiedCKKS Require Import ApproxFHE.
 
 Import PackageNotation.
 Local Open Scope package_scope.
+Local Open Scope ring_scope.
 
 Module IndCpa(Import S: ApproxFheScheme).
   (* -- Variables and their addresses -- *)
@@ -57,5 +58,21 @@ Module IndCpa(Import S: ApproxFheScheme).
         @ret ciphertext c
       }
     ].
-
 End IndCpa.
+
+Module IsIndCpa(Import Scheme: ApproxFheScheme).
+  Module IndCpaGame := IndCpa Scheme.
+  Import IndCpaGame.
+  (* Because we're in the public key setting there's no way to avoid this.
+   * Pick you favorite from LWE, RLWE, or MLWE.
+   * Isn't isogeny fine too?
+   *
+   * You can't have more than one though. That's crazy. *)
+  Parameter crypto_assumption_oracles : Interface.
+  Parameter crypto_assumption :
+    bool -> game crypto_assumption_oracles.
+  Parameter security_loss : R.
+  Axiom is_secure : forall A, exists Red,
+    Advantage IndCpaOracle A <=
+    Advantage crypto_assumption Red + security_loss.
+End IsIndCpa.

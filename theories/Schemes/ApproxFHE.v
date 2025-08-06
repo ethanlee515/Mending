@@ -29,7 +29,7 @@ Module Type ApproxFheScheme.
   Parameter eval1 : evk_t → unary_gate → ciphertext → distr R ciphertext.
   Parameter eval2 : evk_t → binary_gate → ciphertext → ciphertext →
     distr R ciphertext.
-  Parameter decrypt : sk_t → encryption → distr R message.
+  Parameter decrypt : sk_t → ciphertext → distr R message.
 End ApproxFheScheme.
 
 (* Correctness of each individual algorithm in the FHE 4-tuple *)
@@ -38,8 +38,8 @@ Module ApproxCorrectness(Import S: ApproxFheScheme).
   Section simplified_decryption.
   (* Alternative definition of decryption.
    * Will require consistency later with the given scheme. *)
-  Context (dec' : sk_t → encryption → message).
-  Context (metric : message → message → 'int).
+  Context (dec' : sk_t → ciphertext → message).
+  Context (metric : message → message → 'option 'int).
   (* Catch-all error probability for any step going wrong.
    * Should be negligible. *)
   Context (p_gate_error : R).
@@ -49,7 +49,11 @@ Module ApproxCorrectness(Import S: ApproxFheScheme).
   Definition is_underlying_plaintext sk (c : ciphertext) m :=
     match c with
     | None => false
-    | Some (data, error_bound) => metric (dec' sk data) m <? error_bound
+    | Some (data, error_bound) =>
+      match metric (dec' sk c) m with
+      | None => false
+      | Some x => x <? error_bound
+      end
     end.
   (* Correctness of keygen.
    * We ask for a predicate of "good keys".
@@ -91,13 +95,13 @@ End ApproxCorrectness.
 (* A FHE scheme S is approximately correct if all of its operations are. *)
 Module Type IsApproxCorrect(S: ApproxFheScheme).
   Import S.
-  Parameter dec' : sk_t → encryption → message.
+  Parameter dec' : sk_t → ciphertext → message.
   Axiom dec'_correct :
     ∀ sk c,
     \P_[ decrypt sk c ] (fun dec_out => dec_out == dec' sk c) = 1.
   Parameter good_keys : pk_t → evk_t → sk_t → bool.
   Parameter p_gate_bad : R.
-  Parameter metric : message → message → 'int.
+  Parameter metric : message → message → 'option 'int.
   Module Correctness := ApproxCorrectness(S).
   Import Correctness.
   Axiom kg_correct :
