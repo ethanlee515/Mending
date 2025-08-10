@@ -1,7 +1,7 @@
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
-From mathcomp Require Import reals realsum exp sequences realseq.
+From mathcomp Require Import reals realsum exp sequences realseq distr.
 
 Set Bullet Behavior "Strict Subproofs".
 
@@ -25,11 +25,13 @@ Proof. Admitted.
 
 (* Unnormalized Gaussian function *)
 Definition gaussian (s : R) (x : int) : R :=
-  expR (- (x%:~R / s) ^+ 2 / 2).
+  expR (- (x%:~R / s) ^ 2 / 2).
 
 Lemma ge0_gaussian (s : R) (x : int) :
   gaussian s x >= 0.
-Proof. Admitted.
+Proof.
+  exact: expR_ge0.
+Qed.
 
 Definition max_step_ratio (s : R) :=
   expR (- (1 / s) ^ 2 / 2).
@@ -51,5 +53,20 @@ Proof.
     + exact: le_gauss_geo.
   - exact: summable_geo.
 Qed.
+
+Definition gaussian_pdf (s : R) (x : int) :=
+  gaussian s x / sum (gaussian s).
+
+Lemma isdistr_gaussian (s : R) :
+  s > 0 -> isdistr (gaussian_pdf s).
+Proof.
+  move => gt0_s.
+  split.
+  - admit.
+  - admit.
+Admitted.
+
+Definition discrete_gaussian s (H : s > 0) : distr R int :=
+  mkdistr (isdistr_gaussian s H).
 
 End make_generalize_realType.
