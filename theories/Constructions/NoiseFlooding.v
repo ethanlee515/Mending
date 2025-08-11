@@ -15,15 +15,15 @@ Parameter dtuple : forall (n : nat) (t: choiceType),
 (* TODO discrete gaussian, n copies *)
 Parameter n_dg : forall {n : nat} (s : int), distr R (n.-tuple int).
 
-(* To think: Global target security?
- * Other security parameters probably will be chosen using this.
- *
- * No clue where to put this though, proof engineering wise. *)
-Parameter epsilon : R.
+Module Type NoiseFloodingParams.
+(* TODO int or real? *)
+Parameter gaussian_width_multiplier : int.
+End NoiseFloodingParams.
 
 Module NoiseFlooding
   (Import Scheme : ApproxFheScheme)
   (Import Metric : ApproxFheMetric(Scheme))
+  (Import Params : NoiseFloodingParams)
   : ApproxFheScheme.
 Definition pk_t := Scheme.pk_t.
 Definition evk_t := Scheme.evk_t.
@@ -39,35 +39,15 @@ Definition keygen := Scheme.keygen.
 Definition encrypt := Scheme.encrypt.
 Definition eval1 := Scheme.eval1.
 Definition eval2 := Scheme.eval2.
+(* TODO find out if this is the "right" amount of noise. *)
+Definition dg_stdev (error_bound : nat) : int :=
+  (error_bound * error_bound)%:~R * gaussian_width_multiplier.
 Definition decrypt (sk: sk_t) (c: ciphertext) : distr R message :=
   match c with
   | None => dnull
   | Some (_, e) =>
     \dlet_(m <- Scheme.decrypt sk c)
-    (* TODO find out the "right" amount of noise.
-     * The `e * e` below is a placeholder. *)
-    \dlet_(noise <- @n_dg dim (e * e))
+    \dlet_(noise <- @n_dg dim (dg_stdev e))
     dunit (inverse_isometry m (ivec_add noise (isometry m m)))
   end.
 End NoiseFlooding.
-
-(* Main theorem *)
-Module NoiseFloodingSecure
-  (Import Scheme : ApproxFheScheme)
-  (Import Metric : ApproxFheMetric(Scheme))
-  (Import IndCpa : IsIndCpa(Scheme))
-  : IsIndCpad(Scheme).
-  Definition crypto_assumption_oracles := IndCpa.crypto_assumption_oracles.
-  Definition crypto_assumption := IndCpa.crypto_assumption.
-  (* The summand is obviously placeholder.
-   * Who knows what's the actual magic number... *)
-  Definition security_loss (max_queries : nat) :=
-    IndCpa.security_loss + (max_queries%:~R * epsilon).
-  Module IndCpadGame := IndCpad Scheme.
-  Import IndCpadGame.
-  Theorem is_secure : forall A, exists Red,
-    forall max_queries,
-    Advantage (IndCpadOracle max_queries) A <=
-    Advantage crypto_assumption Red + (security_loss max_queries).
-  Admitted.
-End NoiseFloodingSecure.
