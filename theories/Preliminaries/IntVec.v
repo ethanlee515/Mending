@@ -8,6 +8,9 @@ Local Open Scope ring_scope.
 Definition max_norm {n} (v : n.-tuple int) : nat :=
   \big[Order.max/0]_(i < n) absz (tnth v i).
 
+Definition ivec_add {n} (v w : n.-tuple int) : n.-tuple int :=
+  [tuple (tnth v i + tnth w i) | i < n].
+
 Definition ivec_sub {n} (v w : n.-tuple int) : n.-tuple int :=
   [tuple (tnth v i - tnth w i) | i < n].
 

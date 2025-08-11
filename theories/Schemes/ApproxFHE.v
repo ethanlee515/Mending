@@ -5,9 +5,10 @@ Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From VerifiedCKKS Require Import IntVec.
 Import PackageNotation.
-Local Open Scope Z_scope.
+Import Order.Theory.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
+Local Open Scope order_scope.
 
 Module Type ApproxFheScheme.
   Parameter pk_t : choice_type.
@@ -33,37 +34,40 @@ Module Type ApproxFheScheme.
   Parameter decrypt : sk_t → ciphertext → distr R message.
 End ApproxFheScheme.
 
-(* Correctness of each individual algorithm in the FHE 4-tuple *)
-Module ApproxCorrectness(Import S: ApproxFheScheme).
-  (* To talk about correctness, we need a metric. *)
-  Local Parameter (metric : message → message → 'nat).
+(* To talk about correctness, we need a metric. *)
+Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
+  Parameter metric : message → message → 'nat.
   (* We only care about metrics that are locally isometric to Z^n.
    * e.g., polynomials of some fixed degree whose coefficients belong to a finite field. *)
-  Local Parameter dim : nat.
-  Local Parameter isometry_radius : message -> nat.
-  Local Parameter isometry : message -> message -> dim.-tuple int.
-  Local Parameter inverse_isometry : message -> dim.-tuple int -> message.
-  Axiom inverse_isometryK :
+  Parameter dim : nat.
+  Parameter isometry_radius : message -> nat.
+  Parameter isometry : message -> message -> dim.-tuple int.
+  Parameter inverse_isometry : message -> dim.-tuple int -> message.
+  Axiom inv_isoK :
     forall (center : message) (m : message),
-    Order.le (metric center m) (isometry_radius center) ->
+    metric center m <= isometry_radius center ->
     inverse_isometry center (isometry center m) = m.
-  Axiom isometryK :
+  Axiom isoK :
     forall (center : message) (v : dim.-tuple int),
-    Order.le (ivec_dist (isometry center center) v) (isometry_radius center) ->
+    ivec_dist (isometry center center) v <= isometry_radius center ->
     isometry center (inverse_isometry center v) = v.
-  Axiom isometry_correct :
+  Axiom iso_correct :
     forall (center : message) (a b : message),
-    Order.le (metric center a) (isometry_radius center) ->
-    Order.le (metric center b) (isometry_radius center) ->
+    metric center a <= isometry_radius center ->
+    metric center b <= isometry_radius center ->
     metric a b = ivec_dist (isometry center a) (isometry center b).
+End ApproxFheMetric.
+
+(* Correctness of each individual algorithm in the FHE 4-tuple *)
+Module Type ApproxCorrectness (Import Scheme: ApproxFheScheme) (Import M: ApproxFheMetric(Scheme)).
   (* For simplicity, we consider only pure and deterministic decryption. *)
-  Local Parameter (dec' : sk_t → ciphertext → message).
+  Parameter (dec' : sk_t → ciphertext → message).
   (* We require consistency later with the given scheme. *)
   Axiom dec'_correct :
     ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => dec_out == dec' sk c) = 1.
   (* Catch-all error probability for any step going wrong.
    * Should be negligible. *)
-  Local Parameter (p_gate_error : R).
+  Parameter (p_gate_error : R).
   (* Before formalizing correctness further,
    * we need a definition for the "underlying plaintext" of a ciphertext.
    * In the approximate setting, this may not be unique. *)
@@ -75,29 +79,29 @@ Module ApproxCorrectness(Import S: ApproxFheScheme).
   (* Correctness of keygen.
    * We ask for a predicate of "good keys".
    * We then require that keygen output good keys with overwhelming probability. *)
-  Local Parameter (good_keys : pk_t → evk_t → sk_t → bool).
-  Definition keygen_approx_correct :=
+  Parameter (good_keys : pk_t → evk_t → sk_t → bool).
+  Axiom keygen_approx_correct :
     let bad_keys (keys : pk_t × evk_t × sk_t) :=
       let '(pk, evk, sk) := keys in ~~ (good_keys pk evk sk)
     in
     \P_[ keygen ] bad_keys < p_gate_error. 
   (* Conditioned on the key being good,
    * Encryption outputs good ciphertexts with overwhelming probability. *)
-  Definition encrypt_approx_correct :=
+  Axiom encrypt_approx_correct :
     ∀ pk evk sk m,
     good_keys pk evk sk →
     let bad_encryption c :=
         ~~ (is_underlying_plaintext sk c m)
     in
     \P_[ encrypt pk m ] bad_encryption < p_gate_error.
-  Definition eval1_approx_correct :=
+  Axiom eval1_approx_correct :
     ∀ pk evk sk op c m,
     good_keys pk evk sk →
     is_underlying_plaintext sk c m →
     let bad_eval eval_out :=
       ~~ (is_underlying_plaintext sk eval_out (interpret_unary op m)) in
     \P_[ eval1 evk op c ] bad_eval < p_gate_error.
-  Definition eval2_approx_correct :=
+  Axiom eval2_approx_correct :
     ∀ pk evk sk op c1 c2 m1 m2,
     good_keys pk evk sk →
     is_underlying_plaintext sk c1 m1 →

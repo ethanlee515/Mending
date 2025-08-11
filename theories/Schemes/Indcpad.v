@@ -129,3 +129,19 @@ Module IndCpad(Import S: ApproxFheScheme).
     ].
 
 End IndCpad.
+
+Local Open Scope ring_scope.
+
+Module Type IsIndCpad(Import Scheme: ApproxFheScheme).
+  Module IndCpadGame := IndCpad Scheme.
+  Import IndCpadGame.
+  Parameter crypto_assumption_oracles : Interface.
+  Parameter crypto_assumption :
+    bool -> game crypto_assumption_oracles.
+  (* Security loss depends on max queries*)
+  Parameter security_loss : nat -> R.
+  Axiom is_secure : forall A, exists Red,
+    forall max_queries,
+    Advantage (IndCpadOracle max_queries) A <=
+    Advantage crypto_assumption Red + (security_loss max_queries).
+End IsIndCpad.

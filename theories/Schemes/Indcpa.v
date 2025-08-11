@@ -60,7 +60,7 @@ Module IndCpa(Import S: ApproxFheScheme).
     ].
 End IndCpa.
 
-Module IsIndCpa(Import Scheme: ApproxFheScheme).
+Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
   Module IndCpaGame := IndCpa Scheme.
   Import IndCpaGame.
   (* Because we're in the public key setting there's no way to avoid this.
