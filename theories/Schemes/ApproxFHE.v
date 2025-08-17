@@ -17,7 +17,10 @@ Module Type ApproxFheScheme.
   Parameter message : choice_type.
   Parameter encryption : choice_type.
   (* Here we consider "tagged ciphertexts".
-   * That is, an encryption together with an error bound. *)
+   * That is, an encryption together with an error bound.
+   *
+   * The `None` ciphertext should *only* come from evaluating unsupported operations.
+   * e.g. out of circuit depth. *)
   Definition ciphertext := 'option (encryption × 'nat).
   (* We assume the homomorphic encryption operates over arithmetic circuits.
    * We therefore have a set of gates for building such circuits. *)
@@ -36,10 +39,11 @@ End ApproxFheScheme.
 
 (* To talk about correctness, we need a metric. *)
 Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
-  Parameter metric : message → message → 'nat.
+  Parameter metric : message → message → nat.
   (* We only care about metrics that are locally isometric to Z^n.
    * e.g., polynomials of some fixed degree whose coefficients belong to a finite field. *)
   Parameter dim : nat.
+  (* TODO Why not just assume center maps to 0^n? *)
   Parameter isometry_radius : message -> nat.
   Parameter isometry : message -> message -> dim.-tuple int.
   Parameter inverse_isometry : message -> dim.-tuple int -> message.

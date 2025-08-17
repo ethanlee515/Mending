@@ -7,7 +7,7 @@ Set Bullet Behavior "Strict Subproofs".
 
 Section make_generalize_realType.
 
-Parameter (R: realType).
+Context (R: realType).
 
 Local Open Scope ring_scope.
 

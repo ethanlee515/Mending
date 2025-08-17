@@ -8,7 +8,7 @@ From VerifiedCKKS Require Import ApproxFHE IntVec Indcpa Indcpad NoiseFlooding.
 Local Open Scope ring_scope.
 
 (* TODO fill with actual value *)
-Definition global_epsilon (max_queries : nat) (gaussian_width_multiplier : int) : R :=
+Definition global_epsilon (max_queries : nat) (gaussian_width_multiplier : R) : R :=
   1 / 1000%R.
 
 (* Glue code *)
