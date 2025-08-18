@@ -2,14 +2,17 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
+From mathcomp Require Import xfinmap.
+Import GRing.Theory.
+Import Num.Theory.
+From mathcomp Require Import lra.
 
-Set Bullet Behavior "Strict Subproofs".
-
-Section make_generalize_realType.
+Section DiscreteGaussian.
 
 Context (R: realType).
 
 Local Open Scope ring_scope.
+Local Open Scope fset_scope.
 
 (* To construct the discrete Gaussian distribution,
  * We will normalize the Gaussian function above.
@@ -19,9 +22,43 @@ Local Open Scope ring_scope.
 Definition geometric (r : R) (i : int) : R :=
   if i < 0 then 0 else r ^ i.
 
-Lemma summable_geo (r : R) :
-  summable (geometric r).
+Lemma sum_geoE (r: R) (n : nat) :
+  r <> 1 ->
+  \sum_(i < n) (geometric r i) = (1 - r ^ n) / (1 - r).
+Proof.
+  move => ne1_r.
+  induction n.
+  - rewrite big_ord0 /=.
+    rewrite expr0z /=.
+    by rewrite subrr mul0r.
+  rewrite big_ord_recr /=.
+  rewrite IHn.
+  rewrite /geometric /=.
+  have {2}->: r ^ n = (r ^ n) * (1 - r) / (1 - r).
+  - rewrite -mulrA mulrV.
+    + by rewrite mulr1.
+    + rewrite unitfE.
+      lra.
+  by rewrite exprSz; lra.
+Qed. 
+
+Lemma ge0_geo r i :
+  r >= 0 ->
+  geometric r i >= 0.
 Proof. Admitted.
+
+Lemma summable_geo (r : R) :
+  0 <= r < 1 ->
+  summable (geometric r).
+Proof.
+  move/andP => [ge0_r lt1_r].
+  exists (1 / (1 - r)) => J.
+  rewrite (eq_bigr (fun x => geometric r (\val x))); last first.
+  - move => i _.
+    apply/normr_idP.
+    exact: ge0_geo.
+  (* Less than sum_geoE... *)
+Admitted.
 
 (* Unnormalized Gaussian function *)
 Definition gaussian (s : R) (x : int) : R :=
@@ -51,8 +88,9 @@ Proof.
     apply/andP; split.
     + exact: ge0_gaussian.
     + exact: le_gauss_geo.
-  - exact: summable_geo.
-Qed.
+  - apply: summable_geo.
+    admit.
+Admitted.
 
 Definition gaussian_pdf (s : R) (x : int) :=
   gaussian s x / sum (gaussian s).
@@ -69,4 +107,4 @@ Admitted.
 Definition discrete_gaussian s (H : s > 0) : distr R int :=
   mkdistr (isdistr_gaussian s H).
 
-End make_generalize_realType.
+End DiscreteGaussian.

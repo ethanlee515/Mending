@@ -5,7 +5,8 @@
     "customizations": {
         "vscode": {
             "settings": {
-                "vscoq.path": "/home/opam/.opam/5.3/bin/vscoqtop"
+                "vscoq.path": "/home/opam/.opam/5.3/bin/vscoqtop",
+                "editor.colorDecorators": false
             },
             "extensions": [
                 "maximedenes.vscoq"
