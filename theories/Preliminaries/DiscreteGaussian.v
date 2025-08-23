@@ -3,16 +3,15 @@ From mathcomp Require Import all_ssreflect all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 From mathcomp Require Import xfinmap.
-Import GRing.Theory.
-Import Num.Theory.
 From mathcomp Require Import lra.
+Import GRing.Theory Num.Theory Order.Theory.
+
+Local Open Scope ring_scope.
+Local Open Scope fset_scope.
 
 Section DiscreteGaussian.
 
 Context (R: realType).
-
-Local Open Scope ring_scope.
-Local Open Scope fset_scope.
 
 (* To construct the discrete Gaussian distribution,
  * We will normalize the Gaussian function above.
@@ -26,20 +25,19 @@ Lemma sum_geoE (r: R) (n : nat) :
   r <> 1 ->
   \sum_(i < n) (geometric r i) = (1 - r ^ n) / (1 - r).
 Proof.
-  move => ne1_r.
-  induction n.
-  - rewrite big_ord0 /=.
-    rewrite expr0z /=.
-    by rewrite subrr mul0r.
-  rewrite big_ord_recr /=.
-  rewrite IHn.
-  rewrite /geometric /=.
-  have {2}->: r ^ n = (r ^ n) * (1 - r) / (1 - r).
-  - rewrite -mulrA mulrV.
-    + by rewrite mulr1.
-    + rewrite unitfE.
-      lra.
-  by rewrite exprSz; lra.
+move => ne1_r.
+induction n as [|n IH].
+- rewrite big_ord0 /=.
+  rewrite expr0z /=.
+  by rewrite subrr mul0r.
+rewrite big_ord_recr /=.
+rewrite IH /geometric /=.
+rewrite exprSz.
+suff: r ^ n = (r ^ n) * (1 - r) / (1 - r).
+- lra.
+rewrite -mulrA mulrV.
+- by rewrite mulr1.
+- by rewrite unitfE; lra.
 Qed. 
 
 Lemma ge0_geo r i :
@@ -48,22 +46,46 @@ Lemma ge0_geo r i :
 Proof.
 move => ge0_r.
 rewrite /geometric /=.
-case: (i < 0).
-- lra.
+case: (i < 0); first lra.
 exact: exprz_ge0.
+Qed.
+
+Lemma finite_sum_geoE r n :
+  r <> 1 -> 
+  \sum_(i < n) (geometric r i) = (1 - r ^ n) / (1 - r).
+Proof.
+move => ne1_r.
+induction n as [|n IH].
+- rewrite big_ord0.
+  lra.
+rewrite big_ord_recr /=.
+rewrite IH /geometric /=.
+clear IH.
+rewrite exprSz.
+suff: r ^ n = (r ^ n) * (1 - r) / (1 - r); first lra.
+rewrite -mulrA mulrV.
+- by rewrite mulr1.
+- by rewrite unitfE; lra.
 Qed.
 
 Lemma summable_geo (r : R) :
   0 <= r < 1 ->
   summable (geometric r).
 Proof.
-  move/andP => [ge0_r lt1_r].
-  exists (1 / (1 - r)) => J.
-  rewrite (eq_bigr (fun x => geometric r (\val x))); last first.
-  - move => i _.
-    apply/normr_idP.
-    exact: ge0_geo.
-  (* Less than sum_geoE... *)
+move/andP => [ge0_r lt1_r].
+exists (1 / (1 - r)) => J.
+rewrite (eq_bigr (fun x => geometric r (\val x))); last first.
+- move => i _.
+  apply/normr_idP.
+  exact: ge0_geo.
+(* Less than sum_geoE... *)
+pose n : nat := 10.
+apply: (le_trans (y := \sum_(i < n) (geometric r i))); last first.
+- rewrite finite_sum_geoE; last lra.
+  (* do math *)
+  admit.
+(* Nonsense with allowing negative domain... *)
+Check sub_le_big.
 Admitted.
 
 (* Unnormalized Gaussian function *)
