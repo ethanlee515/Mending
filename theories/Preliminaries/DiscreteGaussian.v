@@ -45,7 +45,13 @@ Qed.
 Lemma ge0_geo r i :
   r >= 0 ->
   geometric r i >= 0.
-Proof. Admitted.
+Proof.
+move => ge0_r.
+rewrite /geometric /=.
+case: (i < 0).
+- lra.
+exact: exprz_ge0.
+Qed.
 
 Lemma summable_geo (r : R) :
   0 <= r < 1 ->
@@ -66,9 +72,7 @@ Definition gaussian (s : R) (x : int) : R :=
 
 Lemma ge0_gaussian (s : R) (x : int) :
   gaussian s x >= 0.
-Proof.
-  exact: expR_ge0.
-Qed.
+Proof. exact: expR_ge0. Qed.
 
 Definition max_step_ratio (s : R) :=
   expR (- (1 / s) ^ 2 / 2).
@@ -77,7 +81,10 @@ Definition geom_above (s : R) := geometric (max_step_ratio s).
 
 Lemma le_gauss_geo s x :
   gaussian s x <= geom_above s x.
-Proof. Admitted.
+Proof.
+case x.
+rewrite /gaussian /geom_above.
+Admitted.
 
 Lemma summable_gaussian (s : R) :
   s > 0 -> summable (gaussian s).

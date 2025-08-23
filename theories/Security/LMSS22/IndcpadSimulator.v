@@ -11,11 +11,13 @@ From SSProve Require Import Adv.
 From VerifiedCKKS Require Import Indcpad ApproxFHE.
 From mathcomp Require Import seq.
 From extructures Require Import ord fset fmap.
-From VerifiedCKKS Require Import ListExtras.
 From SSProve Require Import NominalPrelude.
 From VerifiedCKKS Require Import DiscreteGaussian.
 From VerifiedCKKS Require Import IntVec.
 From VerifiedCKKS Require Import ChoiceVector.
+From VerifiedCKKS Require Import ListExtras.
+From VerifiedCKKS Require Import Misc.
+From SSProve Require Import choice_type.
 
 Import PackageNotation.
 Local Open Scope package_scope.
@@ -64,14 +66,16 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
     ].
   Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; ready_addr; table_addr].
 
+  (* Some nonsense with 'int vs int vs Z... to fix with ssrZ. *)
   Parameter toIntVec : forall {n : nat}, chVec 'int n -> n.-tuple int.
   Parameter fromIntVec : forall {n : nat}, n.-tuple int -> chVec 'int n.
-
   (* TODO maps error bound to wide enough Gaussian *)
   Parameter noise_distr : nat -> distr R (chVec 'int dim).
   (* Questionable boilerplate *)
+  (**
   Parameter oget_valid : forall {t} (ox: 'option t),
     (ox != None) -> t.
+    *)
 
   Definition IndCpadOracle (max_queries: nat) : IndCpaSim_t :=
     [package oracle_mem_spec ;
