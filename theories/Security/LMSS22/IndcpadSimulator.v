@@ -71,12 +71,6 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Parameter fromIntVec : forall {n : nat}, n.-tuple int -> chVec 'int n.
   (* TODO maps error bound to wide enough Gaussian *)
   Parameter noise_distr : nat -> distr R (chVec 'int dim).
-  (* Questionable boilerplate *)
-  (**
-  Parameter oget_valid : forall {t} (ox: 'option t),
-    (ox != None) -> t.
-    *)
-
   Definition IndCpadOracle (max_queries: nat) : IndCpaSim_t :=
     [package oracle_mem_spec ;
       #def #[get_keys] (_: 'unit) : 'adv_keys
