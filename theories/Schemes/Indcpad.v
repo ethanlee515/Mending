@@ -3,7 +3,7 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
-From VerifiedCKKS Require Import ApproxFHE ListExtras.
+From Mending Require Import ApproxFHE ListExtras.
 From mathcomp Require Import seq.
 
 Import PackageNotation.

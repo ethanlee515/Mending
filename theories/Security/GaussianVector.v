@@ -5,7 +5,7 @@ Set Warnings "notation-overridden,ambiguous-paths".
 
 From SSProve Require Import Axioms pkg_core_definition Package.
 
-From VerifiedCKKS Require Import ChoiceVector.
+From Mending Require Import ChoiceVector.
 
 Import PackageNotation.
 Local Open Scope package_scope.

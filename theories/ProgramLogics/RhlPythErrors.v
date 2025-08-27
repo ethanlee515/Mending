@@ -11,8 +11,8 @@ From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorp
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve Require Import FreeProbProg.
 From SSProve.Crypt Require Import choice_type SubDistr.
-From VerifiedCKKS Require Import KL.
-From VerifiedCKKS Require Import RhlAe.
+From Mending Require Import KL.
+From Mending Require Import RhlAe.
 
 Import ListNotations.
 Local Open Scope list_scope.

@@ -8,15 +8,15 @@ From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import Adv.
-From VerifiedCKKS Require Import Indcpad ApproxFHE.
+From Mending Require Import Indcpad ApproxFHE.
 From mathcomp Require Import seq.
 From extructures Require Import ord fset fmap.
 From SSProve Require Import NominalPrelude.
-From VerifiedCKKS Require Import DiscreteGaussian.
-From VerifiedCKKS Require Import IntVec.
-From VerifiedCKKS Require Import ChoiceVector.
-From VerifiedCKKS Require Import ListExtras.
-From VerifiedCKKS Require Import Misc.
+From Mending Require Import DiscreteGaussian.
+From Mending Require Import IntVec.
+From Mending Require Import ChoiceVector.
+From Mending Require Import ListExtras.
+From Mending Require Import Misc.
 From SSProve Require Import choice_type.
 
 Import PackageNotation.
@@ -24,7 +24,7 @@ Local Open Scope package_scope.
 Local Open Scope seq_scope.
 Local Open Scope fset_scope.
 
-From VerifiedCKKS Require Import NoiseFlooding.
+From Mending Require Import NoiseFlooding.
 
 Module IndCpadSimulator (Import S: ApproxFheScheme)
   (Import Metric: ApproxFheMetric(S))
