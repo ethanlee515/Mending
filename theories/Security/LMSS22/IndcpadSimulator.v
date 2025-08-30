@@ -8,10 +8,10 @@ From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import Adv.
+From SSProve Require Import NominalPrelude.
 From Mending Require Import Indcpad ApproxFHE.
 From mathcomp Require Import seq.
 From extructures Require Import ord fset fmap.
-From SSProve Require Import NominalPrelude.
 From Mending Require Import DiscreteGaussian.
 From Mending Require Import IntVec.
 From Mending Require Import ChoiceVector.
@@ -151,5 +151,3 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
 (* TODO maybe adversary map from A to R in the end...
  * Should hopefully just be composition? *)
 End IndCpadSimulator.
-
-

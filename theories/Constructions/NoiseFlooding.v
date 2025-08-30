@@ -9,8 +9,8 @@ From Mending Require Import ApproxFHE IntVec Indcpa Indcpad DTuple DiscreteGauss
 
 Local Open Scope ring_scope.
 
-Definition n_dg (n : nat) (s : R) (H : s > 0) : distr R (n.-tuple int) :=
-  nfold_distr R n (discrete_gaussian R s H).
+Definition n_dg (n : nat) (s : R) : distr R (n.-tuple int) :=
+  nfold_distr R n (centered_discrete_gaussian R s).
 
 Module Type NoiseFloodingParams.
 Parameter gaussian_width_multiplier : R.
@@ -40,20 +40,14 @@ Definition eval2 := Scheme.eval2.
 (* TODO find out if this is the "right" amount of noise. *)
 Definition dg_stdev (error_bound : nat) : R :=
   (error_bound * error_bound + 1)%:~R * gaussian_width_multiplier.
-Lemma gt0_dg_stdev e :
-  dg_stdev e > 0.
-Proof. Admitted.
 (* Maybe it's not ideal that decrypting an invalid ciphertext crashes the entire experiment.
  * This makes any sense only if invalid ciphertexts result only from misuse. *)
-Program Definition decrypt (sk: sk_t) (c: ciphertext) : distr R message :=
+Definition decrypt (sk: sk_t) (c: ciphertext) : distr R message :=
   match c with
   | None => dnull
   | Some (_, e) =>
     \dlet_(m <- Scheme.decrypt sk c)
-    \dlet_(noise <- n_dg dim (dg_stdev e) _)
+    \dlet_(noise <- n_dg dim (dg_stdev e))
     dunit (inverse_isometry m (ivec_add noise (isometry m m)))
   end.
-Next Obligation.
-move => *; exact: gt0_dg_stdev.
-Defined.
 End NoiseFlooding.

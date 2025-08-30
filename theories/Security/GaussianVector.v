@@ -2,25 +2,22 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
   ssrnat ssreflect ssrfun ssrbool ssrnum eqtype choice seq.
 Set Warnings "notation-overridden,ambiguous-paths".
-
-From SSProve Require Import Axioms pkg_core_definition Package.
-
-From Mending Require Import ChoiceVector.
+From extructures Require Import ord fset fmap.
+From SSProve Require Import Axioms pkg_core_definition Package Prelude.
+From SSProve Require Import Adv NominalPrelude choice_type.
+From Mending Require Import ChoiceVector SspDG.
 
 Import PackageNotation.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
-From extructures Require Import ord fset fmap.
 
-From SSProve Require Import Adv.
+Check discrete_gaussians.
 
-From SSProve.Crypt Require Import Axioms Package Prelude.
-From SSProve Require Import NominalPrelude.
-From SSProve Require Import choice_type.
-
+(**
 Parameter n_dg' : forall (n : nat), R -> distr R (chVec 'int n).
 Definition add_chIntVec {n : nat} (v1 v2 : chVec 'int n) := v1.
 Parameter dg' : 'int -> R -> distr R 'int.
+*)
 
 Definition sample_gaussian_vector
     (dims: nat)
@@ -28,9 +25,8 @@ Definition sample_gaussian_vector
     (center : chVec 'int dims)
     : code emptym [interface] (chVec 'int dims) :=
   {code
-    let vt := chVec 'int dims in
-    n <$ (vt; n_dg' dims stdev) ;;
-    ret (add_chIntVec center n)
+    res <$ (chVec 'int dims; discrete_gaussians center stdev) ;;
+    ret res
   }.
 
 Fixpoint iterative_sample_gaussian_vector
@@ -43,7 +39,7 @@ Fixpoint iterative_sample_gaussian_vector
   let '(h, b) := center in
   {code
     xs ← iterative_sample_gaussian_vector i stdev b ;;
-    x <$ ('int; dg' h stdev) ;;
+    x <$ ('int; ssp_dg h stdev) ;;
     ret (x, xs)
   }
   end.
