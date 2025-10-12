@@ -11,8 +11,6 @@ Import PackageNotation.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
-Check discrete_gaussians.
-
 (**
 Parameter n_dg' : forall (n : nat), R -> distr R (chVec 'int n).
 Definition add_chIntVec {n : nat} (v1 v2 : chVec 'int n) := v1.
