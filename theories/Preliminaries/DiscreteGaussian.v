@@ -114,8 +114,6 @@ rewrite /max_step_ratio.
 (* do math *)
 Admitted.
 
-Check summable.
-
 Lemma summable_gaussian (s : R) :
   s > 0 -> summable (T := int) (gaussian s).
 Proof.

@@ -10,6 +10,8 @@ Local Open Scope seq_scope.
 
 Set Bullet Behavior "Strict Subproofs".
 
+(* SSProve compatible vectors *)
+
 Fixpoint chVec (t: choice_type) (n: nat) :=
   match n with
   | 0 => chUnit
@@ -50,3 +52,16 @@ elim: n v.
   exact: tuple0.
 - admit.
 Admitted.
+
+(* Non-uniform tuples *)
+Fixpoint nonuniform_vec {n : nat}
+  : n.-tuple choice_type -> choice_type :=
+match n with
+| 0 => fun _ => chUnit
+| S m => fun types => chProd (thead types) (nonuniform_vec (behead types))
+end.
+
+Program Definition nth_nonuniform_vec {dim : nat} {types : dim.-tuple choice_type}
+  (vec : nonuniform_vec types) (n : 'I_dim) (gt0_n : dim > 0) : (tnth types n).
+Admitted.
+
