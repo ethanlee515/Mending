@@ -29,27 +29,31 @@ Module IndCpad(Import S: ApproxFheScheme).
    * The parser can go eat it... *)
   Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
   Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
+  Notation " 'message " := message (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
   Notation " 'adv_ev1 " := (unary_gate × 'nat) (in custom pack_type at level 2).
+  Notation " 'unary_gate " := (unary_gate × 'nat) (in custom pack_type at level 2).
   Notation " 'adv_ev2 " := (binary_gate × 'nat × 'nat) (in custom pack_type at level 2).
   Notation " 'option_message " := (chOption message) (in custom pack_type at level 2).
 
+  Locate "#val".
+  Locate "#def".
+
   (* IND-CPA oracle interface *)
   Definition IndCpaOracle_t := package
-    (* No dependencies *)
     [interface]
-    (* public methods: two oracle calls *)
     [interface
-      #val #[get_keys] : 'unit → 'adv_keys ;
-      #val #[oracle_encrypt] : 'message_pair → 'ciphertext ;
+      (* #val #[get_keys] : 'unit → 'adv_keys ; *)
+      #val #[oracle_encrypt] : 'message × 'message → 'ciphertext ;
       #val #[oracle_eval1] : 'adv_ev1 → 'ciphertext ;
       #val #[oracle_eval2] : 'adv_ev2 → 'ciphertext ;
       #val #[oracle_decrypt] : 'nat → 'option_message
     ].
-  Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; sk_addr; ready_addr; table_addr].
+  Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; sk_addr; table_addr].
 
   Definition IndCpadOracle (max_queries: nat) (b: bool) : IndCpaOracle_t :=
     [package oracle_mem_spec ;
+    (**
       #def #[get_keys] (_: 'unit) : 'adv_keys
       {
         ready ← get ready_addr;;
@@ -62,10 +66,9 @@ Module IndCpad(Import S: ApproxFheScheme).
         #put sk_addr := sk ;;
         @ret (pk_t × evk_t) (pk, evk)
       } ;
+       **)
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
       {
-        ready ← get ready_addr ;;
-        #assert ready ;;
         let (m0, m1) := messages in
         let m := if b then m1 else m0 in
         pk ← get pk_addr ;;
@@ -78,8 +81,6 @@ Module IndCpad(Import S: ApproxFheScheme).
       } ; 
       #def #[oracle_eval1] (a : 'adv_ev1) : 'ciphertext
       {
-        ready ← get ready_addr ;;
-        #assert ready ;;
         let (gate, r) := a in
         table ← get table_addr ;;
         #assert (r < length table) as r_in_range ;;
@@ -95,8 +96,6 @@ Module IndCpad(Import S: ApproxFheScheme).
       } ;
       #def #[oracle_eval2] (a : 'adv_ev2) : 'ciphertext
       {
-        ready ← get ready_addr ;;
-        #assert ready ;;
         let '(gate, ri, rj) := a in
         table ← get table_addr ;;
         #assert (ri < length table) as ri_in_range ;;
@@ -114,8 +113,6 @@ Module IndCpad(Import S: ApproxFheScheme).
       } ;
       #def #[oracle_decrypt] (i: 'nat) : 'option_message
       {
-        ready ← get ready_addr ;;
-        #assert ready ;;
         table ← get table_addr ;;
         #assert (i < length table) as i_in_range ;;
         let '(m0, m1, c) := nth_valid table i i_in_range in
@@ -127,6 +124,27 @@ Module IndCpad(Import S: ApproxFheScheme).
           @ret ('option message) None
       }
     ].
+    
+  (* -- Adversary factorization -- *)
+  Definition FactoredAdversary_t := package
+    [interface]
+    [interface].
+
+  (**
+  (* IND-CPA oracle interface *)
+  Definition IndCpaOracle_t := package
+    (* No dependencies *)
+    [interface]
+    (* public methods: two oracle calls *)
+    [interface
+      #val #[get_keys] : 'unit → 'adv_keys ;
+      #val #[oracle_encrypt] : 'message_pair → 'ciphertext ;
+      #val #[oracle_eval1] : 'adv_ev1 → 'ciphertext ;
+      #val #[oracle_eval2] : 'adv_ev2 → 'ciphertext ;
+      #val #[oracle_decrypt] : 'nat → 'option_message
+    ].
+  **)
+  
 
 End IndCpad.
 

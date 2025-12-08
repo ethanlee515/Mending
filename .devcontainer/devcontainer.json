@@ -5,11 +5,11 @@
     "customizations": {
         "vscode": {
             "settings": {
-                "vscoq.path": "/home/opam/.opam/5.3/bin/vscoqtop",
+                "vsrocq.path": "/home/opam/.opam/5.4/bin/vsrocqtop",
                 "editor.colorDecorators": false
             },
             "extensions": [
-                "maximedenes.vscoq"
+                "rocq-prover.vsrocq"
             ]
         }
     }
