@@ -4,6 +4,7 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
+From SSProve Require Import NominalPrelude.
 From Mending Require Import ApproxFHE.
 
 Import PackageNotation.
@@ -13,13 +14,14 @@ Local Open Scope ring_scope.
 Module IndCpa(Import S: ApproxFheScheme).
   (* -- Variables and their addresses -- *)
   Definition pk_addr : Location := (100, pk_t).
-  Definition initialized : Location := (103, 'bool).
   (* Function labels *)
-  Definition get_keys : nat := 200.
-  Definition oracle_encrypt : nat := 201.
+  Definition oracle_encrypt : nat := 200.
+  Definition adv_set_keys : nat := 300.
+  Definition adv_guess : nat := 301.
+  Definition main : nat := 400.
   (* Some hack that makes the oracle compile.
    * The parser can go eat it... *)
-  (* Notation " 'keys " := (pk_t × evk_t × sk_t) (in custom pack_type at level 2). *)
+  Notation " 'pk_t " := pk_t (in custom pack_type at level 2).
   Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
   Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
@@ -28,36 +30,57 @@ Module IndCpa(Import S: ApproxFheScheme).
   Definition IndCpaOracle_t := package
     (* No dependencies *)
     [interface]
-    (* public methods: two oracle calls *)
+    (* oracle initialization and two oracle calls *)
     [interface
-      #val #[get_keys] : 'unit → 'adv_keys ;
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext
     ].
-  Definition oracle_mem_spec : Locations := [fmap pk_addr; initialized].
 
   Definition IndCpaOracle (b: bool) : IndCpaOracle_t :=
-    [package oracle_mem_spec ;
-      #def #[get_keys] (_: 'unit) : 'adv_keys
-      {
-        a ← get initialized ;;
-        #assert (~~a) ;;
-        #put initialized := true ;;
-        keys <$ (pk_t × evk_t × sk_t; keygen) ;;
-        let '(pk, evk, sk) := keys in
-        #put pk_addr := pk ;;
-        @ret (pk_t × evk_t) (pk, evk)
-      } ;
+    [package [fmap pk_addr] ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
       {
-        a ← get initialized ;;
-        #assert a ;;
         let (m0, m1) := messages in
         let m := if b then m1 else m0 in
         pk ← get pk_addr ;;
         c <$ (ciphertext; encrypt pk m) ;;
-        @ret ciphertext c
+        ret c
       }
     ].
+
+  Definition IndCpaAdv_t := package
+    [interface
+      #val #[oracle_encrypt] : 'message_pair → 'ciphertext
+    ]
+    [interface
+      #val #[adv_guess] : 'adv_keys → 'bool
+    ].
+
+  Definition IndCpaChallenger_t := package
+    [interface
+      #val #[adv_guess] : 'adv_keys → 'bool
+    ]
+    [interface
+      #val #[main] : 'unit → 'bool
+    ].
+
+  Definition IndCpaChallenger : IndCpaChallenger_t :=
+    [package [fmap pk_addr] ;
+      #def #[main] (_ : 'unit) : 'bool
+      {
+        keys <$ (pk_t × evk_t × sk_t; keygen) ;;
+        let '(pk, evk, sk) := keys in
+        #put pk_addr := pk ;;
+        b' ← call [ adv_guess ] : { pk_t × evk_t ~> 'bool} (pk, evk) ;;
+        ret true
+      }
+    ].
+  
+  Definition IndCpaGame (b : bool) (Adv: IndCpaAdv_t) :=
+    IndCpaChallenger ∘ Adv ∘ IndCpaOracle b .
+  
+  Definition winning_probability (Adv: IndCpaAdv_t) :=
+    `|Pr (IndCpaGame false Adv) true - 
+      Pr (IndCpaGame true Adv) true|.
 End IndCpa.
 
 Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
@@ -73,6 +96,6 @@ Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
     bool -> game crypto_assumption_oracles.
   Parameter security_loss : R.
   Axiom is_secure : forall A, exists Red,
-    Advantage IndCpaOracle A <=
+    winning_probability A <=
     Advantage crypto_assumption Red + security_loss.
 End IsIndCpa.

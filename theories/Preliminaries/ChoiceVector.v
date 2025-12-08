@@ -54,6 +54,7 @@ elim: n v.
 Admitted.
 
 (* Non-uniform tuples *)
+(*
 Fixpoint nonuniform_vec {n : nat}
   : n.-tuple choice_type -> choice_type :=
 match n with
@@ -64,4 +65,5 @@ end.
 Program Definition nth_nonuniform_vec {dim : nat} {types : dim.-tuple choice_type}
   (vec : nonuniform_vec types) (n : 'I_dim) (gt0_n : dim > 0) : (tnth types n).
 Admitted.
+*)
 

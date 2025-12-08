@@ -1,3 +1,4 @@
+From Stdlib Require Import Utf8 Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
@@ -18,81 +19,6 @@ Context (R: realType).
  * This requires first proving that the weight of the function is finite.
  * We will do so by showing that it is below a geometric distribution *)
 
-(**
-Definition geometric (r : R) (i : nat) : R := r ^ i.
-*)
-(**
-
-Lemma sum_geoE (r: R) (n : nat) :
-  r <> 1 ->
-  \sum_(i < n) (r ^ i) = (1 - r ^ n) / (1 - r).
-Proof.
-move => ne1_r.
-induction n as [|n IH].
-- rewrite big_ord0 /=.
-  rewrite expr0z /=.
-  by rewrite subrr mul0r.
-rewrite big_ord_recr /=.
-rewrite IH /geometric /=.
-rewrite exprSz.
-suff: r ^ n = (r ^ n) * (1 - r) / (1 - r).
-- lra.
-rewrite -mulrA mulrV.
-- by rewrite mulr1.
-- by rewrite unitfE; lra.
-Qed. 
-
-Lemma ge0_geo (r : R) (i : nat) :
-  r >= 0 ->
-  r ^ i >= 0.
-Proof.
-move => ge0_r.
-rewrite /geometric /=.
-exact: exprz_ge0.
-Qed.
-
-Lemma finite_sum_geoE (r : R) n :
-  r <> 1 -> 
-  \sum_(i < n) (r ^ i) = (1 - r ^ n) / (1 - r).
-Proof.
-move => ne1_r.
-induction n as [|n IH].
-- rewrite big_ord0.
-  lra.
-rewrite big_ord_recr /=.
-rewrite IH /geometric /=.
-clear IH.
-rewrite exprSz.
-suff: r ^ n = (r ^ n) * (1 - r) / (1 - r); first lra.
-rewrite -mulrA mulrV.
-- by rewrite mulr1.
-- by rewrite unitfE; lra.
-Qed.
-
-Lemma summable_geo (r : R) :
-  0 <= r < 1 ->
-  summable (fun i => r ^ i).
-Proof.
-move/andP => [ge0_r lt1_r].
-exists (1 / (1 - r)) => J.
-rewrite (eq_bigr (fun x => r ^ (\val x))); last first.
-- move => i _.
-  admit. (**
-  apply/normr_idP.
-  apply ge0_geo.
-  exact: ge0_geo.
-  *)
-(* Less than sum_geoE... *)
-pose n : nat := 10.
-apply: (le_trans (y := \sum_(i < n) (r ^ i))); last first.
-- rewrite finite_sum_geoE; last lra.
-  (* do math *)
-  admit.
-(* Nonsense with allowing negative domain... *)
-Check sub_le_big.
-Admitted.
-*)
-
 (* Unnormalized Gaussian function *)
 Definition gaussian (s : R) (x : int) : R :=
   expR (- (x%:~R / s) ^ 2 / 2).
@@ -106,12 +32,49 @@ Definition max_step_ratio (s : R) :=
 
 Definition geom_above (s : R) := geometric 1 (max_step_ratio s).
 
+(*
+Lemma le_real_int (a b : int) :
+  a <= b ->
+  a%:~R <= b%:~R.
+*)
+
 Lemma le_gauss_geo s x :
+  s > 0 ->
   gaussian s x <= geom_above s (absz x).
 Proof.
+move => gt0_s.
 rewrite /gaussian /geom_above -exprn_geometric.
 rewrite /max_step_ratio.
-(* do math *)
+rewrite /exprz /=.
+rewrite -expRM_natr.
+rewrite ler_expR /=.
+rewrite /expR.
+rewrite !GRing.expr2.
+have ->: - (1 / s * (1 / s)) / 2 = - (1 / (2 * s * s)) by lra.
+have ->: - (x%:~R / s * (x%:~R / s)) / 2 =  -(1 / (2 * s * s)) * x%:~R * x%:~R.
+- lra.
+rewrite -GRing.mulrA.
+rewrite ler_nM2l. {
+- rewrite /Num.norm /=.
+  Check absz_gt0.
+  Check leq_mul2r.
+  case: (x =P 0).
+  - by move => ?; subst => /=; nra.
+  - move => ne0_x.
+    have H: `|x| >= 1 by nia.
+    have ->: x%:~R * x%:~R = (x * x)%:~R.
+    + admit.
+    have ->: `|x|%:R = `|x|%:~R.
+    + admit.
+    rewrite ler_int.
+    nia.
+    suff: `|x| <= x * x.
+    + move => ?.
+    admit.
+}
+rewrite oppr_lt0 div1r invr_gt0.
+repeat (apply mulr_gt0 => //=).
+nia.
 Admitted.
 
 Lemma summable_gaussian (s : R) :
