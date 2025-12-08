@@ -3,8 +3,10 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
+From SSProve Require Import NominalPrelude.
 From Mending Require Import ApproxFHE ListExtras.
 From mathcomp Require Import seq.
+From Mending Require Import ApproxFHE.
 
 Import PackageNotation.
 Local Open Scope package_scope.
@@ -14,11 +16,10 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition challenger_table_row := message × message × ciphertext.
   Definition challenger_table := chList challenger_table_row.
   (* -- Variables and their addresses -- *)
-  Definition pk_addr : Location := (100, pk_t).
-  Definition evk_addr : Location := (101, evk_t).
-  Definition sk_addr : Location := (102, sk_t).
-  Definition ready_addr : Location := (103, 'bool).
-  Definition table_addr : Location := (104, challenger_table).
+  Definition pk_addr : Location := mkloc 100 (None : 'option pk_t).
+  Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
+  Definition sk_addr : Location := mkloc 102 (None : 'option sk_t).
+  Definition table_addr : Location := mkloc 104 (nil : challenger_table).
   (* Function labels *)
   Definition get_keys : nat := 200.
   Definition oracle_encrypt : nat := 201.
@@ -32,12 +33,8 @@ Module IndCpad(Import S: ApproxFheScheme).
   Notation " 'message " := message (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
   Notation " 'adv_ev1 " := (unary_gate × 'nat) (in custom pack_type at level 2).
-  Notation " 'unary_gate " := (unary_gate × 'nat) (in custom pack_type at level 2).
   Notation " 'adv_ev2 " := (binary_gate × 'nat × 'nat) (in custom pack_type at level 2).
   Notation " 'option_message " := (chOption message) (in custom pack_type at level 2).
-
-  Locate "#val".
-  Locate "#def".
 
   (* IND-CPA oracle interface *)
   Definition IndCpaOracle_t := package
@@ -71,7 +68,9 @@ Module IndCpad(Import S: ApproxFheScheme).
       {
         let (m0, m1) := messages in
         let m := if b then m1 else m0 in
-        pk ← get pk_addr ;;
+        o ← get pk_addr ;;
+        #assert isSome o as opk ;;
+        let pk := getSome o opk in
         c <$ (ciphertext; encrypt pk m) ;;
         table ← get table_addr ;;
         let updated_table := (table ++ [ :: (m0,m1, c)]) in
@@ -85,7 +84,9 @@ Module IndCpad(Import S: ApproxFheScheme).
         table ← get table_addr ;;
         #assert (r < length table) as r_in_range ;;
         let '(m0, m1, c) := nth_valid table r r_in_range in
-        evk ← get evk_addr ;;
+        o ← get evk_addr ;;
+        #assert isSome o as oevk ;;
+        let evk := getSome o oevk in
         let m0' := interpret_unary gate m0 in
         let m1' := interpret_unary gate m1 in
         c' <$ (ciphertext; eval1 evk gate c) ;;
@@ -104,7 +105,9 @@ Module IndCpad(Import S: ApproxFheScheme).
         let '(m0j, m1j, cj) := nth_valid table rj rj_in_range in
         let m0' := interpret_binary gate m0i m0j in
         let m1' := interpret_binary gate m1i m1j in
-        evk ← get evk_addr ;;
+        o ← get evk_addr ;;
+        #assert isSome o as oevk ;;
+        let evk := getSome o oevk in
         c' <$ (ciphertext; eval2 evk gate ci cj) ;;
         let updated_table := (table ++ [ :: (m0', m1', c')]) in
         #assert ((length updated_table) <= max_queries) ;;
@@ -117,7 +120,9 @@ Module IndCpad(Import S: ApproxFheScheme).
         #assert (i < length table) as i_in_range ;;
         let '(m0, m1, c) := nth_valid table i i_in_range in
         if m0 == m1 then
-          sk ← get sk_addr ;;
+          o ← get sk_addr ;;
+          #assert isSome o as osk ;;
+          let sk := getSome o osk in
           m <$ (message; decrypt sk c) ;;
           @ret ('option message) (Some m)
         else

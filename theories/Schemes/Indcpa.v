@@ -13,7 +13,7 @@ Local Open Scope ring_scope.
 
 Module IndCpa(Import S: ApproxFheScheme).
   (* -- Variables and their addresses -- *)
-  Definition pk_addr : Location := (100, pk_t).
+  Definition pk_addr : Location := mkloc 100 (None : 'option pk_t).
   (* Function labels *)
   Definition oracle_encrypt : nat := 200.
   Definition adv_set_keys : nat := 300.
@@ -41,7 +41,9 @@ Module IndCpa(Import S: ApproxFheScheme).
       {
         let (m0, m1) := messages in
         let m := if b then m1 else m0 in
-        pk ← get pk_addr ;;
+        o ← get pk_addr ;;
+        #assert isSome o as opk ;;
+        let pk := getSome o opk in
         c <$ (ciphertext; encrypt pk m) ;;
         ret c
       }
@@ -69,7 +71,7 @@ Module IndCpa(Import S: ApproxFheScheme).
       {
         keys <$ (pk_t × evk_t × sk_t; keygen) ;;
         let '(pk, evk, sk) := keys in
-        #put pk_addr := pk ;;
+        #put pk_addr := Some pk ;;
         b' ← call [ adv_guess ] : { pk_t × evk_t ~> 'bool} (pk, evk) ;;
         ret true
       }

@@ -68,13 +68,9 @@ rewrite ler_nM2l. {
     + admit.
     rewrite ler_int.
     nia.
-    suff: `|x| <= x * x.
-    + move => ?.
-    admit.
 }
 rewrite oppr_lt0 div1r invr_gt0.
 repeat (apply mulr_gt0 => //=).
-nia.
 Admitted.
 
 Lemma summable_gaussian (s : R) :

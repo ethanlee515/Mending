@@ -18,8 +18,8 @@ Definition upToBadJudgment
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
-  (pre : pred ((inL_t * heap_choiceType) * (inR_t * heap_choiceType)))
-  (post : pred ((outL_t * heap_choiceType) * (outR_t * heap_choiceType)))
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (post : pred ((outL_t * heap) * (outR_t * heap)))
   (ε : R) : Prop :=
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
     let out1 := Pr_code (progL xL) memL in

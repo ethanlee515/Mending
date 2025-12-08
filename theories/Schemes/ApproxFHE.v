@@ -2,13 +2,24 @@ From Stdlib Require Import Utf8 BinInt.
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
+From extructures Require Import ord fset fmap.
 From SSProve.Crypt Require Import Axioms Package Prelude.
+From SSProve Require Import NominalPrelude.
 From Mending Require Import IntVec.
 Import PackageNotation.
 Import Order.Theory.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
 Local Open Scope order_scope.
+
+Definition GETA := 50%N.
+Definition GETBC := 51%N.
+
+Definition I_LDDH :=
+  [interface
+    [ GETA  ] : { 'unit ~> 'nat } ;
+    [ GETBC ] : { 'unit ~> 'nat × 'nat }
+  ].
 
 Module Type ApproxFheScheme.
   Parameter pk_t : choice_type.
@@ -35,6 +46,64 @@ Module Type ApproxFheScheme.
   Parameter eval2 : evk_t → binary_gate → ciphertext → ciphertext →
     distr R ciphertext.
   Parameter decrypt : sk_t → ciphertext → distr R message.
+
+  Notation " 'pk_t " := pk_t (in custom pack_type at level 2).
+  Notation " 'evk_t " := evk_t (in custom pack_type at level 2).
+  Notation " 'sk_t " := sk_t (in custom pack_type at level 2).
+  Notation " 'message_t " := message (in custom pack_type at level 2).
+  Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
+  Notation " 'unary_gate " := unary_gate (in custom pack_type at level 2).
+  Notation " 'binary_gate " := binary_gate (in custom pack_type at level 2).
+
+  (*
+  (* function IDs *)
+  Definition keygen_l : nat := 100.
+  Definition enc_l := 101%N.
+  Definition eval1_l := 102%N.
+  Definition eval2_l := 103%N.
+  Definition dec_l := 104%N.
+
+  (* IND-CPA oracle interface *)
+  Definition Scheme_t := package
+    [interface]
+    [interface
+      [ keygen_l ] : { 'unit ~> (pk_t × evk_t) × sk_t} ;
+      [ enc_l ] : { pk_t × message ~> ciphertext } ;
+      [ eval1_l ] : { (evk_t × unary_gate) × ciphertext ~> ciphertext } ;
+      [ eval2_l ] : { ((evk_t × binary_gate) × ciphertext) × ciphertext ~> ciphertext } ;
+      [ dec_l ] : { sk_t × ciphertext ~> message }
+    ].
+
+  Definition Scheme : Scheme_t := [package emptym ;
+    #def #[keygen_l] (_: 'unit) : ('pk_t × 'evk_t) × 'sk_t
+    {
+      keys <$ ((pk_t × evk_t) × sk_t ; keygen) ;;
+      let '(pk, evk, sk) := keys in
+      ret (pk, evk, sk)
+    } ;
+    #def #[enc_l] ('(pk, m) : ('pk_t × 'message_t)) : 'ciphertext
+    {
+      c <$ (ciphertext; encrypt pk m) ;;
+      ret c
+    } ;
+    #def #[eval1_l] ('(evk, g, c) : (('evk_t × 'unary_gate) × 'ciphertext)) : 'ciphertext
+    {
+      c' <$ (ciphertext; eval1 evk g c) ;;
+      ret c'
+    } ;
+    #def #[eval2_l] ('(evk, g, c1, c2) : (('evk_t × 'binary_gate) × 'ciphertext) × 'ciphertext) : 'ciphertext
+    {
+      c <$ (ciphertext; eval2 evk g c1 c2) ;;
+      ret c
+    } ;
+    #def #[dec_l] ('(sk, c) : 'sk_t ×'ciphertext) : 'message_t
+    {
+      m <$ (message; decrypt sk c) ;;
+      ret m
+    }
+  ].
+  *)
+
 End ApproxFheScheme.
 
 (* To talk about correctness, we need a metric. *)
@@ -68,7 +137,7 @@ Module Type ApproxCorrectness (Import Scheme: ApproxFheScheme) (Import M: Approx
   Parameter (dec' : sk_t → ciphertext → message).
   (* We require consistency later with the given scheme. *)
   Axiom dec'_correct :
-    ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => dec_out == dec' sk c) = 1.
+    ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => ((dec_out == (dec' sk c)) : bool)) = 1.
   (* Catch-all error probability for any step going wrong.
    * Should be negligible. *)
   Parameter (p_gate_error : R).

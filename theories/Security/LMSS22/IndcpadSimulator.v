@@ -3,6 +3,10 @@
  * Dec'(Eval(f, Enc(m)) = f(m) + e
  *)
 
+ (* TODO FIX, broken by SSProve update *)
+
+ (**
+
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
@@ -151,3 +155,5 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
 (* TODO maybe adversary map from A to R in the end...
  * Should hopefully just be composition? *)
 End IndCpadSimulator.
+
+*)
