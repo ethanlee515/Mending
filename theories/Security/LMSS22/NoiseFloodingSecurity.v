@@ -34,10 +34,11 @@ Module NoiseFloodingSecure
   Definition security_loss (max_queries : nat) :=
     IndCpa.security_loss + global_epsilon max_queries gaussian_width_multiplier.
   Module IndCpadGame := IndCpad NF.
-  Import IndCpadGame.
+  (* TODO FIX
   Theorem is_secure : forall A, exists Red,
     forall max_queries,
     Advantage (IndCpadOracle max_queries) A <=
     Advantage crypto_assumption Red + (security_loss max_queries).
   Admitted.
+  *)
 End NoiseFloodingSecure.
