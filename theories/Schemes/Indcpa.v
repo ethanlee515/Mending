@@ -76,13 +76,15 @@ Module IndCpa(Import S: ApproxFheScheme).
         ret true
       }
     ].
-  
+
   Definition IndCpaGame (b : bool) (Adv: IndCpaAdv_t) :=
     IndCpaChallenger ∘ Adv ∘ IndCpaOracle b .
   
+  Definition game_out (b : bool) (Adv: IndCpaAdv_t) : distr R bool :=
+    dfst (Pr_op (IndCpaGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
+
   Definition winning_probability (Adv: IndCpaAdv_t) :=
-    `|Pr (IndCpaGame false Adv) true - 
-      Pr (IndCpaGame true Adv) true|.
+    `|(game_out false Adv) true - (game_out true Adv) true|.
 End IndCpa.
 
 Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
