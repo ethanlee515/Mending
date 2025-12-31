@@ -5,7 +5,6 @@
 
  (* TODO FIX, broken by SSProve update *)
 
- (**
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
@@ -36,10 +35,10 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   (* Copied from oracle *)
   Definition simulator_table_row := message × message × ciphertext.
   Definition simulator_table := chList simulator_table_row.
-  Definition pk_addr : Location := (100, pk_t).
-  Definition evk_addr : Location := (101, evk_t).
-  Definition ready_addr : Location := (103, 'bool).
-  Definition table_addr : Location := (104, simulator_table).
+  Definition pk_addr : Location := mkloc 100 (None : 'option pk_t).
+  Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
+  Definition ready_addr : Location := mkloc 103 (false : 'bool).
+  Definition table_addr : Location := mkloc 104 (nil : simulator_table).
   Definition get_keys : nat := 200.
   Definition oracle_encrypt : nat := 201.
   Definition oracle_eval1 : nat := 202.
@@ -85,7 +84,7 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
         '(pk, evk) ← call [ get_keys ] : { 'unit ~> adv_keys} tt ;;
         keys <$ (pk_t × evk_t × sk_t; keygen) ;;
         let '(pk, evk, sk) := keys in
-        #put evk_addr := evk ;;
+        #put evk_addr := Some evk ;;
         @ret (pk_t × evk_t) (pk, evk)
       } ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
@@ -108,7 +107,9 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
         table ← get table_addr ;;
         #assert (r < length table) as r_in_range ;;
         let '(m0, m1, c) := nth_valid table r r_in_range in
-        evk ← get evk_addr ;;
+        o ← get evk_addr ;;
+        #assert isSome o as oevk ;;
+        let evk := getSome o oevk in
         let m0' := interpret_unary gate m0 in
         c' <$ (ciphertext; eval1 evk gate c) ;;
         let updated_table := (table ++ [ :: (m0', m1, c')]) in
@@ -127,7 +128,9 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
         let '(m0i, m1i, ci) := nth_valid table ri ri_in_range in
         let '(m0j, m1j, cj) := nth_valid table rj rj_in_range in
         let m0' := interpret_binary gate m0i m0j in
-        evk ← get evk_addr ;;
+        o ← get evk_addr ;;
+        #assert isSome o as oevk ;;
+        let evk := getSome o oevk in
         c' <$ (ciphertext; eval2 evk gate ci cj) ;;
         let updated_table := (table ++ [ :: (m0', m1i, c')]) in
         #assert ((length updated_table) <= max_queries) ;;
@@ -142,8 +145,8 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
         #assert (i < length table) as i_in_range ;;
         let '(m0, m1, c) := nth_valid table i i_in_range in
         if (m0 == m1) then
-          #assert (c != None) as c_valid ;;
-          let '(_, error_bound) := oget_valid (c: ciphertext) c_valid in
+          #assert isSome c as c_valid ;;
+          let '(_, error_bound) := getSome c c_valid in
           noise <$ (chVec 'int dim; noise_distr error_bound) ;;
           let res := inverse_isometry m0 (ivec_add (toIntVec noise) (isometry m0 m0)) in
           @ret ('option message) (Some res)
@@ -156,4 +159,3 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
  * Should hopefully just be composition? *)
 End IndCpadSimulator.
 
-*)

@@ -12,14 +12,12 @@ Local Open Scope package_scope.
 Local Open Scope ring_scope.
 Local Open Scope order_scope.
 
-Definition GETA := 50%N.
-Definition GETBC := 51%N.
-
-Definition I_LDDH :=
-  [interface
-    [ GETA  ] : { 'unit ~> 'nat } ;
-    [ GETBC ] : { 'unit ~> 'nat × 'nat }
-  ].
+(* function IDs *)
+Definition keygen_l : nat := 100.
+Definition enc_l := 101%N.
+Definition eval1_l := 102%N.
+Definition eval2_l := 103%N.
+Definition dec_l := 104%N.
 
 Module Type ApproxFheScheme.
   Parameter pk_t : choice_type.
@@ -54,14 +52,6 @@ Module Type ApproxFheScheme.
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
   Notation " 'unary_gate " := unary_gate (in custom pack_type at level 2).
   Notation " 'binary_gate " := binary_gate (in custom pack_type at level 2).
-
-  (*
-  (* function IDs *)
-  Definition keygen_l : nat := 100.
-  Definition enc_l := 101%N.
-  Definition eval1_l := 102%N.
-  Definition eval2_l := 103%N.
-  Definition dec_l := 104%N.
 
   (* IND-CPA oracle interface *)
   Definition Scheme_t := package
@@ -102,7 +92,6 @@ Module Type ApproxFheScheme.
       ret m
     }
   ].
-  *)
 
 End ApproxFheScheme.
 

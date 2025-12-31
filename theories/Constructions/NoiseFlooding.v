@@ -6,7 +6,9 @@ From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From Mending Require Import ApproxFHE IntVec Indcpa Indcpad DTuple DiscreteGaussian.
-
+From extructures Require Import ord fset fmap.
+Import PackageNotation.
+Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
 Definition n_dg (n : nat) (s : R) : distr R (n.-tuple int) :=
@@ -26,6 +28,7 @@ Module NoiseFlooding
 Definition pk_t := Scheme.pk_t.
 Definition evk_t := Scheme.evk_t.
 Definition sk_t := Scheme.sk_t.
+Definition Scheme_t := Scheme.Scheme_t.
 Definition message := Scheme.message.
 Definition encryption := Scheme.encryption.
 Definition ciphertext := Scheme.ciphertext.
@@ -50,4 +53,34 @@ Definition decrypt (sk: sk_t) (c: ciphertext) : distr R message :=
     \dlet_(noise <- n_dg dim (dg_stdev e))
     dunit (inverse_isometry m (ivec_add noise (isometry m m)))
   end.
+
+  Definition Scheme : Scheme_t := [package emptym ;
+    #def #[keygen_l] (_: 'unit) : ('pk_t × 'evk_t) × 'sk_t
+    {
+      keys <$ ((pk_t × evk_t) × sk_t ; keygen) ;;
+      let '(pk, evk, sk) := keys in
+      ret (pk, evk, sk)
+    } ;
+    #def #[enc_l] ('(pk, m) : ('pk_t × 'message_t)) : 'ciphertext
+    {
+      c <$ (ciphertext; encrypt pk m) ;;
+      ret c
+    } ;
+    #def #[eval1_l] ('(evk, g, c) : (('evk_t × 'unary_gate) × 'ciphertext)) : 'ciphertext
+    {
+      c' <$ (ciphertext; eval1 evk g c) ;;
+      ret c'
+    } ;
+    #def #[eval2_l] ('(evk, g, c1, c2) : (('evk_t × 'binary_gate) × 'ciphertext) × 'ciphertext) : 'ciphertext
+    {
+      c <$ (ciphertext; eval2 evk g c1 c2) ;;
+      ret c
+    } ;
+    #def #[dec_l] ('(sk, c) : 'sk_t ×'ciphertext) : 'message_t
+    {
+      m <$ (message; decrypt sk c) ;;
+      ret m
+    }
+  ].
+
 End NoiseFlooding.

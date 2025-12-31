@@ -26,18 +26,9 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition oracle_eval1 : nat := 202.
   Definition oracle_eval2 : nat := 203.
   Definition oracle_decrypt : nat := 204.
-  (* Some hack that makes the oracle compile.
-   * The parser can go eat it... *)
-  Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
-  Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
+
   Notation " 'message " := message (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
-
-  (*
-  Notation " 'adv_ev1 " := (unary_gate × 'nat) (in custom pack_type at level 2).
-  Notation " 'adv_ev2 " := (binary_gate × 'nat × 'nat) (in custom pack_type at level 2).
-  Notation " 'option_message " := (chOption message) (in custom pack_type at level 2).
-  *)
 
   (* IND-CPA oracle interface *)
   Definition IndCpaOracle_t := package
@@ -139,38 +130,22 @@ Module IndCpad(Import S: ApproxFheScheme).
     ]
     [interface
       [guess] : { 'unit ~> 'bool }
-
     ].
 
-  Check for_loop.
-  Locate for_loop.
-
-  Definition AdvTop : AdvTop_t :=
+  Definition AdvTop (num_dec_queries : nat) : AdvTop_t :=
     [package emptym ;
       #def #[guess] (a : 'unit ) : 'bool
       {
-
-        b ← call [ guess ] : { 'unit ~> 'bool} (tt) ;;
+        for_loop (fun _ =>
+          i ← call [ send_next_input ] : { 'unit ~> 'nat } tt ;;
+          o ← call [ oracle_decrypt ] : { 'nat ~> 'option message } i ;;
+          _ ← call [ receive_output ] : { 'option message ~> 'unit } o ;;
+          ret tt
+        ) num_dec_queries ;;
+        b ← call [ guess ] : { 'unit ~> 'bool} tt ;;
         ret b
       }
     ].
-
-  (**
-  (* IND-CPA oracle interface *)
-  Definition IndCpaOracle_t := package
-    (* No dependencies *)
-    [interface]
-    (* public methods: two oracle calls *)
-    [interface
-      #val #[get_keys] : 'unit → 'adv_keys ;
-      #val #[oracle_encrypt] : 'message_pair → 'ciphertext ;
-      #val #[oracle_eval1] : 'adv_ev1 → 'ciphertext ;
-      #val #[oracle_eval2] : 'adv_ev2 → 'ciphertext ;
-      #val #[oracle_decrypt] : 'nat → 'option_message
-    ].
-  **)
-  
-
 End IndCpad.
 
 Local Open Scope ring_scope.
@@ -186,7 +161,7 @@ Module Type IsIndCpad(Import Scheme: ApproxFheScheme).
   (*
   Axiom is_secure : forall A, exists Red,
     forall max_queries,
-    Advantage (IndCpadOracle max_queries) A <=
+    Advantage (IndCpadOracle) A <=
     Advantage crypto_assumption Red + (security_loss max_queries).
     *)
 End IsIndCpad.
