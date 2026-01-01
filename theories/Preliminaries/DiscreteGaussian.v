@@ -65,9 +65,6 @@ Fixpoint max_nat_lst (s : list nat) : nat :=
   | head :: tail => max head (max_nat_lst tail)
   end.
 
-Definition max_nat_fset (s : {fset nat}) : nat :=
-  max_nat_lst (enum_fset s).
-
 Definition compl (s : seq nat) (n : nat) : seq nat :=
   filter (fun x => x \notin s) (index_iota 0 n).
 
@@ -103,10 +100,13 @@ Lemma ge0_bigsum (s : seq nat) (f : nat -> R) :
   (forall (x : nat), f x >= 0) ->
   \sum_(x <- s) (f x) >= 0.
 Proof.
-  move => H.
-  induction s.
-  Check leq_sum.
-Admitted.
+move => H.
+induction s.
+- rewrite big_nil; lra.
+rewrite big_cons.
+suff: 0 <= f a by lra.
+apply H.
+Qed.
 
 Lemma summable_geo (r : R) :
   0 <= r < 1 ->
@@ -127,7 +127,8 @@ have uniq_s : uniq s. {
 have ->: \sum_(i <- index_enum J) geometric 1 r (\val i) =
   \sum_(i <- s) geometric 1 r i.
 - by rewrite big_map.
-apply: (le_trans (y := \sum_(0 <= i < S (max_nat_lst s)) (geometric 1 r i))); last first. {
+apply: (le_trans (y := \sum_(0 <= i < S (max_nat_lst s)) (geometric 1 r i)));
+  last first. {
   rewrite big_mkord.
   rewrite finite_sum_geoE; last lra.
   suff: r ^ (S (max_nat_lst s)) / (1 - r) >= 0 by lra.
@@ -178,6 +179,12 @@ rewrite oppr_lt0 div1r invr_gt0.
 repeat (apply mulr_gt0 => //=).
 Qed.
 
+Lemma mirror_summable (f : nat -> R) :
+  summable f ->
+  summable (fun (x : int) => f (absz x)).
+Proof.
+Admitted.
+
 Lemma summable_gaussian (s : R) :
   s > 0 -> summable (T := int) (gaussian s).
 Proof.
@@ -188,8 +195,9 @@ Proof.
     + exact: ge0_gaussian.
     + exact: le_gauss_geo.
   - rewrite /geom_above.
-    (* TODO nat vs int nonsense... *)
-    (* apply: summable_geo. *)
+    apply mirror_summable.
+    apply summable_geo.
+    rewrite /max_step_ratio /=.
     admit.
 Admitted.
 
