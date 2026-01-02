@@ -12,7 +12,6 @@ From mathcomp.algebra_tactics Require Import ring.
 Local Open Scope fset_scope.
 Local Open Scope ring_scope.
 
-
 Section DiscreteGaussian.
 
 Context (R: realType).
@@ -65,15 +64,95 @@ Fixpoint max_nat_lst (s : list nat) : nat :=
   | head :: tail => max head (max_nat_lst tail)
   end.
 
+Lemma max_nat_lst_correct (s : list nat) (x : nat) :
+  x \in s -> leq x (max_nat_lst s).
+Proof.
+move => mem_x.
+induction s.
+- by rewrite in_nil in mem_x.
+rewrite in_cons in mem_x.
+rewrite /=.
+case/orP: mem_x => mem_x; first lia.
+suff: (x <= (max_nat_lst s))%N by lia.
+exact: IHs.
+Qed.
+
 Definition compl (s : seq nat) (n : nat) : seq nat :=
   filter (fun x => x \notin s) (index_iota 0 n).
+
+Lemma perm_eq_double_containment (s1 s2 : seq nat) :
+  uniq s1 ->
+  uniq s2 ->
+  {subset s1 <= s2} ->
+  {subset s2 <= s1} ->
+  perm_eq s1 s2.
+Proof.
+move => uniq_s1 uniq_s2 sub_s1_s2 sub_s2_s1.
+apply: uniq_perm => //.
+apply uniq_min_size => //.
+exact: uniq_leq_size.
+Qed.
+
+Lemma uniq_cat_with_compl s :
+  uniq s ->
+  uniq (s ++ compl s (S (max_nat_lst s))).
+Proof.
+move => uniq_s.
+rewrite cat_uniq /=.
+apply/andP; split => //=.
+apply/andP; split => //=; last first.
+- rewrite /compl.
+  apply filter_uniq.
+  exact: iota_uniq.
+apply /hasP.
+apply boolp.forallPNP => x.
+suff: x \in s -> ¬ (x \in compl s (S (max_nat_lst s))) by tauto.
+move => mem_x.
+by rewrite mem_filter mem_x.
+Qed.
+
+Lemma subset_iota_complcat (s : seq nat) :
+  uniq s ->
+  let n := S (max_nat_lst s) in
+  {subset (index_iota 0 n) <= (s ++ compl s n)}.
+Proof.
+move => /= uniq_s.
+rewrite /sub_mem => x /=.
+rewrite mem_index_iota => bounds_x.
+rewrite mem_cat.
+case H: (x \in s) => //=.
+by rewrite /compl mem_filter H mem_iota.
+Qed.
+
+Lemma subset_complcat_iota (s : seq nat) :
+  uniq s ->
+  let n := S (max_nat_lst s) in
+  {subset (s ++ compl s n) <= (index_iota 0 n)}.
+Proof.
+move => /= uniq_s.
+rewrite /sub_mem => x /=.
+rewrite mem_cat.
+move => H.
+case/orP: H => mem_x.
+- rewrite mem_index_iota.
+  apply/andP; split => //.
+  exact: max_nat_lst_correct.
+- rewrite /compl mem_filter in mem_x.
+  by move/andP: mem_x => [??].
+Qed.
 
 Lemma compl_cat (s : seq nat) :
   uniq s ->
   let n := S (max_nat_lst s) in
   perm_eq (index_iota 0 n) (s ++ compl s n).
 Proof.
-Admitted.
+move => uniq_s /=.
+apply perm_eq_double_containment.
+- apply iota_uniq.
+- exact: uniq_cat_with_compl.
+- exact: subset_iota_complcat.
+- exact: subset_complcat_iota.
+Qed.
 
 Lemma split_domain s (f : nat -> R) :
   uniq s ->
@@ -183,38 +262,144 @@ Lemma mirror_summable (f : nat -> R) :
   summable f ->
   summable (fun (x : int) => f (absz x)).
 Proof.
-Admitted.
+move => summable_f.
+rewrite summable_seqP /= in summable_f.
+move:summable_f => [M ge0_M] summable_f.
+apply summable_seqP; exists (2 * M) => /=; first lra.
+move => J uniq_J.
+pose posJ := [seq x <- J | 0 <= x].
+pose negJ := filter (predC (Order.le 0)) J.
+rewrite (perm_big (posJ ++ negJ)) /=; last first.
+- rewrite perm_sym.
+  apply permEl.
+  exact: perm_filterC.
+rewrite big_cat /=.
+have H (a b : R): (a <= M) -> (b <= M) -> (a + b <= 2 * M) by lra.
+apply H; clear H.
+- rewrite -(big_map absz predT (fun u => `|f `|u|%N|)) /=.
+  apply summable_f.
+  rewrite map_inj_in_uniq.
+  + rewrite /posJ.
+    exact: filter_uniq. 
+  move => x y mem_x mem_y eq_abs_xy.
+  rewrite mem_filter in mem_x.
+  rewrite mem_filter in mem_y.
+  lia.
+- rewrite -(big_map absz predT (fun u => `|f `|u|%N|)) /=.
+  apply summable_f.
+  rewrite map_inj_in_uniq.
+  + rewrite /negJ.
+    exact: filter_uniq. 
+  move => x y mem_x mem_y eq_abs_xy.
+  rewrite mem_filter /predC /= in mem_x.
+  rewrite mem_filter /predC /= in mem_y.
+  lia.
+Qed.
 
 Lemma summable_gaussian (s : R) :
   s > 0 -> summable (T := int) (gaussian s).
 Proof.
-  move => gt0_s.
-  apply: (le_summable (T := int) (F2 := fun x => geom_above s (absz x))).
-  - move => x.
-    apply/andP; split.
-    + exact: ge0_gaussian.
-    + exact: le_gauss_geo.
-  - rewrite /geom_above.
-    apply mirror_summable.
-    apply summable_geo.
-    rewrite /max_step_ratio /=.
-    admit.
-Admitted.
+move => gt0_s.
+apply: (le_summable (T := int) (F2 := fun x => geom_above s (absz x))).
+- move => x.
+  apply/andP; split.
+  + exact: ge0_gaussian.
+  + exact: le_gauss_geo.
+- rewrite /geom_above.
+  apply mirror_summable.
+  apply summable_geo.
+  rewrite /max_step_ratio /=.
+  apply/andP; split.
+  + apply expR_ge0.
+  rewrite expR_lt1.
+  suff: (1 / s) ^ 2 > 0 by lra.
+  rewrite /exprz /= expr2.
+  have H: (1 / s > 0) by exact: divr_gt0.
+  exact: mulr_gt0.
+Qed.
 
 (* Works "as expected" if s > 0.
  * null distribution otherwise. *)
-Definition gaussian_pdf (s : R) (x : int) :=
+Definition gaussian_pdf (s : R) (x : int) : R :=
   if s > 0 then
     gaussian s x / sum (gaussian s)
   else 0.
 
+Lemma gt0_weight_gaussian s :
+  s > 0 ->
+  sum (gaussian s) > 0.
+Proof.
+move => gt0_s.
+rewrite -psum_sum; last first.
+- move => x.
+  exact: ge0_gaussian.
+have H (b a c : R): a < b <= c -> a < c by lra.
+pose J : {fset int} := [fset 0].
+apply (H (\sum_(i : J) (gaussian s (val i)))).
+apply/andP; split.
+- rewrite big_fset1 /gaussian /=.
+  exact: expR_gt0.
+rewrite (eq_bigr (F1 := _)
+  ((fun i => `|gaussian s (val i)|))); first last.
+- move => i _.
+  symmetry.
+  apply ger0_norm.
+  exact: ge0_gaussian.
+apply (gerfin_psum J (S := gaussian s)).
+exact: summable_gaussian.
+Qed.
+
 Lemma isdistr_gaussian (s : R) :
   isdistr (gaussian_pdf s).
 Proof.
-  case H: (s < 0).
-  - admit.
-  - rewrite /gaussian_pdf.
-Admitted.
+case H: (s <= 0).
+- have H' (m : int -> R) : (m = mnull) -> isdistr m.
+  + by move => ->; exact isd_mnull.
+  rewrite /gaussian_pdf. 
+  apply H'.
+  apply boolp.funext => x.
+  by rewrite ifF //; lra.
+rewrite /gaussian_pdf.
+split => //=.
+- move => x.
+  rewrite ifT; last lra.
+  apply divr_ge0.
+  + exact: ge0_gaussian.
+  + suff: 0 < sum (gaussian s) by lra.
+    by apply gt0_weight_gaussian; lra.
+move => J uniq_J.
+rewrite (eq_bigr (F1 := _)
+  ((fun i => (1 / sum (gaussian s)) * (gaussian s) i))); first last.
++ move => i _.
+  by rewrite ifT; lra.
+rewrite -big_distrr.
+have H' (b a : R) : a = b -> b <= 1 -> a <= 1 by lra.
+apply (H' ((1 / sum (gaussian s)) * \sum_(i <- J) (gaussian s i))).
++ by trivial.
+clear H'.
+have H' (a b : R) : a <> 0 -> (1 / a) * b = b / a.
++ by lra.
+rewrite H'; last first.
++ suff: sum (gaussian s) > 0 by lra.
+  apply gt0_weight_gaussian.
+  lra.
+clear H'.
+rewrite ler_pdivrMr; last first.
++ by apply gt0_weight_gaussian; lra.
+rewrite -psum_sum; last first.
++ move => x.
+  exact: ge0_gaussian.
+rewrite mul1r.
+rewrite (eq_bigr (F1 := _)
+  (fun i => `|gaussian s i|)); first last.
++ move => i _.
+  symmetry.
+  apply ger0_norm.
+  apply ge0_gaussian.
+apply ger_big_psum => //.
+apply summable_gaussian.
+lra.
+Qed.
 
 Definition centered_discrete_gaussian s : distr R int :=
   mkdistr (isdistr_gaussian s).
