@@ -184,11 +184,11 @@ Qed.
 
 Theorem kl_discrete_gaussian_integer_centered mu nu s :
   s > 0 ->
-  kl_divergence (discrete_gaussian R mu s) (discrete_gaussian R nu s) =
+  δ_KL (discrete_gaussian R mu s) (discrete_gaussian R nu s) =
     ((nu - mu)%:~R) ^+ 2 / (2 * s ^ 2).
 Proof.
 move=> gt0_s.
-rewrite /kl_divergence.
+rewrite /δ_KL.
 rewrite (expectation_ext (discrete_gaussian R mu s)
   (fun x => ln (discrete_gaussian R mu s x / discrete_gaussian R nu s x))
   (fun x => quadratic_gap mu nu x / (2 * s ^ 2))); last first.
