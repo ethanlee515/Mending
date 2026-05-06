@@ -1,13 +1,16 @@
 From Stdlib Require Import Utf8 Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import ssreflect ssrbool eqtype ssrnat seq choice fintype bigop order all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
+Set Warnings "-notation-incompatible-prefix".
 From mathcomp Require Import xfinmap.
+Set Warnings "notation-incompatible-prefix".
 From mathcomp Require Import lra.
 Import GRing.Theory Num.Theory Order.Theory.
 From Stdlib Require Import Ring.
 From mathcomp.algebra_tactics Require Import ring.
+From Mending Require Import RealSumExtras.
 
 Local Open Scope fset_scope.
 Local Open Scope ring_scope.
@@ -58,135 +61,6 @@ rewrite -mulrA mulrV.
 - by rewrite unitfE; lra.
 Qed.
 
-Fixpoint max_nat_lst (s : list nat) : nat :=
-  match s with
-  | nil => 0
-  | head :: tail => max head (max_nat_lst tail)
-  end.
-
-Lemma max_nat_lst_correct (s : list nat) (x : nat) :
-  x \in s -> leq x (max_nat_lst s).
-Proof.
-move => mem_x.
-induction s.
-- by rewrite in_nil in mem_x.
-rewrite in_cons in mem_x.
-rewrite /=.
-case/orP: mem_x => mem_x; first lia.
-suff: (x <= (max_nat_lst s))%N by lia.
-exact: IHs.
-Qed.
-
-Definition compl (s : seq nat) (n : nat) : seq nat :=
-  filter (fun x => x \notin s) (index_iota 0 n).
-
-Lemma perm_eq_double_containment (s1 s2 : seq nat) :
-  uniq s1 ->
-  uniq s2 ->
-  {subset s1 <= s2} ->
-  {subset s2 <= s1} ->
-  perm_eq s1 s2.
-Proof.
-move => uniq_s1 uniq_s2 sub_s1_s2 sub_s2_s1.
-apply: uniq_perm => //.
-apply uniq_min_size => //.
-exact: uniq_leq_size.
-Qed.
-
-Lemma uniq_cat_with_compl s :
-  uniq s ->
-  uniq (s ++ compl s (S (max_nat_lst s))).
-Proof.
-move => uniq_s.
-rewrite cat_uniq /=.
-apply/andP; split => //=.
-apply/andP; split => //=; last first.
-- rewrite /compl.
-  apply filter_uniq.
-  exact: iota_uniq.
-apply /hasP.
-apply boolp.forallPNP => x.
-suff: x \in s -> ¬ (x \in compl s (S (max_nat_lst s))) by tauto.
-move => mem_x.
-by rewrite mem_filter mem_x.
-Qed.
-
-Lemma subset_iota_complcat (s : seq nat) :
-  uniq s ->
-  let n := S (max_nat_lst s) in
-  {subset (index_iota 0 n) <= (s ++ compl s n)}.
-Proof.
-move => /= uniq_s.
-rewrite /sub_mem => x /=.
-rewrite mem_index_iota => bounds_x.
-rewrite mem_cat.
-case H: (x \in s) => //=.
-by rewrite /compl mem_filter H mem_iota.
-Qed.
-
-Lemma subset_complcat_iota (s : seq nat) :
-  uniq s ->
-  let n := S (max_nat_lst s) in
-  {subset (s ++ compl s n) <= (index_iota 0 n)}.
-Proof.
-move => /= uniq_s.
-rewrite /sub_mem => x /=.
-rewrite mem_cat.
-move => H.
-case/orP: H => mem_x.
-- rewrite mem_index_iota.
-  apply/andP; split => //.
-  exact: max_nat_lst_correct.
-- rewrite /compl mem_filter in mem_x.
-  by move/andP: mem_x => [??].
-Qed.
-
-Lemma compl_cat (s : seq nat) :
-  uniq s ->
-  let n := S (max_nat_lst s) in
-  perm_eq (index_iota 0 n) (s ++ compl s n).
-Proof.
-move => uniq_s /=.
-apply perm_eq_double_containment.
-- apply iota_uniq.
-- exact: uniq_cat_with_compl.
-- exact: subset_iota_complcat.
-- exact: subset_complcat_iota.
-Qed.
-
-Lemma split_domain s (f : nat -> R) :
-  uniq s ->
-  let n := S (max_nat_lst s) in
-  \sum_(0 <= i < n) (f i) =
-  \sum_(i <- s ++ compl s n) (f i).
-Proof.
-move => uniq_s.
-apply perm_big.
-exact:compl_cat.
-Qed.
-
-Lemma split_sum (s : seq nat) (f : nat -> R) :
-  uniq s ->
-  let n := S (max_nat_lst s) in
-  \sum_(0 <= i < n) (f i) =
-  \sum_(j <- s) (f j) + \sum_(k <- compl s n) (f k).
-Proof.
-move => uniq_s /=.
-by rewrite split_domain // big_cat.
-Qed.
-
-Lemma ge0_bigsum (s : seq nat) (f : nat -> R) :
-  (forall (x : nat), f x >= 0) ->
-  \sum_(x <- s) (f x) >= 0.
-Proof.
-move => H.
-induction s.
-- rewrite big_nil; lra.
-rewrite big_cons.
-suff: 0 <= f a by lra.
-apply H.
-Qed.
-
 Lemma summable_geo (r : R) :
   0 <= r < 1 ->
   summable (geometric 1 r).
@@ -215,7 +89,7 @@ apply: (le_trans (y := \sum_(0 <= i < S (max_nat_lst s)) (geometric 1 r i)));
   + by apply exprz_ge0.
   + lra.
 }
-rewrite (split_sum s) //.
+rewrite (split_sum R s) //.
 suff: \sum_(k <- compl s (max_nat_lst s).+1)  geometric 1 r k >= 0 by lra.
 apply ge0_bigsum.
 move => x.
