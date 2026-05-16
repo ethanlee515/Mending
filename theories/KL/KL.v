@@ -1,9 +1,12 @@
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra all_reals distr.
 From mathcomp Require Import realseq realsum exp.
+From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending Require Import DistrExtras.
+
+Import GRing.Theory Num.Theory Order.Theory.
 
 Local Open Scope ring_scope.
 
@@ -52,6 +55,13 @@ Lemma mass1_kl_left {T : choiceType} (P Q : {distr T / R}) :
     \E_[P] (fun x => ln (P x / Q x)).
 Proof. by []. Qed.
 
+Lemma expectation_le_const_on_support {T : choiceType}
+    (P : {distr T / R}) (f : T -> R) (c : R) :
+  dweight P = 1 ->
+  (forall x, 0 < P x -> f x <= c) ->
+  \E_[P] f <= c.
+Admitted.
+
 Lemma kl_chain_rule {T U : choiceType}
     (P Q : {distr (T * U) / R}) :
   absolute_continuous P Q ->
@@ -76,7 +86,15 @@ Corollary kl_conditional_sup_bound {T U : choiceType}
     0 < dmargin (fun xy : T * U => xy.1) P x ->
     δ_KL (conditional_second P x) (conditional_second Q x) <= eps1) ->
   δ_KL P Q <= eps0 + eps1.
-Admitted.
+Proof.
+move=> _ Hac HP HQ Hmarg Hcond.
+rewrite (kl_chain_rule P Q Hac HP HQ).
+apply: lerD.
+- exact: Hmarg.
+- apply: expectation_le_const_on_support.
+  + by rewrite dmargin_dweight.
+  + exact: Hcond.
+Qed.
 
 Lemma iterated_kl_chain_bound
     {n : nat} {Ω : choiceType} {X : 'I_n -> choiceType}
@@ -113,7 +131,16 @@ Theorem pythagorean_probability_preservation
     δ_KL (conditional_coordinate coord P i a)
          (conditional_coordinate coord Q i a) <= tnth eps i) ->
   total_variation P Q <= Num.sqrt ((\sum_(i < n) tnth eps i) / 2).
-Admitted.
+Proof.
+move=> Hsep Heps Hac HP HQ Hcond.
+have Hpin := pinsker P Q Hac HP HQ.
+apply: (le_trans Hpin).
+apply: ler_wsqrtr.
+have Hkl :
+    δ_KL P Q <= \sum_(i < n) tnth eps i :=
+  iterated_kl_chain_bound coord P Q eps Hsep Heps Hac HP HQ Hcond.
+lra.
+Qed.
 
 Corollary pythagorean_probability_preservation_sup_pinsker
     {n : nat} {Ω : choiceType} {X : 'I_n -> choiceType}
@@ -128,6 +155,23 @@ Corollary pythagorean_probability_preservation_sup_pinsker
     δ_KL (conditional_coordinate coord P i a)
          (conditional_coordinate coord Q i a) <= eps) ->
   total_variation P Q <= Num.sqrt ((n%:R * eps) / 2).
-Admitted.
+Proof.
+move=> Hsep Heps Hac HP HQ Hcond.
+pose eps_tuple : n.-tuple R := [tuple eps | i < n].
+have Heps_tuple : forall i : 'I_n, 0 <= tnth eps_tuple i.
+  by move=> i; rewrite /eps_tuple tnth_mktuple.
+have Hcond_tuple : forall (i : 'I_n) (a : forall j : 'I_n, X j),
+    δ_KL (conditional_coordinate coord P i a)
+         (conditional_coordinate coord Q i a) <= tnth eps_tuple i.
+  by move=> i a; rewrite /eps_tuple tnth_mktuple; apply: Hcond.
+have Htv :=
+  pythagorean_probability_preservation coord P Q eps_tuple
+    Hsep Heps_tuple Hac HP HQ Hcond_tuple.
+apply: (le_trans Htv).
+apply: ler_wsqrtr.
+rewrite (eq_bigr (fun _ : 'I_n => eps)); last first.
+  by move=> i _; rewrite /eps_tuple tnth_mktuple.
+by rewrite big_const_ord iter_addr_0 mulr_natl.
+Qed.
 
 End KL_Divergence.
