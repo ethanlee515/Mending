@@ -89,6 +89,79 @@ Lemma kl_nonnegative {T : choiceType} (P Q : {distr T / R}) :
   0 <= δ_KL P Q.
 Admitted.
 
+(* Conditioning lemma: probabilities under dcond are honest conditional probabilities. *)
+Lemma pr_dcond {T : choiceType} (mu : {distr T / R})
+    (p : pred T) (A : pred T) :
+  \P_[dcond mu p] A = \P_[mu, p] A.
+Admitted.
+
+(* A pointwise formula for the conditional second-coordinate distribution. *)
+Lemma conditional_secondE {T U : choiceType}
+    (P : {distr (T * U) / R}) (x : T) (y : U) :
+  conditional_second P x y =
+    if dmargin (fun xy : T * U => xy.1) P x == 0 then 0
+    else P (x, y) / dmargin (fun xy : T * U => xy.1) P x.
+Admitted.
+
+(* Joint factorization: P(x,y) = P_X(x) * P_{Y|X=x}(y). *)
+Lemma conditional_second_factorization {T U : choiceType}
+    (P : {distr (T * U) / R}) (x : T) (y : U) :
+  P (x, y) =
+    dmargin (fun xy : T * U => xy.1) P x *
+    conditional_second P x y.
+Admitted.
+
+(* Explicit marginal expectation rule for the KL integrand. *)
+Lemma expectation_dmargin_kl {T U : choiceType}
+    (P Q : {distr (T * U) / R}) :
+  \E_[P]
+    (fun xy : T * U =>
+      ln (dmargin (fun xy : T * U => xy.1) P xy.1 /
+          dmargin (fun xy : T * U => xy.1) Q xy.1)) =
+  \E_[dmargin (fun xy : T * U => xy.1) P]
+    (fun x : T =>
+      ln (dmargin (fun xy : T * U => xy.1) P x /
+          dmargin (fun xy : T * U => xy.1) Q x)).
+Admitted.
+
+(* Explicit conditional expectation rule for the KL integrand. *)
+Lemma expectation_conditional_kl {T U : choiceType}
+    (P Q : {distr (T * U) / R}) :
+  \E_[P]
+    (fun xy : T * U =>
+      ln (conditional_second P xy.1 xy.2 /
+          conditional_second Q xy.1 xy.2)) =
+  \E_[dmargin (fun xy : T * U => xy.1) P]
+    (fun x : T =>
+      δ_KL (conditional_second P x) (conditional_second Q x)).
+Admitted.
+
+Lemma kl_chain_rule_decomp {T U : choiceType}
+    (P Q : {distr (T * U) / R}) :
+  (fun xy : T * U => ln (P xy / Q xy)) =1
+    (fun xy : T * U =>
+      ln (dmargin (fun xy : T * U => xy.1) P xy.1 /
+          dmargin (fun xy : T * U => xy.1) Q xy.1) +
+      ln (conditional_second P xy.1 xy.2 /
+          conditional_second Q xy.1 xy.2)).
+Admitted.
+
+Lemma kl_chain_rule_split {T U : choiceType}
+    (P Q : {distr (T * U) / R}) :
+  \E_[P]
+    (fun xy : T * U =>
+      ln (dmargin (fun xy : T * U => xy.1) P xy.1 /
+          dmargin (fun xy : T * U => xy.1) Q xy.1) +
+      ln (conditional_second P xy.1 xy.2 /
+          conditional_second Q xy.1 xy.2)) =
+  \E_[P] (fun xy : T * U =>
+      ln (dmargin (fun xy : T * U => xy.1) P xy.1 /
+          dmargin (fun xy : T * U => xy.1) Q xy.1)) +
+  \E_[P] (fun xy : T * U =>
+      ln (conditional_second P xy.1 xy.2 /
+          conditional_second Q xy.1 xy.2)).
+Admitted.
+
 Lemma kl_chain_rule {T U : choiceType}
     (P Q : {distr (T * U) / R}) :
   absolute_continuous P Q ->
@@ -99,7 +172,39 @@ Lemma kl_chain_rule {T U : choiceType}
          (dmargin (fun xy : T * U => xy.1) Q) +
     \E_[dmargin (fun xy : T * U => xy.1) P]
       (fun x => δ_KL (conditional_second P x) (conditional_second Q x)).
-Admitted.
+Proof.
+move=> Hac HP HQ.
+pose Pm := dmargin (fun xy : T * U => xy.1) P.
+pose Qm := dmargin (fun xy : T * U => xy.1) Q.
+have Hmarg :
+    \E_[P] (fun xy : T * U => ln (Pm xy.1 / Qm xy.1)) =
+    δ_KL Pm Qm.
+  rewrite /δ_KL /esp /Pm /Qm.
+  exact: (expectation_dmargin_kl P Q).
+have Hcond :
+    \E_[P]
+      (fun xy : T * U =>
+        ln (conditional_second P xy.1 xy.2 /
+            conditional_second Q xy.1 xy.2)) =
+    \E_[Pm] (fun x => δ_KL (conditional_second P x)
+                                 (conditional_second Q x)).
+  exact: (expectation_conditional_kl P Q).
+have Hdecomp := kl_chain_rule_decomp P Q.
+have Hsplit := kl_chain_rule_split P Q.
+rewrite /δ_KL.
+have Hlhs :
+    \E_[P] (fun xy : T * U => ln (P xy / Q xy)) =
+    \E_[P]
+      (fun xy : T * U =>
+        ln (Pm xy.1 / Qm xy.1) +
+        ln (conditional_second P xy.1 xy.2 /
+            conditional_second Q xy.1 xy.2)).
+  exact: (expectation_ext P _ _ Hdecomp).
+rewrite Hlhs.
+rewrite Hsplit.
+rewrite Hmarg Hcond.
+by [].
+Qed.
 
 Corollary kl_conditional_sup_bound {T U : choiceType}
     (P Q : {distr (T * U) / R}) (eps0 eps1 : R) :
