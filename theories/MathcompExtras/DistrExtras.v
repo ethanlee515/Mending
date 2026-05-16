@@ -19,11 +19,55 @@ Definition statistical_distance {T : choiceType} (P Q : {distr T / R}) : R :=
   sum (fun x => `| P x - Q x |).
 
 (* -- Conditional distributions -- *)
-(* Will adapt from EasyCrypt *)
+
+Lemma isdistr_dcond {T : choiceType} (P : {distr T / R}) (p : pred T) :
+  isdistr (fun x => \P_[P, p] (pred1 x)).
+Proof.
+split=> [x|J uniq_J]; first exact: ge0_prc.
+rewrite /prc -mulr_suml.
+case: (\P_[P] p =P 0) => [p0|pNZ].
+  by rewrite p0 invr0 mulr0 ler01.
+rewrite ler_pdivrMr ?mul1r; last by rewrite lt_def; apply/andP; split; [apply/eqP | exact: ge0_pr].
+rewrite (eq_bigr (fun x => (p x)%:R * P x)); last first.
+  move=> x _.
+  rewrite /pr.
+  rewrite (psum_finseq (r := [:: x])).
+  - rewrite big_seq1 !inE eqxx.
+    case Hpx: (x \in p); rewrite ?mul1r ?mul0r.
+      have -> : p x = true by exact: Hpx.
+      by rewrite mul1r ger0_norm ?ge0_mu.
+    have -> : p x = false by exact: Hpx.
+    by rewrite normr0 mul0r.
+  - by [].
+  move=> y; rewrite !inE; case: (y == x) => //=.
+  by rewrite mul0r eqxx.
+rewrite /pr.
+have le_sum_psum :
+    \sum_(x <- J) `| (p x)%:R * P x | <=
+    psum (fun x => (p x)%:R * P x) :=
+  gerfinseq_psum uniq_J (summable_pr p P).
+apply: (le_trans _ le_sum_psum).
+apply/ler_sum=> x _.
+by rewrite ger0_norm ?mulr_ge0 ?ler0n ?ge0_mu.
+Qed.
 
 Definition dcond {T : choiceType} (P : {distr T / R}) (p : pred T)
-  : {distr T / R}.
-Admitted.
+  : {distr T / R} :=
+  mkdistr (isdistr_dcond P p).
+
+Lemma dcondE {T : choiceType} (P : {distr T / R}) (p : pred T) x :
+  dcond P p x = \P_[P, p] (pred1 x).
+Proof. by []. Qed.
+
+Lemma dcond_mass1 {T : choiceType} (P : {distr T / R}) (p : pred T) :
+  0 < \P_[P] p -> dweight (dcond P p) = 1.
+Proof.
+move=> gt0_p.
+rewrite pr_predT.
+rewrite (eq_psum (F2 := fun x => \P_[P, p] (pred1 x))).
+  exact: prc_sum.
+by move=> x; rewrite dcondE.
+Qed.
 
 Lemma expectation_ext {T : choiceType} (P : {distr T / R}) (f g : T -> R) :
   f =1 g ->

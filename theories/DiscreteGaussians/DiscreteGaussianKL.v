@@ -10,9 +10,9 @@ From mathcomp Require Import lra.
 From mathcomp.algebra_tactics Require Import ring.
 Import GRing.Theory Num.Theory Order.Theory.
 
-From Mending Require Import DiscreteGaussian DiscreteGaussianMoment KL.
+From Mending Require Import DiscreteGaussian DiscreteGaussianMoment.
+From Mending.KL Require Import KL.
 From Mending Require Import RealSumExtras DistrExtras.
-From Mending Require Import KL.
 
 Local Open Scope ring_scope.
 
@@ -180,9 +180,7 @@ rewrite /quadratic_gap !rmorphB /=.
 lra.
 Qed.
 
-(** Main theorem: the direct integer-centered KL calculation. *)
-
-Theorem kl_discrete_gaussian_integer_centered mu nu s :
+Theorem kl_discrete_gaussian mu nu s :
   s > 0 ->
   δ_KL (discrete_gaussian R mu s) (discrete_gaussian R nu s) =
     ((nu - mu)%:~R) ^+ 2 / (2 * s ^ 2).
@@ -225,6 +223,6 @@ have -> : (nu - mu)%:~R = - (mu - nu)%:~R :> R.
 lra.
 Qed.
 
-Print Assumptions kl_discrete_gaussian_integer_centered.
+Print Assumptions kl_discrete_gaussian.
 
 End IntegerCenteredKL.
