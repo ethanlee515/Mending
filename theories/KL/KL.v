@@ -58,8 +58,35 @@ Proof. by []. Qed.
 Lemma expectation_le_const_on_support {T : choiceType}
     (P : {distr T / R}) (f : T -> R) (c : R) :
   dweight P = 1 ->
+  0 <= c ->
+  (forall x, 0 <= f x) ->
   (forall x, 0 < P x -> f x <= c) ->
   \E_[P] f <= c.
+Proof.
+move=> HP Hc Hf Hbound.
+rewrite /esp.
+have Hpoint x : 0 <= f x * P x <= c * P x.
+  apply/andP; split.
+  - by rewrite mulr_ge0 ?Hf ?ge0_mu.
+  - case Px0: (P x == 0).
+    + by rewrite (eqP Px0) !mulr0.
+    + apply: ler_wpM2r; first exact: ge0_mu.
+      apply: Hbound.
+      by rewrite lt_def Px0 ge0_mu.
+have smG : summable (fun x : T => c * P x).
+  change (summable (c \*o P)).
+  exact: summableZ.
+have smF : summable (fun x : T => f x * P x).
+  apply: (le_summable (F2 := fun x : T => c * P x)); first exact: Hpoint.
+  exact: smG.
+apply: (le_trans (le_sum smF smG _)).
+  by move=> x; have /andP[_ hx] := Hpoint x.
+change (\E_[P] (fun=> c) <= c).
+by rewrite exp_cst HP mul1r.
+Qed.
+
+Lemma kl_nonnegative {T : choiceType} (P Q : {distr T / R}) :
+  0 <= δ_KL P Q.
 Admitted.
 
 Lemma kl_chain_rule {T U : choiceType}
@@ -87,12 +114,14 @@ Corollary kl_conditional_sup_bound {T U : choiceType}
     δ_KL (conditional_second P x) (conditional_second Q x) <= eps1) ->
   δ_KL P Q <= eps0 + eps1.
 Proof.
-move=> _ Hac HP HQ Hmarg Hcond.
+move=> Heps1 Hac HP HQ Hmarg Hcond.
 rewrite (kl_chain_rule P Q Hac HP HQ).
 apply: lerD.
 - exact: Hmarg.
 - apply: expectation_le_const_on_support.
   + by rewrite dmargin_dweight.
+  + exact: Heps1.
+  + move=> x; exact: kl_nonnegative.
   + exact: Hcond.
 Qed.
 
@@ -111,12 +140,92 @@ Lemma iterated_kl_chain_bound
   δ_KL P Q <= \sum_(i < n) tnth eps i.
 Admitted.
 
+Lemma ln_r_ineq (r : R) :
+  0 < r ->
+  r * ln r - r + 1 >= (r - 1)^2 / (r + 1).
+Admitted.
+
+Lemma kl_lower_bound_chi2 {T : choiceType} (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  δ_KL P Q >=
+    sum (fun x : T =>
+      Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))).
+Admitted.
+
+Lemma chi2_sum_nonneg {T : choiceType} (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  0 <=
+    sum (fun x : T =>
+      Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))).
+Admitted.
+
+Lemma divide_by_two_le (a b : R) :
+  a <= b ->
+  a / 2 <= b / 2.
+Admitted.
+
+Lemma divide_by_two_nonneg (a : R) :
+  0 <= a ->
+  0 <= a / 2.
+Admitted.
+
+Lemma sqrt_monotone_nonneg (a b : R) :
+  0 <= a ->
+  0 <= b ->
+  a <= b ->
+  Num.sqrt a <= Num.sqrt b.
+Admitted.
+
+Lemma total_variation_chi2_bound {T : choiceType} (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  total_variation P Q <=
+    Num.sqrt (
+      sum (fun x : T =>
+        Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) / 2).
+Admitted.
+
 Lemma pinsker {T : choiceType} (P Q : {distr T / R}) :
   absolute_continuous P Q ->
   dweight P = 1 ->
   dweight Q = 1 ->
   total_variation P Q <= Num.sqrt (δ_KL P Q / 2).
-Admitted.
+Proof.
+move=> Hac HP HQ.
+have Hchi :
+    sum (fun x : T =>
+      Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) <=
+    δ_KL P Q :=
+  kl_lower_bound_chi2 P Q Hac HP HQ.
+have Htv :
+    total_variation P Q <=
+      Num.sqrt (
+        sum (fun x : T =>
+          Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) / 2) :=
+  total_variation_chi2_bound P Q Hac HP HQ.
+have Hchi2 :
+    sum (fun x : T =>
+      Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) / 2 <=
+    δ_KL P Q / 2 :=
+  divide_by_two_le _ _ Hchi.
+have Hsum_nonneg :
+    0 <=
+      sum (fun x : T =>
+        Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) / 2 :=
+  divide_by_two_nonneg _ (chi2_sum_nonneg P Q Hac HP HQ).
+have Hkl_nonneg : 0 <= δ_KL P Q / 2 :=
+  divide_by_two_nonneg _ (kl_nonnegative P Q).
+apply: (le_trans Htv).
+apply: sqrt_monotone_nonneg.
+- exact: Hsum_nonneg.
+- exact: Hkl_nonneg.
+- exact: Hchi2.
+Qed.
 
 Theorem pythagorean_probability_preservation
     {n : nat} {Ω : choiceType} {X : 'I_n -> choiceType}
