@@ -20,9 +20,6 @@ Definition δ_KL {T : choiceType} (P Q : {distr T / R}) : R :=
 Definition absolute_continuous {T : choiceType} (P Q : {distr T / R}) : Prop :=
   forall x, Q x = 0 -> P x = 0.
 
-Definition total_variation {T : choiceType} (P Q : {distr T / R}) : R :=
-  (1 / 2) * statistical_distance P Q.
-
 Definition conditional_second {T U : choiceType}
     (P : {distr (T * U) / R}) (x : T) : {distr U / R} :=
   dmargin (fun xy : T * U => xy.2)

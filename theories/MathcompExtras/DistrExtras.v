@@ -15,8 +15,8 @@ Section DistrExtras.
 
 Context {R : realType}.
 
-Definition statistical_distance {T : choiceType} (P Q : {distr T / R}) : R :=
-  sum (fun x => `| P x - Q x |).
+Definition total_variation {T : choiceType} (P Q : {distr T / R}) : R :=
+  (1 / 2) * sum (fun x => `| P x - Q x |).
 
 (* -- Conditional distributions -- *)
 

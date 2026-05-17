@@ -48,6 +48,6 @@ Lemma up_to_bad (out_t: ord_choiceType)
   ∀ s,
     let out1 := thetaFstd out_t progL s in
     let out2 := thetaFstd out_t progR s in
-    statistical_distance out1 out2 < ε.
+    total_variation out1 out2 < ε.
 Admitted.
 *)
