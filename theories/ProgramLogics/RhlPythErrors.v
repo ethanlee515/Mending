@@ -17,7 +17,7 @@ From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve Require Import pkg_core_definition pkg_advantage.
 From Mending.KL Require Import KL.
 From Mending Require Import DistrExtras.
-From Mending Require Import RhlAe.
+From Mending Require Import RhlAe RhlPythDist.
 Local Open Scope UtbNotations.
 
 Import ListNotations.
@@ -46,32 +46,26 @@ have ?: (t < ℓ.+1)%N by apply ltn_ord.
 lia.
 Defined.
 
-
 Definition pythJudgment
   {ℓ : nat}
-  {outs_t : 'I_ℓ.+1 -> choiceType}
-  {inL_t inR_t : ord_choiceType}
-  (progL : inL_t -> raw_code (outs_t ord_max))
-  (progR : inR_t -> raw_code (outs_t ord_max))
+  {inL_t inR_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (post : pred (outs_t ord_max * heap))
+  (post : pred (out_t * heap))
   (s : (ℓ.+1).-tuple R) :=
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
   exists
-  (prod_out_t : choiceType)
-  (marginal : forall (i : 'I_ℓ.+1), prod_out_t -> (F_choice_prod_obj ⟨outs_t i, (heap : choiceType)⟩))
-  (P Q : {distr prod_out_t / R}),
+  (Ω : choiceType)
+  (X : 'I_ℓ -> choiceType)
+  (coord : forall i : 'I_ℓ, Ω -> X i)
+  (final : Ω -> out_t * heap)
+  (P Q : {distr Ω / R}),
   let outL := Pr_code (progL xL) memL in
   let outR := Pr_code (progR xR) memR in
-  (* Marginals match *)
-  dmargin (marginal ord_max) P =1 outL /\
-  dmargin (marginal ord_max) Q =1 outR /\
-  (* KL closeness *)
-  (forall (t : 'I_ℓ.+1) (a : forall (i : 'I_t), outs_t (lift_i i) * heap),
-  let Pa := dcond P (fun ys => [forall i : 'I_t, a i == marginal (lift_i i) ys]) in
-  let Qa := dcond Q (fun ys => [forall i : 'I_t, a i == marginal (lift_i i) ys]) in
-  δ_KL (dmargin (marginal t) Pa) (dmargin (marginal t) Qa) < tnth s t) /\
-  (* post-condition satisfied *)
+  pythDistWithFinal coord final P Q s /\
+  dmargin final P =1 outL /\
+  dmargin final Q =1 outR /\
   forall x, x \in dinsupp outL -> post x.
 
 Declare Scope pyth_scope.
@@ -80,8 +74,17 @@ Local Open Scope pyth_scope.
 Notation "⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
   (pythJudgment progL progR pre post s) : pyth_scope.
 
-Definition two_norm {n : nat} (s : (n.+1).-tuple R) : R.
-Admitted.
+Definition tuple_sum {n : nat} (s : n.-tuple R) : R :=
+  \sum_(i < n) tnth s i.
+
+Definition tuple_sum_squares {n : nat} (s : n.-tuple R) : R :=
+  \sum_(i < n) (tnth s i) ^+ 2.
+
+Definition two_norm {n : nat} (s : n.-tuple R) : R :=
+  Num.sqrt (tuple_sum_squares s).
+
+Definition pythagorean_tv_bound {n : nat} (s : n.-tuple R) : R :=
+  Num.sqrt (tuple_sum s / 2).
 
 
 Lemma MicciancioWalterRule
@@ -93,7 +96,7 @@ Lemma MicciancioWalterRule
   (post : pred (out_t * heap))
   (s : (ℓ.+1).-tuple R) :
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
-  let delta := two_norm s in
+  let delta := pythagorean_tv_bound s in
   ⊨UTB ⦃ pre ⦄ progL ≈( delta ) progR ⦃
     fun outs =>
       let '((y_1, m_1'), (y_2, m_2')) := outs in
