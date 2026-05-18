@@ -66,7 +66,8 @@ Definition pythJudgment
   pythDistWithFinal coord final P Q s /\
   dmargin final P =1 outL /\
   dmargin final Q =1 outR /\
-  forall x, x \in dinsupp outL -> post x.
+  (forall x, x \in dinsupp outL -> post x) /\
+  (forall x, x \in dinsupp outR -> post x).
 
 Declare Scope pyth_scope.
 Local Open Scope pyth_scope.
@@ -136,14 +137,24 @@ Lemma aePythSeqRule
   ⊨Pyth ⦃ pre ⦄ seqRaw progL contL ≈( s ) seqRaw progR contR ⦃ post ⦄.
 Admitted.
 
-(*
-  The Pyth-Seq rule in the writeup needs a stronger first judgment than the
-  current pythJudgment provides: pythJudgment has a unary postcondition on the
-  left output support, while the rule composes through a relational predicate
-  on paired intermediate states.  We leave that rule unstated here until the
-  judgment records a relational intermediate postcondition or the paper rule is
-  strengthened with an explicit relational support premise.
-*)
+Lemma pythSeqRule
+  {ℓ ℓ' : nat}
+  {inL_t inR_t mid_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code mid_t)
+  (progR : inR_t -> raw_code mid_t)
+  (contL : mid_t -> raw_code out_t)
+  (contR : mid_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (left_post : pred (mid_t * heap))
+  (mid : pred ((mid_t * heap) * (mid_t * heap)))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (s' : (ℓ'.+1).-tuple R) :
+  (forall aL aR, left_post aL -> left_post aR -> mid (aL, aR)) ->
+  ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ left_post ⦄ ->
+  ⊨Pyth ⦃ mid ⦄ contL ≈( s' ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄ seqRaw progL contL ≈( cat_tuple s s' ) seqRaw progR contR ⦃ post ⦄.
+Admitted.
 
 (**
     @FrStP mem_t out_t → @FrStP mem_t out_t → list R → Prop :=
