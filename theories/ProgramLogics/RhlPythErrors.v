@@ -105,6 +105,46 @@ Proof.
 move => *.
 Admitted.
 
+Lemma pythConseqRule
+  {ℓ : nat}
+  {inL_t inR_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
+  (pre pre' : pred ((inL_t * heap) * (inR_t * heap)))
+  (post post' : pred (out_t * heap))
+  (s s' : (ℓ.+1).-tuple R) :
+  (forall inps, pre' inps -> pre inps) ->
+  (forall outs, post outs -> post' outs) ->
+  (forall i : 'I_(ℓ.+1), tnth s i <= tnth s' i) ->
+  ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
+Admitted.
+
+Lemma aePythSeqRule
+  {ℓ : nat}
+  {inL_t inR_t midL_t midR_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code midL_t)
+  (progR : inR_t -> raw_code midR_t)
+  (contL : midL_t -> raw_code out_t)
+  (contR : midR_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (mid : pred ((midL_t * heap) * (midR_t * heap)))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃ mid ⦄ ->
+  ⊨Pyth ⦃ mid ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄ seqRaw progL contL ≈( s ) seqRaw progR contR ⦃ post ⦄.
+Admitted.
+
+(*
+  The Pyth-Seq rule in the writeup needs a stronger first judgment than the
+  current pythJudgment provides: pythJudgment has a unary postcondition on the
+  left output support, while the rule composes through a relational predicate
+  on paired intermediate states.  We leave that rule unstated here until the
+  judgment records a relational intermediate postcondition or the paper rule is
+  strengthened with an explicit relational support premise.
+*)
+
 (**
     @FrStP mem_t out_t → @FrStP mem_t out_t → list R → Prop :=
 Inductive equiv_with_pythagorean_errors :
