@@ -14,7 +14,7 @@ Local Open Scope ring_scope.
 
 Import pkg_heap.
 
-Definition upToBadJudgment
+Definition additiveErrorJudgment
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
@@ -26,18 +26,18 @@ Definition upToBadJudgment
     let out2 := Pr_code (progR xR) memR in
     ∃ d, coupling d out1 out2 ∧ \P_[ d ] post >= 1 - ε.
 
-Declare Scope UtbNotations.
-Local Open Scope UtbNotations.
+Declare Scope AeNotations.
+Local Open Scope AeNotations.
 
-Notation "⊨UTB ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
-  (upToBadJudgment progL progR pre post ε) : UtbNotations.
+Notation "⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
+  (additiveErrorJudgment progL progR pre post ε) : AeNotations.
 
 (* I'm sure this belongs somewhere else
  * and requires a bunch of other lemma *)
 
 (* There is probably a stronger version of this...? *)
 (**
-Lemma up_to_bad (out_t: ord_choiceType)
+Lemma additive_error_tv_bound (out_t: ord_choiceType)
   {mem_t: choiceType}
   (progL : @FrStP mem_t out_t) (progR : @FrStP mem_t out_t)
   (ε : R) :

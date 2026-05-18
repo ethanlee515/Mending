@@ -18,7 +18,7 @@ From SSProve Require Import pkg_core_definition pkg_advantage.
 From Mending.KL Require Import KL.
 From Mending Require Import DistrExtras.
 From Mending Require Import RhlAe RhlPythDist.
-Local Open Scope UtbNotations.
+Local Open Scope AeNotations.
 
 Import ListNotations.
 Import pkg_heap.
@@ -97,7 +97,7 @@ Lemma MicciancioWalterRule
   (s : (ℓ.+1).-tuple R) :
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   let delta := pythagorean_tv_bound s in
-  ⊨UTB ⦃ pre ⦄ progL ≈( delta ) progR ⦃
+  ⊨AE ⦃ pre ⦄ progL ≈( delta ) progR ⦃
     fun outs =>
       let '((y_1, m_1'), (y_2, m_2')) := outs in
       post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2')⦄.
@@ -132,7 +132,7 @@ Inductive equiv_with_pythagorean_errors :
     (bindrFree progA_L progB_L) (bindrFree progA_R progB_R) (ε_L ++ ε_R).
 
 
-Local Open Scope UtbNotations.
+Local Open Scope AeNotations.
 
 Theorem mw18 (out_t : ord_choiceType) (mem_t : choiceType)
   (progL progR : @FrStP mem_t out_t) (eps_lst : list R) :
