@@ -6,7 +6,7 @@ From Stdlib Require Import Lia.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra.
-From mathcomp Require Import reals distr.
+From mathcomp Require Import reals distr ssrZ.
 From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
@@ -14,15 +14,17 @@ From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorp
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve Require Import FreeProbProg.
 From SSProve.Crypt Require Import choice_type SubDistr.
-From SSProve Require Import pkg_core_definition pkg_advantage.
+From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
 From Mending.KL Require Import KL.
-From Mending Require Import DistrExtras.
+From Mending Require Import DistrExtras SspDG.
 From Mending Require Import RhlAe RhlPythDist.
 Local Open Scope AeNotations.
 
 Import ListNotations.
+Import PackageNotation.
 Import pkg_heap.
 Local Open Scope list_scope.
+Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
 Arguments retrFree {_ _ _} _.
@@ -87,6 +89,48 @@ Definition two_norm {n : nat} (s : n.-tuple R) : R :=
 Definition pythagorean_tv_bound {n : nat} (s : n.-tuple R) : R :=
   Num.sqrt (tuple_sum s / 2).
 
+
+Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code out_t :=
+  x <$ (existT _ out_t D) ;;
+  ret x.
+
+Lemma klSampRule
+  {inL_t inR_t : ord_choiceType} {out_t : choice_type}
+  (DL : inL_t -> {distr out_t / R})
+  (DR : inR_t -> {distr out_t / R})
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (post : pred (out_t * heap))
+  (ε : R) :
+  0 <= ε ->
+  (forall xL xR, absolute_continuous (DL xL) (DR xR)) ->
+  (forall xL, dweight (DL xL) = 1) ->
+  (forall xR, dweight (DR xR) = 1) ->
+  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
+    δ_KL (DL xL) (DR xR) <= ε) ->
+  (forall memL memR xL xR y,
+    pre ((xL, memL), (xR, memR)) -> y \in dinsupp (DL xL) -> post (y, memL)) ->
+  (forall memL memR xL xR y,
+    pre ((xL, memL), (xR, memR)) -> y \in dinsupp (DR xR) -> post (y, memR)) ->
+  ⊨Pyth ⦃ pre ⦄ (fun x => sampleRaw (DL x)) ≈( [tuple ε] )
+    (fun x => sampleRaw (DR x)) ⦃ post ⦄.
+Admitted.
+
+Lemma klDgRule
+  (centerL centerR : chInt)
+  (stdev ε : R)
+  (pre : pred ((chUnit * heap) * (chUnit * heap)))
+  (post : pred (chInt * heap)) :
+  0 < stdev ->
+  ((int_of_Z centerR - int_of_Z centerL)%:~R) ^+ 2 / (2 * stdev ^ 2) <= ε ->
+  (forall memL memR,
+    pre ((tt, memL), (tt, memR)) ->
+    forall y, y \in dinsupp (ssp_dg centerL stdev) -> post (y, memL)) ->
+  (forall memL memR,
+    pre ((tt, memL), (tt, memR)) ->
+    forall y, y \in dinsupp (ssp_dg centerR stdev) -> post (y, memR)) ->
+  ⊨Pyth ⦃ pre ⦄ (fun _ : chUnit => sampleRaw (ssp_dg centerL stdev)) ≈( [tuple ε] )
+    (fun _ : chUnit => sampleRaw (ssp_dg centerR stdev)) ⦃ post ⦄.
+Admitted.
 
 Lemma MicciancioWalterRule
   {ℓ : nat}
