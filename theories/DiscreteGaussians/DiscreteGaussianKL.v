@@ -20,7 +20,7 @@ Local Open Scope ring_scope.
 
 Section IntegerCenteredKL.
 
-Context (R : realType).
+Context {R : realType}.
 
 Definition centered_difference (center : int) : int -> R :=
   fun x => (x - center)%:~R.
@@ -30,25 +30,25 @@ Definition quadratic_gap (mu nu : int) (x : int) : R :=
 
 (** First layer: expose the concrete mass functions. *)
 
-Lemma gaussian_pdfE s x :
+Lemma gaussian_pdfE (s : R) (x : int) :
   s > 0 ->
-  gaussian_pdf R s x = gaussian R s x / sum (gaussian R s).
+  gaussian_pdf s x = gaussian s x / sum (gaussian s).
 Proof.
 move=> gt0_s.
 by rewrite /gaussian_pdf ifT.
 Qed.
 
-Lemma centered_discrete_gaussianE s x :
+Lemma centered_discrete_gaussianE (s : R) (x : int) :
   s > 0 ->
-  centered_discrete_gaussian R s x = gaussian_pdf R s x.
+  centered_discrete_gaussian s x = gaussian_pdf s x.
 Proof.
 by [].
 Qed.
 
-Lemma discrete_gaussianE center s x :
+Lemma discrete_gaussianE (center : int) (s : R) (x : int) :
   s > 0 ->
-  discrete_gaussian R center s x =
-    gaussian_pdf R s (x - center).
+  discrete_gaussian center s x =
+    gaussian_pdf s (x - center).
 Proof.
 move=> gt0_s.
 by rewrite /discrete_gaussian dmargin_add_intE centered_discrete_gaussianE.
@@ -56,8 +56,8 @@ Qed.
 
 (** Second layer: the integer-shift facts replacing Poisson summation. *)
 
-Lemma gaussian_opp s x :
-  gaussian R s (- x) = gaussian R s x.
+Lemma gaussian_opp (s : R) (x : int) :
+  gaussian s (- x) = gaussian s x.
 Proof.
 rewrite /gaussian.
 congr expR.
@@ -65,17 +65,17 @@ rewrite rmorphN.
 lra.
 Qed.
 
-Lemma gaussian_weight_shift_int center s :
-  sum (fun x : int => gaussian R s (x - center)) =
-  sum (gaussian R s).
+Lemma gaussian_weight_shift_int (center : int) (s : R) :
+  sum (fun x : int => gaussian s (x - center)) =
+  sum (gaussian s).
 Proof.
-exact: (sum_shift_sub_int R (gaussian R s) center).
+exact: (sum_shift_sub_int (gaussian s) center).
 Qed.
 
-Lemma discrete_gaussian_translate center s :
+Lemma discrete_gaussian_translate (center : int) (s : R) :
   s > 0 ->
-  dmargin (fun x => x - center) (discrete_gaussian R center s) =1
-  centered_discrete_gaussian R s.
+  dmargin (fun x => x - center) (discrete_gaussian center s) =1
+  centered_discrete_gaussian s.
 Proof.
 move=> gt0_s x.
 rewrite dmargin_sub_intE discrete_gaussianE //.
@@ -85,64 +85,66 @@ Qed.
 
 (** Third layer: symmetry gives the one expectation needed by the KL proof. *)
 
-Lemma centered_discrete_gaussian_opp s x :
+Lemma centered_discrete_gaussian_opp (s : R) (x : int) :
   s > 0 ->
-  centered_discrete_gaussian R s (- x) =
-  centered_discrete_gaussian R s x.
+  centered_discrete_gaussian s (- x) =
+  centered_discrete_gaussian s x.
 Proof.
 move=> gt0_s.
 rewrite !centered_discrete_gaussianE // !gaussian_pdfE //.
 by rewrite gaussian_opp.
 Qed.
 
-Lemma centered_discrete_gaussian_mean0 s :
+Lemma centered_discrete_gaussian_mean0 (s : R) :
   s > 0 ->
-  \E_[centered_discrete_gaussian R s] (fun x => x%:~R) = 0.
+  \E_[centered_discrete_gaussian s] (fun x => x%:~R) = 0.
 Proof.
 move=> gt0_s.
 rewrite /esp.
-set F := fun x : int => x%:~R * centered_discrete_gaussian R s x.
+set F := fun x : int => x%:~R * centered_discrete_gaussian s x.
 have odd_F x : F (- x) = - F x.
   rewrite /F rmorphN centered_discrete_gaussian_opp //.
   lra.
 have H : sum F = - sum F.
   rewrite -sumN.
-  rewrite -(sum_opp_int R F).
+  rewrite -(sum_opp_int F).
   by apply/eq_sum=> x.
 lra.
 Qed.
 
-Lemma discrete_gaussian_centered_difference_mean0 center s :
+Lemma discrete_gaussian_centered_difference_mean0 (center : int) (s : R) :
   s > 0 ->
-  \E_[discrete_gaussian R center s] (centered_difference center) = 0.
+  \E_[discrete_gaussian center s] (centered_difference center) = 0.
 Proof.
 move=> gt0_s.
-rewrite -[RHS](centered_discrete_gaussian_mean0 s gt0_s).
-Locate expectation_dmargin_sub_int.
-rewrite -[LHS](expectation_dmargin_sub_int center
-  (discrete_gaussian R center s) (fun x => x%:~R)).
-apply: expectation_distr_ext.
-exact: discrete_gaussian_translate.
+rewrite /esp.
+have H1 : sum (fun x => centered_difference center x * discrete_gaussian center s x) =
+          sum (fun x => (x - center)%:~R * centered_discrete_gaussian s (x - center)).
+  by apply/eq_sum=> x; rewrite discrete_gaussianE // centered_discrete_gaussianE //.
+rewrite H1.
+rewrite (sum_shift_sub_int (fun y => y%:~R * centered_discrete_gaussian s y) center).
+apply: centered_discrete_gaussian_mean0.
+exact: gt0_s.
 Qed.
 
-Lemma centered_discrete_gaussian_mass1 s :
+Lemma centered_discrete_gaussian_mass1 (s : R) :
   s > 0 ->
-  dweight (centered_discrete_gaussian R s) = 1.
+  dweight (centered_discrete_gaussian s) = 1.
 Proof.
 move=> gt0_s.
 rewrite pr_predT psum_sum; last exact: ge0_mu.
-rewrite (eq_sum (F2 := fun x => (1 / sum (gaussian R s)) * gaussian R s x)).
+rewrite (eq_sum (F2 := fun x => (1 / sum (gaussian s)) * gaussian s x)).
 - rewrite sumZ.
-  have gt0_sum : 0 < sum (gaussian R s) by exact: gt0_weight_gaussian.
+  have gt0_sum : 0 < sum (gaussian s) by exact: gt0_weight_gaussian.
   by rewrite mul1r mulVf //; apply/eqP; lra.
 move=> x.
 rewrite centered_discrete_gaussianE // gaussian_pdfE //.
 lra.
 Qed.
 
-Lemma discrete_gaussian_mass1 center s :
+Lemma discrete_gaussian_mass1 (center : int) (s : R) :
   s > 0 ->
-  dweight (discrete_gaussian R center s) = 1.
+  dweight (discrete_gaussian center s) = 1.
 Proof.
 move=> gt0_s.
 rewrite /discrete_gaussian dmargin_dweight.
@@ -151,20 +153,20 @@ Qed.
 
 (** Fourth layer: pointwise logarithm algebra for equal-variance Gaussians. *)
 
-Lemma ln_discrete_gaussian_ratio mu nu s x :
+Lemma ln_discrete_gaussian_ratio (mu nu : int) (s : R) (x : int) :
   s > 0 ->
-  ln ((discrete_gaussian R mu s x) / (discrete_gaussian R nu s x)) =
+  ln ((discrete_gaussian mu s x) / (discrete_gaussian nu s x)) =
     quadratic_gap mu nu x / (2 * s ^ 2).
 Proof.
 move=> gt0_s.
 rewrite !discrete_gaussianE // !gaussian_pdfE //.
-have gt0_sum : 0 < sum (gaussian R s) by exact: gt0_weight_gaussian.
-have gt0_g_mu : 0 < gaussian R s (x - mu) by rewrite /gaussian; exact: expR_gt0.
-have gt0_g_nu : 0 < gaussian R s (x - nu) by rewrite /gaussian; exact: expR_gt0.
+have gt0_sum : 0 < sum (gaussian s) by exact: gt0_weight_gaussian.
+have gt0_g_mu : 0 < gaussian s (x - mu) by rewrite /gaussian; exact: expR_gt0.
+have gt0_g_nu : 0 < gaussian s (x - nu) by rewrite /gaussian; exact: expR_gt0.
 have -> :
-    gaussian R s (x - mu) / sum (gaussian R s) /
-      (gaussian R s (x - nu) / sum (gaussian R s)) =
-    gaussian R s (x - mu) / gaussian R s (x - nu).
+    gaussian s (x - mu) / sum (gaussian s) /
+      (gaussian s (x - nu) / sum (gaussian s)) =
+    gaussian s (x - mu) / gaussian s (x - nu).
 - field.
   by apply/andP; split; apply/eqP; lra.
 rewrite ln_div ?gt0_g_mu ?gt0_g_nu //.
@@ -180,24 +182,24 @@ rewrite /quadratic_gap !rmorphB /=.
 lra.
 Qed.
 
-Theorem kl_discrete_gaussian mu nu s :
+Theorem kl_discrete_gaussian (mu nu : int) (s : R) :
   s > 0 ->
-  δ_KL (discrete_gaussian R mu s) (discrete_gaussian R nu s) =
+  δ_KL (discrete_gaussian mu s) (discrete_gaussian nu s) =
     ((nu - mu)%:~R) ^+ 2 / (2 * s ^ 2).
 Proof.
 move=> gt0_s.
 rewrite /δ_KL.
-rewrite (expectation_ext (discrete_gaussian R mu s)
-  (fun x => ln (discrete_gaussian R mu s x / discrete_gaussian R nu s x))
+rewrite (expectation_ext (discrete_gaussian mu s)
+  (fun x => ln (discrete_gaussian mu s x / discrete_gaussian nu s x))
   (fun x => quadratic_gap mu nu x / (2 * s ^ 2))); last first.
 - by move=> x; rewrite ln_discrete_gaussian_ratio.
-rewrite (expectation_ext (discrete_gaussian R mu s)
+rewrite (expectation_ext (discrete_gaussian mu s)
   (fun x => quadratic_gap mu nu x / (2 * s ^ 2))
   (fun x =>
      (((mu - nu)%:~R) ^+ 2 + 2 * (x - mu)%:~R * (mu - nu)%:~R) /
        (2 * s ^ 2))); last first.
 - by move=> x; rewrite quadratic_gap_centered.
-rewrite (expectation_ext (discrete_gaussian R mu s)
+rewrite (expectation_ext (discrete_gaussian mu s)
   (fun x =>
      (((mu - nu)%:~R) ^+ 2 + 2 * (x - mu)%:~R * (mu - nu)%:~R) /
        (2 * s ^ 2))

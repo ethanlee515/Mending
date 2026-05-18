@@ -210,7 +210,7 @@ have -> :
   sum (fun x => g x * dmargin (fun x => x - center) P x) =
   sum (fun x => g x * P (x + center)).
   by apply/eq_sum=> x; rewrite dmargin_sub_intE.
-rewrite -(sum_shift_add_int R
+rewrite -(sum_shift_add_int
   (fun x => g (x - center) * P x) center).
 apply/eq_sum=> x.
 congr (_ * _).

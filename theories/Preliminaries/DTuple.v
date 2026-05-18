@@ -4,7 +4,7 @@ Set Warnings "notation-overridden,ambiguous-paths".
 
 Section DTuple.
 
-Context (R: realType).
+Context {R : realType}.
 
 Fixpoint dtuple {n : nat} {t: choiceType} :
     n.-tuple (distr R t) -> distr R (n.-tuple t) :=

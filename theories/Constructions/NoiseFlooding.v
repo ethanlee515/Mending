@@ -12,7 +12,7 @@ Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
 Definition n_dg (n : nat) (s : R) : distr R (n.-tuple int) :=
-  nfold_distr R n (centered_discrete_gaussian R s).
+  nfold_distr n (centered_discrete_gaussian s).
 
 Module Type NoiseFloodingParams.
 Parameter gaussian_width_multiplier : R.

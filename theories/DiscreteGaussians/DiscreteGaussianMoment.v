@@ -24,7 +24,7 @@ Local Open Scope ring_scope.
 
 Section DiscreteGaussianMoment.
 
-Context (R : realType).
+Context {R : realType}.
 
 Definition mid_step_ratio (r : R) : R :=
   (1 + r) / 2.
@@ -151,13 +151,13 @@ apply: summable_geo.
 exact: mid_step_ratio_in01.
 Qed.
 
-Lemma summable_int_linear_geometric s :
+Lemma summable_int_linear_geometric (s : R) :
   s > 0 ->
-  summable (fun x : int => (absz x)%:R * geom_above R s (absz x)).
+  summable (fun x : int => (absz x)%:R * geom_above s (absz x)).
 Proof.
 move=> gt0_s.
-apply: (mirror_summable R
-  (fun n : nat => n%:R * geom_above R s n)).
+apply: (mirror_summable
+  (fun n : nat => n%:R * geom_above s n)).
 apply: summable_nat_mul_geometric.
 rewrite /geom_above /max_step_ratio /=.
 apply/andP; split.
@@ -169,14 +169,14 @@ have H : 1 / s > 0 by exact: divr_gt0.
 exact: mulr_gt0.
 Qed.
 
-Lemma le_abs_int_gaussian_linear_geo s x :
+Lemma le_abs_int_gaussian_linear_geo (s : R) (x : int) :
   s > 0 ->
-  `|x%:~R * gaussian R s x| <=
-    (absz x)%:R * geom_above R s (absz x).
+  `|x%:~R * gaussian s x| <=
+    (absz x)%:R * geom_above s (absz x).
 Proof.
 move=> gt0_s.
 rewrite normrM.
-have -> : `|gaussian R s x| = gaussian R s x by rewrite ger0_norm ?ge0_gaussian.
+have -> : `|gaussian s x| = gaussian s x by rewrite ger0_norm ?ge0_gaussian.
 rewrite natr_absz intr_norm.
 apply: ler_pM.
 - exact: normr_ge0.
@@ -185,14 +185,14 @@ apply: ler_pM.
 exact: le_gauss_geo.
 Qed.
 
-Lemma summable_int_gaussian_moment s :
+Lemma summable_int_gaussian_moment (s : R) :
   s > 0 ->
-  summable (fun x : int => x%:~R * gaussian R s x).
+  summable (fun x : int => x%:~R * gaussian s x).
 Proof.
 move=> gt0_s.
 apply/summable_abs.
 apply: (le_summable
-  (F2 := fun x : int => (absz x)%:R * geom_above R s (absz x))).
+  (F2 := fun x : int => (absz x)%:R * geom_above s (absz x))).
 - move=> x.
   apply/andP; split.
   + exact: normr_ge0.
@@ -200,15 +200,15 @@ apply: (le_summable
 exact: summable_int_linear_geometric.
 Qed.
 
-Lemma summable_centered_discrete_gaussian_moment s :
+Lemma summable_centered_discrete_gaussian_moment (s : R) :
   s > 0 ->
-  \E?_[centered_discrete_gaussian R s] (fun x : int => x%:~R).
+  \E?_[centered_discrete_gaussian s] (fun x : int => x%:~R).
 Proof.
 move=> gt0_s.
 rewrite /has_esp.
 apply: (eq_summable
-  (S1 := (1 / sum (gaussian R s)) \*o
-    (fun x : int => x%:~R * gaussian R s x))).
+  (S1 := (1 / sum (gaussian s)) \*o
+    (fun x : int => x%:~R * gaussian s x))).
 - move=> x /=.
   rewrite /centered_discrete_gaussian /gaussian_pdf.
   rewrite ifT //.
@@ -217,20 +217,20 @@ apply: summableZ.
 exact: summable_int_gaussian_moment.
 Qed.
 
-Lemma discrete_gaussian_centered_difference_has_exp center s :
+Lemma discrete_gaussian_centered_difference_has_exp (center : int) (s : R) :
   s > 0 ->
-  \E?_[discrete_gaussian R center s] (fun x : int => (x - center)%:~R).
+  \E?_[discrete_gaussian center s] (fun x : int => (x - center)%:~R).
 Proof.
 move=> gt0_s.
 rewrite /has_esp.
 rewrite /discrete_gaussian.
 apply: (eq_summable
   (S1 := fun x : int =>
-     (x - center)%:~R * centered_discrete_gaussian R s (x - center))).
+     (x - center)%:~R * centered_discrete_gaussian s (x - center))).
 - move=> x.
   by rewrite dmargin_add_intE.
-apply: (summable_shift_add_int R
-  (fun y : int => y%:~R * centered_discrete_gaussian R s y) center).
+apply: (summable_shift_add_int
+  (fun y : int => y%:~R * centered_discrete_gaussian s y) center).
 exact: summable_centered_discrete_gaussian_moment.
 Qed.
 

@@ -17,7 +17,7 @@ Local Open Scope ring_scope.
 
 Section DiscreteGaussian.
 
-Context (R: realType).
+Context {R : realType}.
 
 (* To construct the discrete Gaussian distribution,
  * We will normalize the Gaussian function above.
@@ -89,7 +89,7 @@ apply: (le_trans (y := \sum_(0 <= i < S (max_nat_lst s)) (geometric 1 r i)));
   + by apply exprz_ge0.
   + lra.
 }
-rewrite (split_sum R s) //.
+rewrite (split_sum s) //.
 suff: \sum_(k <- compl s (max_nat_lst s).+1)  geometric 1 r k >= 0 by lra.
 apply ge0_bigsum.
 move => x.

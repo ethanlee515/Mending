@@ -15,7 +15,7 @@ From Mending Require Import ChoiceVector.
 From mathcomp Require Import reals.
 
 Definition ssp_dg (m : 'int) (s : R) : distr R 'int :=
-  dmargin (U := 'int) Z_of_int (discrete_gaussian R (int_of_Z m) s).
+  dmargin (U := 'int) Z_of_int (discrete_gaussian (int_of_Z m) s).
 
 Fixpoint discrete_gaussians_aux {n : nat} (s : R)
   : chVec 'int n -> distr R (chVec 'int n) :=

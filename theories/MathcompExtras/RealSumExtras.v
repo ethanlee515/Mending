@@ -15,7 +15,7 @@ Local Open Scope ring_scope.
 
 Section RealSumExtras.
 
-Context (R : realType).
+Context {R : realType}.
 
 Lemma summable_shift_add_int (F : int -> R) center :
   summable F ->
@@ -193,7 +193,7 @@ Qed.
 
 Section FiniteBigopExtras.
 
-Context (R : realType).
+Context {R : realType}.
 
 Lemma split_domain s (f : nat -> R) :
   uniq s ->
