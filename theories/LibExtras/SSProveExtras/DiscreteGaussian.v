@@ -2,7 +2,7 @@
 
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_order all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import distr.
 From SSProve Require Import Axioms choice_type Package.

@@ -1,5 +1,5 @@
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_order all_algebra.
 From mathcomp Require Import reals.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 

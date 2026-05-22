@@ -1,6 +1,6 @@
 From Stdlib Require Import Utf8 BinInt.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_ssreflect all_algebra reals distr.
+From mathcomp Require Import all_boot all_order all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From Mending.Schemes Require Import ApproxFHE Indcpa Indcpad.

@@ -1,7 +1,7 @@
 (* Distribution facts for Pythagorean errors. *)
 
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_order all_algebra.
 From mathcomp Require Import reals distr.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 

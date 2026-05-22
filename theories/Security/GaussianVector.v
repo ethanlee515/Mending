@@ -1,5 +1,5 @@
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_ssreflect all_algebra reals distr realsum
+From mathcomp Require Import all_boot all_order all_algebra reals distr realsum
   ssrnat ssreflect ssrfun ssrbool ssrnum eqtype choice seq.
 Set Warnings "notation-overridden,ambiguous-paths".
 From extructures Require Import ord fset fmap.

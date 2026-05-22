@@ -1,6 +1,6 @@
 From Stdlib Require Import Utf8 List Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_order all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 
 Local Obligation Tactic := simpl.

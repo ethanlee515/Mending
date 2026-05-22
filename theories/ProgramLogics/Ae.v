@@ -1,7 +1,7 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_ssreflect all_algebra.
+From mathcomp Require Import all_boot all_order all_algebra.
 From mathcomp Require Import reals distr.
 From mathcomp Require Import realseq realsum exp lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".

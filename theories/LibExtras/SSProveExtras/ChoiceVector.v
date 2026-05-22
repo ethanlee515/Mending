@@ -1,6 +1,6 @@
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_ssreflect tuple.
+From mathcomp Require Import all_boot all_order tuple.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 Import PackageNotation.
