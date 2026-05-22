@@ -107,22 +107,15 @@ Lemma additiveErrorSeqRule
   ⊨AE ⦃ pre ⦄ seqRaw progL contL ≈( ε + ε' ) seqRaw progR contR ⦃ post ⦄.
 Admitted.
 
-(* I'm sure this belongs somewhere else
- * and requires a bunch of other lemma *)
-
-(* There is probably a stronger version of this...? *)
-(**
-Lemma additive_error_tv_bound (out_t: ord_choiceType)
-  {mem_t: choiceType}
-  (progL : @FrStP mem_t out_t) (progR : @FrStP mem_t out_t)
+Lemma additiveErrorTvBound
+  {inL_t inR_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (ε : R) :
-  equiv_with_additive_error progL progR
-    (fun mems => match mems with (mL, mR) => mL == mR end)
-    (fun results => match results with (resL, resR) => resL == resR end)
-    ε ->
-  ∀ s,
-    let out1 := thetaFstd out_t progL s in
-    let out2 := thetaFstd out_t progR s in
-    total_variation out1 out2 < ε.
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ fun outs => outs.1.1 == outs.2.1 ⦄ ->
+  forall memL memR xL xR,
+    pre ((xL, memL), (xR, memR)) ->
+    total_variation (dmargin fst (Pr_code (progL xL) memL))
+                    (dmargin fst (Pr_code (progR xR) memR)) <= ε.
 Admitted.
-*)
