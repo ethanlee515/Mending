@@ -1,12 +1,9 @@
-(* Distributional RHL with Pythagorean errors. *)
+(* Distribution facts for Pythagorean errors. *)
 
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra.
 From mathcomp Require Import reals distr.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
-
-From SSProve.Relational Require Import OrderEnrichedCategory.
-From SSProve.Crypt Require Import Axioms.
 
 From Mending.Probability Require Import KL.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
@@ -16,6 +13,8 @@ Import GRing.Theory Num.Theory Order.Theory.
 Local Open Scope ring_scope.
 
 Section PythagoreanDistributionJudgments.
+
+Context {R : realType}.
 
 Definition pythDist
     {n : nat} {Ω : choiceType} {X : 'I_n -> choiceType}

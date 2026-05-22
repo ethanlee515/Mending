@@ -6,7 +6,7 @@ From mathcomp Require Import reals distr.
 From mathcomp Require Import realseq realsum exp lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
-From Mending.ProgramLogics.Distribution Require Import Ae.
+From Mending.Probability Require Import Ae.
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.

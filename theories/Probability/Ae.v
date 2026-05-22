@@ -1,4 +1,4 @@
-(* Distributional RHL with additive errors. *)
+(* Distribution facts for additive-error couplings. *)
 
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra.
@@ -6,13 +6,15 @@ From mathcomp Require Import reals distr.
 From mathcomp Require Import realseq realsum exp lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
-From SSProve.Crypt Require Import Axioms.
-
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 
 Import GRing.Theory Num.Theory Order.Theory Order.POrderTheory.
 
 Local Open Scope ring_scope.
+
+Section AdditiveErrorCouplings.
+
+Context {R : realType}.
 
 Definition complete_mass {T : choiceType} (D : {distr T / R}) : option T -> R :=
   fun x =>
@@ -107,3 +109,5 @@ Lemma coupling_with_loss_bind
       (\dlet_(xR <- MR) KR xR) /\
     \P_[ d ] post >= 1 - (ε + ε').
 Admitted.
+
+End AdditiveErrorCouplings.
