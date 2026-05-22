@@ -72,10 +72,10 @@ Proof. by []. Qed.
 
 Definition coupling_with_loss
   {outL_t outR_t : ord_choiceType}
-  (d : {distr (option outL_t * option outR_t) / R})
+  (d : {distr (outL_t * outR_t) / R})
   (outL : {distr outL_t / R})
   (outR : {distr outR_t / R}) : Prop :=
-  coupling d (complete outL) (complete outR).
+  dmargin fst d <=1 outL /\ dmargin snd d <=1 outR.
 
 Definition lift_loss_post
   {outL_t outR_t : choiceType}
@@ -97,8 +97,7 @@ Definition additiveErrorJudgment
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
     let out1 := Pr_code (progL xL) memL in
     let out2 := Pr_code (progR xR) memR in
-    ∃ d, coupling_with_loss d out1 out2 ∧
-      \P_[ d ] (fun outs => match outs with | (Some outL, Some outR) => post (outL, outR) | _ => false end) >= 1 - ε.
+    ∃ d, coupling_with_loss d out1 out2 ∧ \P_[ d ] post >= 1 - ε.
 
 Declare Scope AeNotations.
 Local Open Scope AeNotations.
@@ -122,7 +121,7 @@ Lemma additiveErrorCoupleRule
     let out2 := Pr_code (progR xR) memR in
     coupling_with_loss (wit memL memR xL xR Hpre) out1 out2) ->
   (forall memL memR xL xR Hpre,
-    \P_[ wit memL memR xL xR Hpre ] (fun outs => match outs with | (Some outL, Some outR) => post (outL, outR) | _ => false end) >= 1 - ε) ->
+    \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->
   ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄.
 Proof.
 move=> Heps Hcoupling Hpost.
@@ -187,21 +186,8 @@ split; first by lra.
 move=> memL memR xL xR Hpre'.
 have [d [Hd Hprob]] := Hae memL memR xL xR (Hpre _ Hpre').
 exists d; split; first exact: Hd.
-(* Weakening the original postcondition weakens its lifted Some/Some version. *)
-have Hmono :
-    \P_[d] (fun outs =>
-      match outs with
-      | (Some outL, Some outR) => post (outL, outR)
-      | _ => false
-      end)
-    <=
-    \P_[d] (fun outs =>
-      match outs with
-      | (Some outL, Some outR) => post' (outL, outR)
-      | _ => false
-      end).
+have Hmono : \P_[d] post <= \P_[d] post'.
   apply: subset_pr => out Hout.
-  case: out Hout => [[outL|] [outR|]] //= .
   exact: Hpost.
 (* Increasing the error budget lowers the required success threshold. *)
 have Hthreshold : 1 - ε' <= 1 - ε by lra.
