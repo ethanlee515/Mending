@@ -1,8 +1,6 @@
 (* RHL with Pythagorean Errors *)
 
 From Stdlib Require Import Unicode.Utf8.
-From Stdlib Require Import List.
-From Stdlib Require Import Lia.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra.
@@ -12,7 +10,6 @@ Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
-From SSProve Require Import FreeProbProg.
 From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
 From Mending.Probability Require Import KL.
@@ -22,24 +19,10 @@ From Mending.ProgramLogics.Distribution Require Import Pyth.
 From Mending.ProgramLogics.Rawcode Require Import Ae.
 Local Open Scope AeNotations.
 
-Import ListNotations.
 Import PackageNotation.
 Import pkg_heap.
-Local Open Scope list_scope.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
-
-Arguments retrFree {_ _ _} _.
-Arguments bindrFree {_ _ _ _} _ _.
-Arguments callrFree {_ _ } _.
-
-Program Definition lift_i {ℓ : nat} {t : 'I_(ℓ.+1)} (i : 'I_t) : 'I_(ℓ.+1) :=
-  widen_ord _ i.
-Next Obligation.
-move => ℓ t i.
-have ?: (t < ℓ.+1)%N by apply ltn_ord.
-lia.
-Defined.
 
 Definition pythJudgment
   {ℓ : nat}
