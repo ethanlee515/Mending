@@ -1,4 +1,5 @@
 From Stdlib Require Import Unicode.Utf8.
+From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra.
 From mathcomp Require Import reals distr.
@@ -90,7 +91,31 @@ Lemma additiveErrorTvdEqRule
   (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
     total_variation (Pr_code (progL xL) memL)
                     (Pr_code (progR xR) memR) <= ε) ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ fun outs => outs.1.1 == outs.2.1 ⦄.
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+    fun outs =>
+      let '((y_1, m_1'), (y_2, m_2')) := outs in
+      (y_1 == y_2) && (m_1' == m_2') ⦄.
+Admitted.
+
+Lemma additiveErrorTvdEqPostRule
+  {inL_t inR_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (post : pred (out_t * heap))
+  (ε : R) :
+  0 <= ε ->
+  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
+    total_variation (Pr_code (progL xL) memL)
+                    (Pr_code (progR xR) memR) <= ε) ->
+  (forall memL memR xL xR y,
+    pre ((xL, memL), (xR, memR)) ->
+    y \in dinsupp (Pr_code (progL xL) memL) ->
+    post y) ->
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+    fun outs =>
+      let '((y_1, m_1'), (y_2, m_2')) := outs in
+      post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2') ⦄.
 Admitted.
 
 Lemma additiveErrorReflRule

@@ -4,7 +4,7 @@ From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_ssreflect all_algebra.
-From mathcomp Require Import reals distr ssrZ.
+From mathcomp Require Import reals distr ssrZ realseq realsum.
 From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
@@ -110,8 +110,30 @@ Lemma MicciancioWalterRule
       let '((y_1, m_1'), (y_2, m_2')) := outs in
       post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2')⦄.
 Proof.
-move => *.
-Admitted.
+move=> Hpyth.
+apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)).
+- rewrite /pythagorean_tv_bound.
+  exact: Num.Theory.sqrtr_ge0.
+- move=> memL memR xL xR Hpre.
+  have [Ω [X [coord [final [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+    Hpyth memL memR xL xR Hpre.
+  pose outL := Pr_code (progL xL) memL.
+  pose outR := Pr_code (progR xR) memR.
+  have Htv := pythDistWithFinal_total_variation coord final P Q s Hdist.
+  have Htv_eq :
+      total_variation outL outR =
+      total_variation (dmargin final P) (dmargin final Q).
+    rewrite /total_variation.
+    congr (_ * _).
+    apply/eq_sum=> y.
+    by rewrite -(HmarginL y) -(HmarginR y).
+  rewrite Htv_eq.
+  exact: Htv.
+- move=> memL memR xL xR y Hpre Hy.
+  have [Ω [X [coord [final [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+    Hpyth memL memR xL xR Hpre.
+  exact: HpostL.
+Qed.
 
 Lemma pythConseqRule
   {ℓ : nat}

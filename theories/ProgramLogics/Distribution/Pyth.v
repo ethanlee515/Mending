@@ -9,7 +9,7 @@ From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import Axioms.
 
 From Mending.Probability Require Import KL.
-From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.
 
@@ -63,5 +63,14 @@ Definition pythDistWithFinal
     (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
     (P Q : {distr Ω / R}) (eps : n.+1.-tuple R) : Prop :=
   pythDist (rcons_coord coord final) P Q eps.
+
+Lemma pythDistWithFinal_total_variation
+    {n : nat} {Ω A : choiceType} {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
+    (P Q : {distr Ω / R}) (eps : n.+1.-tuple R) :
+  pythDistWithFinal coord final P Q eps ->
+  total_variation (dmargin final P) (dmargin final Q) <=
+    pythagorean_tv_bound eps.
+Admitted.
 
 End PythagoreanDistributionJudgments.
