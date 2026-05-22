@@ -16,8 +16,10 @@ From SSProve Require Import FreeProbProg.
 From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
 From Mending.KL Require Import KL.
-From Mending Require Import DistrExtras SspDG.
-From Mending Require Import RhlAe RhlPythDist.
+From Mending.MathcompExtras Require Import DistrExtras RealTupleExtras.
+From Mending.Preliminaries Require Import SspDG.
+From Mending.ProgramLogics.Distribution Require Import Pyth.
+From Mending.ProgramLogics.Rawcode Require Import Ae.
 Local Open Scope AeNotations.
 
 Import ListNotations.
@@ -30,15 +32,6 @@ Local Open Scope ring_scope.
 Arguments retrFree {_ _ _} _.
 Arguments bindrFree {_ _ _ _} _ _.
 Arguments callrFree {_ _ } _.
-
-Fixpoint sum_squares (lst : list R) :=
-  match lst with
-  | [] => 0
-  | head :: tail => head * head + sum_squares tail
-  end.
-
-Definition l2_norm (eps_lst : list R) := Num.sqrt (sum_squares eps_lst).
-
 
 Program Definition lift_i {ℓ : nat} {t : 'I_(ℓ.+1)} (i : 'I_t) : 'I_(ℓ.+1) :=
   widen_ord _ i.
@@ -76,19 +69,6 @@ Local Open Scope pyth_scope.
 
 Notation "⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
   (pythJudgment progL progR pre post s) : pyth_scope.
-
-Definition tuple_sum {n : nat} (s : n.-tuple R) : R :=
-  \sum_(i < n) tnth s i.
-
-Definition tuple_sum_squares {n : nat} (s : n.-tuple R) : R :=
-  \sum_(i < n) (tnth s i) ^+ 2.
-
-Definition two_norm {n : nat} (s : n.-tuple R) : R :=
-  Num.sqrt (tuple_sum_squares s).
-
-Definition pythagorean_tv_bound {n : nat} (s : n.-tuple R) : R :=
-  Num.sqrt (tuple_sum s / 2).
-
 
 Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code out_t :=
   x <$ (existT _ out_t D) ;;
