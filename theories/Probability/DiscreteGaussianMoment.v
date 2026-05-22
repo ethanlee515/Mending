@@ -10,9 +10,9 @@ From mathcomp Require Import lra.
 From mathcomp.algebra_tactics Require Import ring.
 Import GRing.Theory Num.Theory Order.Theory.
 
-From Mending Require Import DiscreteGaussian.
-From Mending Require Import RealSumExtras.
-From Mending Require Import DistrExtras.
+From Mending.Probability Require Import DiscreteGaussian.
+From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 
 Local Open Scope ring_scope.
 

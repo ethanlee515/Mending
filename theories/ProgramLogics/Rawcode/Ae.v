@@ -4,7 +4,7 @@ From mathcomp Require Import all_ssreflect all_algebra.
 From mathcomp Require Import reals distr.
 From mathcomp Require Import realseq realsum exp.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
-From Mending.MathcompExtras Require Import DistrExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.

@@ -8,7 +8,7 @@ Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import Axioms FreeProbProg Theta_dens.
 
-From Mending.MathcompExtras Require Import DistrExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 From Mending.ProgramLogics.Distribution Require Import Pyth.
 
 Import GRing.Theory Num.Theory Order.Theory.

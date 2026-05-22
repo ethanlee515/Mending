@@ -5,7 +5,10 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
-From Mending Require Import ApproxFHE IntVec Indcpa Indcpad DTuple DiscreteGaussian.
+From Mending.Schemes Require Import ApproxFHE Indcpa Indcpad.
+From Mending.Schemes.Utils Require Import IntVec.
+From Mending.LibExtras.MathcompExtras Require Import DTuple.
+From Mending.Probability Require Import DiscreteGaussian.
 From extructures Require Import ord fset fmap.
 Import PackageNotation.
 Local Open Scope package_scope.

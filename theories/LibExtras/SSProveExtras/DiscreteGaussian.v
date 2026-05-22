@@ -6,12 +6,12 @@ From mathcomp Require Import all_ssreflect all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import distr.
 From SSProve Require Import Axioms choice_type Package.
-From Mending Require Import DiscreteGaussian.
+From Mending.Probability Require Import DiscreteGaussian.
 Import ssrZ.
 Import PackageNotation.
 Local Open Scope package_scope.
 
-From Mending Require Import ChoiceVector.
+From Mending.LibExtras.SSProveExtras Require Import ChoiceVector.
 From mathcomp Require Import reals.
 
 Definition ssp_dg (m : 'int) (s : R) : distr R 'int :=

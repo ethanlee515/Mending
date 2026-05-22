@@ -10,7 +10,7 @@ From mathcomp Require Import lra.
 Import GRing.Theory Num.Theory Order.Theory.
 From Stdlib Require Import Ring.
 From mathcomp.algebra_tactics Require Import ring.
-From Mending Require Import RealSumExtras.
+From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
 
 Local Open Scope fset_scope.
 Local Open Scope ring_scope.

@@ -3,7 +3,9 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
-From Mending Require Import ApproxFHE IntVec Indcpa Indcpad NoiseFlooding.
+From Mending.Schemes Require Import ApproxFHE Indcpa Indcpad.
+From Mending.Constructions Require Import NoiseFlooding.
+From Mending.Schemes.Utils Require Import IntVec.
 
 Local Open Scope ring_scope.
 

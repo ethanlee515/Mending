@@ -5,7 +5,7 @@ Set Warnings "notation-overridden,ambiguous-paths".
 From extructures Require Import ord fset fmap.
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import NominalPrelude.
-From Mending Require Import IntVec.
+From Mending.Schemes.Utils Require Import IntVec.
 Import PackageNotation.
 Import Order.Theory.
 Local Open Scope package_scope.

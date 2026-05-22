@@ -4,7 +4,7 @@ From mathcomp Require Import realseq realsum exp.
 From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
-From Mending Require Import DistrExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.
 

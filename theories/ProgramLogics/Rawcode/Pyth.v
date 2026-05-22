@@ -15,9 +15,9 @@ From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve Require Import FreeProbProg.
 From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
-From Mending.KL Require Import KL.
-From Mending.MathcompExtras Require Import DistrExtras RealTupleExtras.
-From Mending.Preliminaries Require Import SspDG.
+From Mending.Probability Require Import KL.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
+From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
 From Mending.ProgramLogics.Distribution Require Import Pyth.
 From Mending.ProgramLogics.Rawcode Require Import Ae.
 Local Open Scope AeNotations.

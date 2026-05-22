@@ -5,7 +5,7 @@ Set Warnings "notation-overridden,ambiguous-paths".
 From extructures Require Import ord fset fmap.
 From SSProve Require Import Axioms pkg_core_definition Package Prelude.
 From SSProve Require Import Adv NominalPrelude choice_type.
-From Mending Require Import ChoiceVector SspDG.
+From Mending.LibExtras.SSProveExtras Require Import ChoiceVector DiscreteGaussian.
 
 Import PackageNotation.
 Local Open Scope package_scope.

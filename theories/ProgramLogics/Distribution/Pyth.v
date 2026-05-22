@@ -8,8 +8,8 @@ Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import Axioms.
 
-From Mending.KL Require Import KL.
-From Mending.MathcompExtras Require Import DistrExtras.
+From Mending.Probability Require Import KL.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.
 

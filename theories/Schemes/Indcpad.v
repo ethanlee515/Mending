@@ -4,9 +4,10 @@ From mathcomp Require Import all_ssreflect all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import NominalPrelude.
-From Mending Require Import ApproxFHE ListExtras.
+From Mending.Schemes Require Import ApproxFHE.
+From Mending.LibExtras.MathcompExtras Require Import ListExtras.
 From mathcomp Require Import seq.
-From Mending Require Import ApproxFHE.
+From Mending.Schemes Require Import ApproxFHE.
 
 Import PackageNotation.
 Local Open Scope package_scope.

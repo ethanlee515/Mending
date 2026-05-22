@@ -12,14 +12,13 @@ Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import Adv.
 From SSProve Require Import NominalPrelude.
-From Mending Require Import Indcpad ApproxFHE.
+From Mending.Schemes Require Import Indcpad ApproxFHE.
 From mathcomp Require Import seq.
 From extructures Require Import ord fset fmap.
-From Mending Require Import DiscreteGaussian.
-From Mending Require Import IntVec.
-From Mending Require Import ChoiceVector.
-From Mending Require Import ListExtras.
-From Mending Require Import Misc.
+From Mending.Probability Require Import DiscreteGaussian.
+From Mending.Schemes.Utils Require Import IntVec.
+From Mending.LibExtras.SSProveExtras Require Import ChoiceVector.
+From Mending.LibExtras.MathcompExtras Require Import ListExtras.
 From SSProve Require Import choice_type.
 
 Import PackageNotation.
@@ -27,7 +26,7 @@ Local Open Scope package_scope.
 Local Open Scope seq_scope.
 Local Open Scope fset_scope.
 
-From Mending Require Import NoiseFlooding.
+From Mending.Constructions Require Import NoiseFlooding.
 
 Module IndCpadSimulator (Import S: ApproxFheScheme)
   (Import Metric: ApproxFheMetric(S))

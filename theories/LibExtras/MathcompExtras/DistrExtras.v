@@ -7,7 +7,7 @@ From mathcomp Require Import lra.
 From mathcomp.algebra_tactics Require Import ring.
 Import GRing.Theory Num.Theory Order.Theory.
 
-From Mending Require Import RealSumExtras.
+From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
 
 Open Scope ring_scope.
 
