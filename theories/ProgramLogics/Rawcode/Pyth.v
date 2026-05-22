@@ -158,7 +158,11 @@ Lemma aePythSeqRule
   (s : (ℓ.+1).-tuple R) :
   ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃ mid ⦄ ->
   ⊨Pyth ⦃ mid ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
-  ⊨Pyth ⦃ pre ⦄ seqRaw progL contL ≈( s ) seqRaw progR contR ⦃ post ⦄.
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( s )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
 Admitted.
 
 Lemma pythSeqRule
@@ -177,44 +181,9 @@ Lemma pythSeqRule
   (forall aL aR, left_post aL -> left_post aR -> mid (aL, aR)) ->
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ left_post ⦄ ->
   ⊨Pyth ⦃ mid ⦄ contL ≈( s' ) contR ⦃ post ⦄ ->
-  ⊨Pyth ⦃ pre ⦄ seqRaw progL contL ≈( cat_tuple s s' ) seqRaw progR contR ⦃ post ⦄.
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( cat_tuple s s' )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
 Admitted.
-
-(**
-    @FrStP mem_t out_t → @FrStP mem_t out_t → list R → Prop :=
-Inductive equiv_with_pythagorean_errors :
-  ∀ (out_t : ord_choiceType) (mem_t : choiceType),
-    @FrStP mem_t out_t → @FrStP mem_t out_t → list R → Prop :=
-| pyth_ret_eq {out_t : ord_choiceType} (mem_t : choiceType) (v : out_t) :
-    equiv_with_pythagorean_errors out_t mem_t (retrFree v) (retrFree v) []
-| pyth_same_op {supp_t : choice_type} (mem_t : choiceType)
-  (P : {distr supp_t / R}) :
-  equiv_with_pythagorean_errors _ mem_t
-    (callrFree (samplee (existT _ supp_t P)))
-    (callrFree (samplee (existT _ supp_t P))) [ ]
-| pyth_eps_samp {supp_t : choice_type} (mem_t : choiceType)
-    (P Q : {distr supp_t / R}) (ε : R) :
-  δ_KL P Q < ε →
-  equiv_with_pythagorean_errors _ mem_t
-    (callrFree (samplee (existT _ supp_t P)))
-    (callrFree (samplee (existT _ supp_t Q))) [ ε ]
-| pyth_bind_eq (mem_t: choiceType) (outA_t outB_t : ord_choiceType)
-    (progA_L progA_R : @FrStP mem_t outA_t) (progB_L progB_R : outA_t → @FrStP mem_t outB_t)
-    (ε_L ε_R : list R) :
-  equiv_with_pythagorean_errors outA_t mem_t progA_L progA_R ε_L →
-  (∀ a, equiv_with_pythagorean_errors outB_t mem_t (progB_L a) (progB_R a) ε_R) →
-  equiv_with_pythagorean_errors outB_t mem_t
-    (bindrFree progA_L progB_L) (bindrFree progA_R progB_R) (ε_L ++ ε_R).
-
-
-Local Open Scope AeNotations.
-
-Theorem mw18 (out_t : ord_choiceType) (mem_t : choiceType)
-  (progL progR : @FrStP mem_t out_t) (eps_lst : list R) :
-  equiv_with_pythagorean_errors out_t mem_t progL progR eps_lst →
-  equiv_with_additive_error progL progR
-  (fun mems => match mems with (mL, mR) => mL == mR end)
-  (fun results => match results with (resL, resR) => resL == resR end)
-  (l2_norm eps_lst).
-Admitted.
-*)
