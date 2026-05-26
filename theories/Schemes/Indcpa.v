@@ -14,8 +14,10 @@ Local Open Scope ring_scope.
 Module IndCpa(Import S: ApproxFheScheme).
   (* -- Variables and their addresses -- *)
   Definition pk_addr : Location := mkloc 100 (None : 'option pk_t).
+  Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
   (* Function labels *)
   Definition oracle_encrypt : nat := 200.
+  Definition get_keys : nat := 205.
   Definition adv_set_keys : nat := 300.
   Definition adv_guess : nat := 301.
   Definition main : nat := 400.
@@ -32,11 +34,22 @@ Module IndCpa(Import S: ApproxFheScheme).
     [interface]
     (* oracle initialization and two oracle calls *)
     [interface
+      #val #[get_keys] : 'unit → 'adv_keys ;
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext
     ].
 
   Definition IndCpaOracle (b: bool) : IndCpaOracle_t :=
-    [package [fmap pk_addr] ;
+    [package [fmap pk_addr; evk_addr] ;
+      #def #[get_keys] (_ : 'unit) : 'adv_keys
+      {
+        opk ← get pk_addr ;;
+        #assert isSome opk as pk_is_set ;;
+        let pk := getSome opk pk_is_set in
+        oevk ← get evk_addr ;;
+        #assert isSome oevk as evk_is_set ;;
+        let evk := getSome oevk evk_is_set in
+        ret (pk, evk)
+      } ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
       {
         let (m0, m1) := messages in
@@ -51,55 +64,48 @@ Module IndCpa(Import S: ApproxFheScheme).
 
   Definition IndCpaAdv_t := package
     [interface
+      #val #[get_keys] : 'unit → 'adv_keys ;
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext
     ]
     [interface
-      #val #[adv_guess] : 'adv_keys → 'bool
+      #val #[adv_guess] : 'unit → 'bool
     ].
 
   Definition IndCpaChallenger_t := package
     [interface
-      #val #[adv_guess] : 'adv_keys → 'bool
+      #val #[adv_guess] : 'unit → 'bool
     ]
     [interface
       #val #[main] : 'unit → 'bool
     ].
 
   Definition IndCpaChallenger : IndCpaChallenger_t :=
-    [package [fmap pk_addr] ;
+    [package [fmap pk_addr; evk_addr] ;
       #def #[main] (_ : 'unit) : 'bool
       {
         keys <$ (pk_t × evk_t × sk_t; keygen) ;;
         let '(pk, evk, sk) := keys in
         #put pk_addr := Some pk ;;
-        b' ← call [ adv_guess ] : { pk_t × evk_t ~> 'bool} (pk, evk) ;;
-        ret true
+        #put evk_addr := Some evk ;;
+        b' ← call [ adv_guess ] : { 'unit ~> 'bool} tt ;;
+        ret b'
       }
     ].
 
-  Definition IndCpaGame (b : bool) (Adv: IndCpaAdv_t) :=
+  Definition IndCpaGame (b : bool) (Adv: raw_package) :=
     IndCpaChallenger ∘ Adv ∘ IndCpaOracle b .
   
-  Definition game_out (b : bool) (Adv: IndCpaAdv_t) : distr R bool :=
+  Definition game_out (b : bool) (Adv: raw_package) : distr R bool :=
     dfst (Pr_op (IndCpaGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
 
-  Definition winning_probability (Adv: IndCpaAdv_t) :=
+  Definition winning_probability (Adv: raw_package) :=
     `|(game_out false Adv) true - (game_out true Adv) true|.
 End IndCpa.
 
 Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
   Module IndCpaGame := IndCpa Scheme.
   Import IndCpaGame.
-  (* Because we're in the public key setting there's no way to avoid this.
-   * Pick you favorite from LWE, RLWE, or MLWE.
-   * Isn't isogeny fine too?
-   *
-   * You can't have more than one though. That's crazy. *)
-  Parameter crypto_assumption_oracles : Interface.
-  Parameter crypto_assumption :
-    bool -> game crypto_assumption_oracles.
   Parameter security_loss : R.
-  Axiom is_secure : forall A, exists Red,
-    winning_probability A <=
-    Advantage crypto_assumption Red + security_loss.
+  Axiom is_secure : forall (A : raw_package),
+    winning_probability A <= security_loss.
 End IsIndCpa.

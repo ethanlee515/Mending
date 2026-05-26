@@ -38,7 +38,7 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
   Definition ready_addr : Location := mkloc 103 (false : 'bool).
   Definition table_addr : Location := mkloc 104 (nil : simulator_table).
-  Definition get_keys : nat := 200.
+  Definition get_keys : nat := 205.
   Definition oracle_encrypt : nat := 201.
   Definition oracle_eval1 : nat := 202.
   Definition oracle_eval2 : nat := 203.

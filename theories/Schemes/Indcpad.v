@@ -22,19 +22,23 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition sk_addr : Location := mkloc 102 (None : 'option sk_t).
   Definition table_addr : Location := mkloc 104 (nil : challenger_table).
   (* Function labels *)
-  Definition get_keys : nat := 200.
+  Definition get_keys : nat := 205.
   Definition oracle_encrypt : nat := 201.
   Definition oracle_eval1 : nat := 202.
   Definition oracle_eval2 : nat := 203.
   Definition oracle_decrypt : nat := 204.
 
+  Notation " 'pk_t " := pk_t (in custom pack_type at level 2).
+  Notation " 'evk_t " := evk_t (in custom pack_type at level 2).
   Notation " 'message " := message (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
+  Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
 
   (* IND-CPA oracle interface *)
   Definition IndCpaOracle_t := package
     [interface]
     [interface
+      [get_keys] : { 'unit ~> (pk_t × evk_t) } ;
       [oracle_encrypt] : { message × message ~> ciphertext } ;
       [oracle_eval1] : {unary_gate × 'nat ~> ciphertext } ;
       [oracle_eval2] : { binary_gate × 'nat× 'nat ~> ciphertext } ;
@@ -44,6 +48,16 @@ Module IndCpad(Import S: ApproxFheScheme).
 
   Definition IndCpadOracle (b: bool) : IndCpaOracle_t :=
     [package oracle_mem_spec ;
+      #def #[get_keys] (_: 'unit) : ('pk_t × 'evk_t)
+      {
+        opk ← get pk_addr ;;
+        #assert isSome opk as pk_is_set ;;
+        let pk := getSome opk pk_is_set in
+        oevk ← get evk_addr ;;
+        #assert isSome oevk as evk_is_set ;;
+        let evk := getSome oevk evk_is_set in
+        ret (pk, evk)
+      } ;
       #def #[oracle_encrypt] ('(m0, m1) : 'message × 'message ) : 'ciphertext
       {
         let m := if b then m1 else m0 in
@@ -109,6 +123,52 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition send_next_input := 500%N.
   Definition receive_output := 501%N.
   Definition guess := 502%N.
+  Definition main : nat := 503%N.
+
+  Definition IndCpadAdv_t := package
+    [interface
+      [get_keys] : { 'unit ~> (pk_t × evk_t) } ;
+      [oracle_encrypt] : { message × message ~> ciphertext } ;
+      [oracle_eval1] : { unary_gate × nat ~> ciphertext } ;
+      [oracle_eval2] : { binary_gate × nat × nat ~> ciphertext } ;
+      [oracle_decrypt] : { 'nat ~> 'option message }
+    ]
+    [interface
+      [guess] : { 'unit ~> 'bool }
+    ].
+
+  Definition IndCpadChallenger_t := package
+    [interface
+      [guess] : { 'unit ~> 'bool }
+    ]
+    [interface
+      [main] : { 'unit ~> 'bool }
+    ].
+
+  Definition IndCpadChallenger : IndCpadChallenger_t :=
+    [package oracle_mem_spec ;
+      #def #[main] (_ : 'unit) : 'bool
+      {
+        keys <$ (pk_t × evk_t × sk_t; keygen) ;;
+        let '(pk, evk, sk) := keys in
+        #put pk_addr := Some pk ;;
+        #put evk_addr := Some evk ;;
+        #put sk_addr := Some sk ;;
+        b' ← call [ guess ] : { 'unit ~> 'bool} tt ;;
+        ret b'
+      }
+    ].
+
+  Definition IndCpadGame (b : bool) (Adv : IndCpadAdv_t) :=
+    IndCpadChallenger ∘ Adv ∘ IndCpadOracle b.
+
+  Definition game_out (b : bool) (Adv : IndCpadAdv_t) : distr R bool :=
+    dfst (Pr_op (IndCpadGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
+
+  Local Open Scope ring_scope.
+
+  Definition winning_probability (Adv : IndCpadAdv_t) :=
+    `|(game_out false Adv) true - (game_out true Adv) true|.
 
   Definition FactoredAdversary_t := package
     [interface
@@ -154,15 +214,8 @@ Local Open Scope ring_scope.
 Module Type IsIndCpad(Import Scheme: ApproxFheScheme).
   Module IndCpadGame := IndCpad Scheme.
   Import IndCpadGame.
-  Parameter crypto_assumption_oracles : Interface.
-  Parameter crypto_assumption :
-    bool -> game crypto_assumption_oracles.
-  (* Security loss depends on max queries*)
+  (* Security loss depends on max queries. *)
   Parameter security_loss : nat -> R.
-  (*
-  Axiom is_secure : forall A, exists Red,
-    forall max_queries,
-    Advantage (IndCpadOracle) A <=
-    Advantage crypto_assumption Red + (security_loss max_queries).
-    *)
+  Axiom is_secure : forall (A : IndCpadAdv_t) (max_queries : nat),
+    winning_probability A <= security_loss max_queries.
 End IsIndCpad.
