@@ -1,1 +1,0 @@
-Here we machine-check the [LMSS22](https://ia.cr/2022/816) paper.
