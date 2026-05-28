@@ -12,7 +12,7 @@ Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import Adv.
 From SSProve Require Import NominalPrelude.
-From Mending.Schemes Require Import Indcpad ApproxFHE.
+From Mending.Schemes Require Import Indcpa Indcpad ApproxFHE.
 From mathcomp Require Import seq.
 From extructures Require Import ord fset fmap.
 From Mending.Probability Require Import DiscreteGaussian.
@@ -23,6 +23,7 @@ From SSProve Require Import choice_type.
 
 Import PackageNotation.
 Local Open Scope package_scope.
+Local Open Scope sep_scope.
 Local Open Scope seq_scope.
 Local Open Scope fset_scope.
 
@@ -31,6 +32,9 @@ From Mending.Constructions Require Import NoiseFlooding.
 Module IndCpadSimulator (Import S: ApproxFheScheme)
   (Import Metric: ApproxFheMetric(S))
   (Import Params : NoiseFloodingParams).
+  Module NF := NoiseFlooding(S)(Metric)(Params).
+  Module IndCpaGame := IndCpa S.
+  Module IndCpadGame := IndCpad NF.
   (* Copied from oracle *)
   Definition simulator_table_row := message × message × ciphertext.
   Definition simulator_table := chList simulator_table_row.
@@ -50,6 +54,23 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Notation " 'adv_ev1 " := (unary_gate × 'nat) (in custom pack_type at level 2).
   Notation " 'adv_ev2 " := (binary_gate × 'nat × 'nat) (in custom pack_type at level 2).
   Notation " 'option_message " := (chOption message) (in custom pack_type at level 2).
+  Definition IndCpadAdv_import :=
+    [interface
+      #val #[oracle_encrypt] : 'message_pair → 'ciphertext ;
+      #val #[oracle_eval1] : 'adv_ev1 → 'ciphertext ;
+      #val #[oracle_eval2] : 'adv_ev2 → 'ciphertext ;
+      #val #[oracle_decrypt] : 'nat → 'option_message
+    ].
+
+  Definition adv_guess := 301%N.
+
+  Definition IndCpadAdv_export :=
+    [interface
+      #val #[adv_guess] : 'adv_keys → 'bool
+    ].
+
+  Definition IndCpadAdv_t := package IndCpadAdv_import IndCpadAdv_export.
+
   (* Simulator interface *)
   Definition IndCpaSim_t := package
     (* Uses the IND-CPA encryption oracle. *)
@@ -57,12 +78,7 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext
     ]
     (* Provides the IND-CPA-D oracle surface. *)
-    [interface
-      #val #[oracle_encrypt] : 'message_pair → 'ciphertext ;
-      #val #[oracle_eval1] : 'adv_ev1 → 'ciphertext ;
-      #val #[oracle_eval2] : 'adv_ev2 → 'ciphertext ;
-      #val #[oracle_decrypt] : 'nat → 'option_message
-    ].
+    IndCpadAdv_import.
   Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; ready_addr; table_addr].
 
   (* Some nonsense with 'int vs int vs Z... to fix with ssrZ. *)
@@ -141,8 +157,6 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
     ].
 
 
-  Definition adv_guess := 301%N.
-
   Definition IndCpaSimTop_t := package
     [interface
       #val #[adv_guess] : 'adv_keys → 'bool
@@ -165,8 +179,39 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
       }
     ].
 
+  Definition IndCpaReduction_nom (A : IndCpadAdv_t) (max_queries: nat) : nom_package :=
+    ((IndCpaSimTop ∘ A)%sep ∘ IndCpadOracle max_queries)%share.
+
+  Definition IndCpaReduction_package (A : IndCpadAdv_t) (max_queries: nat) : raw_package :=
+    IndCpaReduction_nom A max_queries.
+
   Definition IndCpaReduction (A : raw_package) (max_queries: nat) : raw_package :=
-    IndCpaSimTop ∘ A ∘ IndCpadOracle max_queries.
+    (IndCpaSimTop ∘ A ∘ IndCpadOracle max_queries)%pack.
+
+  Definition IndCpaReduction_locs (A : IndCpadAdv_t) (max_queries: nat) : Locations :=
+    loc (IndCpaReduction_nom A max_queries).
+
+  Lemma IndCpaReduction_valid :
+    forall (A : IndCpadAdv_t) max_queries,
+      ValidPackage (IndCpaReduction_locs A max_queries)
+        IndCpaGame.IndCpaAdv_import
+        IndCpaGame.IndCpaAdv_export
+        (IndCpaReduction_package A max_queries).
+  Proof.
+    move=> A max_queries.
+    rewrite /IndCpaReduction_locs /IndCpaReduction_package /IndCpaReduction_nom.
+    typeclasses eauto with ssprove_valid_db.
+    Unshelve.
+    all: try fmap_solve.
+    rewrite sep_linkE /=; apply union_fcompat.
+    - fmap_solve.
+    - apply fseparate_compat.
+      rewrite fseparate_disj.
+      change (disj (fresh (IndCpaSimTop : nom_package) (A : nom_package) ∙ (A : nom_package))
+        (IndCpaSimTop : nom_package)).
+      rewrite disjC.
+      apply fresh_disjoint.
+  Qed.
 
 (* TODO maybe adversary map from A to R in the end...
  * Should hopefully just be composition? *)
