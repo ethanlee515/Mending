@@ -22,11 +22,11 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition sk_addr : Location := mkloc 102 (None : 'option sk_t).
   Definition table_addr : Location := mkloc 104 (nil : challenger_table).
   (* Function labels *)
-  Definition get_keys : nat := 205.
-  Definition oracle_encrypt : nat := 201.
+  Definition oracle_encrypt : nat := 200.
   Definition oracle_eval1 : nat := 202.
   Definition oracle_eval2 : nat := 203.
   Definition oracle_decrypt : nat := 204.
+  Definition guess := 301%N.
 
   Notation " 'pk_t " := pk_t (in custom pack_type at level 2).
   Notation " 'evk_t " := evk_t (in custom pack_type at level 2).
@@ -34,11 +34,23 @@ Module IndCpad(Import S: ApproxFheScheme).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
   Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
 
+  Definition IndCpadAdv_import :=
+    [interface
+      [oracle_encrypt] : { message × message ~> ciphertext } ;
+      [oracle_eval1] : { unary_gate × nat ~> ciphertext } ;
+      [oracle_eval2] : { binary_gate × nat × nat ~> ciphertext } ;
+      [oracle_decrypt] : { 'nat ~> 'option message }
+    ].
+
+  Definition IndCpadAdv_export :=
+    [interface
+      [guess] : { pk_t × evk_t ~> 'bool }
+    ].
+
   (* IND-CPA oracle interface *)
   Definition IndCpaOracle_t := package
     [interface]
     [interface
-      [get_keys] : { 'unit ~> (pk_t × evk_t) } ;
       [oracle_encrypt] : { message × message ~> ciphertext } ;
       [oracle_eval1] : {unary_gate × 'nat ~> ciphertext } ;
       [oracle_eval2] : { binary_gate × 'nat× 'nat ~> ciphertext } ;
@@ -48,16 +60,6 @@ Module IndCpad(Import S: ApproxFheScheme).
 
   Definition IndCpadOracle (b: bool) : IndCpaOracle_t :=
     [package oracle_mem_spec ;
-      #def #[get_keys] (_: 'unit) : ('pk_t × 'evk_t)
-      {
-        opk ← get pk_addr ;;
-        #assert isSome opk as pk_is_set ;;
-        let pk := getSome opk pk_is_set in
-        oevk ← get evk_addr ;;
-        #assert isSome oevk as evk_is_set ;;
-        let evk := getSome oevk evk_is_set in
-        ret (pk, evk)
-      } ;
       #def #[oracle_encrypt] ('(m0, m1) : 'message × 'message ) : 'ciphertext
       {
         let m := if b then m1 else m0 in
@@ -122,24 +124,13 @@ Module IndCpad(Import S: ApproxFheScheme).
   (* function labels *)
   Definition send_next_input := 500%N.
   Definition receive_output := 501%N.
-  Definition guess := 502%N.
   Definition main : nat := 503%N.
 
-  Definition IndCpadAdv_t := package
-    [interface
-      [get_keys] : { 'unit ~> (pk_t × evk_t) } ;
-      [oracle_encrypt] : { message × message ~> ciphertext } ;
-      [oracle_eval1] : { unary_gate × nat ~> ciphertext } ;
-      [oracle_eval2] : { binary_gate × nat × nat ~> ciphertext } ;
-      [oracle_decrypt] : { 'nat ~> 'option message }
-    ]
-    [interface
-      [guess] : { 'unit ~> 'bool }
-    ].
+  Definition IndCpadAdv_t := package IndCpadAdv_import IndCpadAdv_export.
 
   Definition IndCpadChallenger_t := package
     [interface
-      [guess] : { 'unit ~> 'bool }
+      [guess] : { pk_t × evk_t ~> 'bool }
     ]
     [interface
       [main] : { 'unit ~> 'bool }
@@ -154,20 +145,20 @@ Module IndCpad(Import S: ApproxFheScheme).
         #put pk_addr := Some pk ;;
         #put evk_addr := Some evk ;;
         #put sk_addr := Some sk ;;
-        b' ← call [ guess ] : { 'unit ~> 'bool} tt ;;
+        b' ← call [ guess ] : { pk_t × evk_t ~> 'bool} (pk, evk) ;;
         ret b'
       }
     ].
 
-  Definition IndCpadGame (b : bool) (Adv : IndCpadAdv_t) :=
+  Definition IndCpadGame (b : bool) (Adv : raw_package) :=
     IndCpadChallenger ∘ Adv ∘ IndCpadOracle b.
 
-  Definition game_out (b : bool) (Adv : IndCpadAdv_t) : distr R bool :=
+  Definition game_out (b : bool) (Adv : raw_package) : distr R bool :=
     dfst (Pr_op (IndCpadGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
 
   Local Open Scope ring_scope.
 
-  Definition winning_probability (Adv : IndCpadAdv_t) :=
+  Definition winning_probability (Adv : raw_package) :=
     `|(game_out false Adv) true - (game_out true Adv) true|.
 
   Definition FactoredAdversary_t := package
@@ -179,7 +170,7 @@ Module IndCpad(Import S: ApproxFheScheme).
     [interface
       [send_next_input] : { 'unit ~> 'nat } ;
       [receive_output] : { 'option message ~> 'unit } ;
-      [guess] : {'unit ~> 'bool}
+      [guess] : { pk_t × evk_t ~> 'bool}
     ].
   
   Definition AdvTop_t := package
@@ -187,15 +178,15 @@ Module IndCpad(Import S: ApproxFheScheme).
       [send_next_input] : { 'unit ~> 'nat } ;
       [receive_output] : { 'option message ~> 'unit } ;
       [oracle_decrypt] : { 'nat ~> 'option message } ;
-      [guess] : { 'unit ~> 'bool }
+      [guess] : { pk_t × evk_t ~> 'bool }
     ]
     [interface
-      [guess] : { 'unit ~> 'bool }
+      [guess] : { pk_t × evk_t ~> 'bool }
     ].
 
   Definition AdvTop (num_dec_queries : nat) : AdvTop_t :=
     [package emptym ;
-      #def #[guess] (a : 'unit ) : 'bool
+      #def #[guess] (a : 'adv_keys ) : 'bool
       {
         for_loop (fun _ =>
           i ← call [ send_next_input ] : { 'unit ~> 'nat } tt ;;
@@ -203,7 +194,7 @@ Module IndCpad(Import S: ApproxFheScheme).
           _ ← call [ receive_output ] : { 'option message ~> 'unit } o ;;
           ret tt
         ) num_dec_queries ;;
-        b ← call [ guess ] : { 'unit ~> 'bool} tt ;;
+        b ← call [ guess ] : { pk_t × evk_t ~> 'bool} a ;;
         ret b
       }
     ].
@@ -216,6 +207,8 @@ Module Type IsIndCpad(Import Scheme: ApproxFheScheme).
   Import IndCpadGame.
   (* Security loss depends on max queries. *)
   Parameter security_loss : nat -> R.
-  Axiom is_secure : forall (A : IndCpadAdv_t) (max_queries : nat),
+  Axiom is_secure : forall LA A max_queries,
+    ValidPackage LA IndCpadAdv_import IndCpadAdv_export A ->
+    fseparate LA oracle_mem_spec ->
     winning_probability A <= security_loss max_queries.
 End IsIndCpad.

@@ -34,12 +34,11 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   (* Copied from oracle *)
   Definition simulator_table_row := message × message × ciphertext.
   Definition simulator_table := chList simulator_table_row.
-  Definition pk_addr : Location := mkloc 100 (None : 'option pk_t).
-  Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
-  Definition ready_addr : Location := mkloc 103 (false : 'bool).
-  Definition table_addr : Location := mkloc 104 (nil : simulator_table).
-  Definition get_keys : nat := 205.
-  Definition oracle_encrypt : nat := 201.
+  Definition pk_addr : Location := mkloc 1100 (None : 'option pk_t).
+  Definition evk_addr : Location := mkloc 1101 (None : 'option evk_t).
+  Definition ready_addr : Location := mkloc 1103 (false : 'bool).
+  Definition table_addr : Location := mkloc 1104 (nil : simulator_table).
+  Definition oracle_encrypt : nat := 200.
   Definition oracle_eval1 : nat := 202.
   Definition oracle_eval2 : nat := 203.
   Definition oracle_decrypt : nat := 204.
@@ -53,14 +52,12 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Notation " 'option_message " := (chOption message) (in custom pack_type at level 2).
   (* Simulator interface *)
   Definition IndCpaSim_t := package
-    (* Acts as adversary to IND-CPA *)
+    (* Uses the IND-CPA encryption oracle. *)
     [interface
-      #val #[get_keys] : 'unit → 'adv_keys ;
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext
     ]
-    (* Accepts adversary of IND-CPA-D *)
+    (* Provides the IND-CPA-D oracle surface. *)
     [interface
-      #val #[get_keys] : 'unit → 'adv_keys ;
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext ;
       #val #[oracle_eval1] : 'adv_ev1 → 'ciphertext ;
       #val #[oracle_eval2] : 'adv_ev2 → 'ciphertext ;
@@ -75,17 +72,6 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Parameter noise_distr : nat -> distr R (chVec 'int dim).
   Definition IndCpadOracle (max_queries: nat) : IndCpaSim_t :=
     [package oracle_mem_spec ;
-      #def #[get_keys] (_: 'unit) : 'adv_keys
-      {
-        ready ← get ready_addr;;
-        #assert (~~ready) ;;
-        #put ready_addr := true ;;
-        '(pk, evk) ← call [ get_keys ] : { 'unit ~> adv_keys} tt ;;
-        keys <$ (pk_t × evk_t × sk_t; keygen) ;;
-        let '(pk, evk, sk) := keys in
-        #put evk_addr := Some evk ;;
-        @ret (pk_t × evk_t) (pk, evk)
-      } ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
       {
         ready ← get ready_addr ;;
@@ -153,6 +139,34 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
           @ret ('option message) (None)
       }
     ].
+
+
+  Definition adv_guess := 301%N.
+
+  Definition IndCpaSimTop_t := package
+    [interface
+      #val #[adv_guess] : 'adv_keys → 'bool
+    ]
+    [interface
+      #val #[adv_guess] : 'adv_keys → 'bool
+    ].
+
+  Definition IndCpaSimTop : IndCpaSimTop_t :=
+    [package oracle_mem_spec ;
+      #def #[adv_guess] ('(pk, evk) : 'adv_keys) : 'bool
+      {
+        ready ← get ready_addr ;;
+        #assert (~~ ready) ;;
+        #put ready_addr := true ;;
+        #put pk_addr := Some pk ;;
+        #put evk_addr := Some evk ;;
+        b ← call [ adv_guess ] : { pk_t × evk_t ~> 'bool } (pk, evk) ;;
+        ret b
+      }
+    ].
+
+  Definition IndCpaReduction (A : raw_package) (max_queries: nat) : raw_package :=
+    IndCpaSimTop ∘ A ∘ IndCpadOracle max_queries.
 
 (* TODO maybe adversary map from A to R in the end...
  * Should hopefully just be composition? *)

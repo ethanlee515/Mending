@@ -17,7 +17,6 @@ Module IndCpa(Import S: ApproxFheScheme).
   Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
   (* Function labels *)
   Definition oracle_encrypt : nat := 200.
-  Definition get_keys : nat := 205.
   Definition adv_set_keys : nat := 300.
   Definition adv_guess : nat := 301.
   Definition main : nat := 400.
@@ -28,28 +27,29 @@ Module IndCpa(Import S: ApproxFheScheme).
   Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
 
+  Definition IndCpa_locs : Locations := [fmap pk_addr; evk_addr].
+
+  Definition IndCpaAdv_import :=
+    [interface
+      #val #[oracle_encrypt] : 'message_pair → 'ciphertext
+    ].
+
+  Definition IndCpaAdv_export :=
+    [interface
+      #val #[adv_guess] : 'adv_keys → 'bool
+    ].
+
   (* IND-CPA oracle interface *)
   Definition IndCpaOracle_t := package
     (* No dependencies *)
     [interface]
     (* oracle initialization and two oracle calls *)
     [interface
-      #val #[get_keys] : 'unit → 'adv_keys ;
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext
     ].
 
   Definition IndCpaOracle (b: bool) : IndCpaOracle_t :=
-    [package [fmap pk_addr; evk_addr] ;
-      #def #[get_keys] (_ : 'unit) : 'adv_keys
-      {
-        opk ← get pk_addr ;;
-        #assert isSome opk as pk_is_set ;;
-        let pk := getSome opk pk_is_set in
-        oevk ← get evk_addr ;;
-        #assert isSome oevk as evk_is_set ;;
-        let evk := getSome oevk evk_is_set in
-        ret (pk, evk)
-      } ;
+    [package IndCpa_locs ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
       {
         let (m0, m1) := messages in
@@ -62,32 +62,25 @@ Module IndCpa(Import S: ApproxFheScheme).
       }
     ].
 
-  Definition IndCpaAdv_t := package
-    [interface
-      #val #[get_keys] : 'unit → 'adv_keys ;
-      #val #[oracle_encrypt] : 'message_pair → 'ciphertext
-    ]
-    [interface
-      #val #[adv_guess] : 'unit → 'bool
-    ].
+  Definition IndCpaAdv_t := package IndCpaAdv_import IndCpaAdv_export.
 
   Definition IndCpaChallenger_t := package
     [interface
-      #val #[adv_guess] : 'unit → 'bool
+      #val #[adv_guess] : 'adv_keys → 'bool
     ]
     [interface
       #val #[main] : 'unit → 'bool
     ].
 
   Definition IndCpaChallenger : IndCpaChallenger_t :=
-    [package [fmap pk_addr; evk_addr] ;
+    [package IndCpa_locs ;
       #def #[main] (_ : 'unit) : 'bool
       {
         keys <$ (pk_t × evk_t × sk_t; keygen) ;;
         let '(pk, evk, sk) := keys in
         #put pk_addr := Some pk ;;
         #put evk_addr := Some evk ;;
-        b' ← call [ adv_guess ] : { 'unit ~> 'bool} tt ;;
+        b' ← call [ adv_guess ] : { pk_t × evk_t ~> 'bool} (pk, evk) ;;
         ret b'
       }
     ].
@@ -106,6 +99,8 @@ Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
   Module IndCpaGame := IndCpa Scheme.
   Import IndCpaGame.
   Parameter security_loss : R.
-  Axiom is_secure : forall (A : raw_package),
+  Axiom is_secure : forall LA A,
+    ValidPackage LA IndCpaAdv_import IndCpaAdv_export A ->
+    fseparate LA IndCpa_locs ->
     winning_probability A <= security_loss.
 End IsIndCpa.
