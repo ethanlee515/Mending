@@ -1,3 +1,5 @@
+From Stdlib Require Import BinInt.
+
 (* The main reduction to IND-CPA.
  * The reduction simulates decryption results by computing in the plain:
  * Dec'(Eval(f, Enc(m)) = f(m) + e
@@ -17,7 +19,7 @@ From mathcomp Require Import seq.
 From extructures Require Import ord fset fmap.
 From Mending.Probability Require Import DiscreteGaussian.
 From Mending.Schemes.Utils Require Import IntVec.
-From Mending.LibExtras.SSProveExtras Require Import ChoiceVector.
+From Mending.LibExtras.SSProveExtras Require Import ChoiceVector DiscreteGaussian.
 From Mending.LibExtras.MathcompExtras Require Import ListExtras.
 From SSProve Require Import choice_type.
 
@@ -81,11 +83,9 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
     IndCpadAdv_import.
   Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; ready_addr; table_addr].
 
-  (* Some nonsense with 'int vs int vs Z... to fix with ssrZ. *)
-  Parameter toIntVec : forall {n : nat}, chVec 'int n -> n.-tuple int.
-  Parameter fromIntVec : forall {n : nat}, n.-tuple int -> chVec 'int n.
-  (* TODO maps error bound to wide enough Gaussian *)
-  Parameter noise_distr : nat -> distr R (chVec 'int dim).
+  (* Bridge SSProve package integers to the MathComp integer vectors used by the metric. *)
+  Parameter toIntVec : forall {n : nat}, chVec chInt n -> n.-tuple int.
+
   Definition IndCpadOracle (max_queries: nat) : IndCpaSim_t :=
     [package oracle_mem_spec ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
@@ -112,8 +112,9 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
         #assert isSome o as oevk ;;
         let evk := getSome o oevk in
         let m0' := interpret_unary gate m0 in
+        let m1' := interpret_unary gate m1 in
         c' <$ (ciphertext; eval1 evk gate c) ;;
-        let updated_table := (table ++ [ :: (m0', m1, c')]) in
+        let updated_table := (table ++ [ :: (m0', m1', c')]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         @ret ciphertext c'
@@ -129,11 +130,12 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
         let '(m0i, m1i, ci) := nth_valid table ri ri_in_range in
         let '(m0j, m1j, cj) := nth_valid table rj rj_in_range in
         let m0' := interpret_binary gate m0i m0j in
+        let m1' := interpret_binary gate m1i m1j in
         o ← get evk_addr ;;
         #assert isSome o as oevk ;;
         let evk := getSome o oevk in
         c' <$ (ciphertext; eval2 evk gate ci cj) ;;
-        let updated_table := (table ++ [ :: (m0', m1i, c')]) in
+        let updated_table := (table ++ [ :: (m0', m1', c')]) in
         #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         @ret ciphertext c'
@@ -148,7 +150,9 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
         if (m0 == m1) then
           #assert isSome c as c_valid ;;
           let '(_, error_bound) := getSome c c_valid in
-          noise <$ (chVec 'int dim; noise_distr error_bound) ;;
+          noise <$ (chVec chInt dim;
+            discrete_gaussians (@toVec chInt dim [tuple BinNums.Z0 | i < dim])
+              (noise_flooding_dg_stdev gaussian_width_multiplier error_bound)) ;;
           let res := inverse_isometry m0 (ivec_add (toIntVec noise) (isometry m0 m0)) in
           @ret ('option message) (Some res)
         else

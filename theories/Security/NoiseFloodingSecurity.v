@@ -17,8 +17,8 @@ Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
 (* TODO fill with actual value *)
-Definition global_epsilon (max_queries : nat) (gaussian_width_multiplier : R) : R :=
-  1 / 1000%R.
+Definition global_epsilon (max_queries : nat) (gaussian_width_multiplier : R) : R.
+Admitted.
 
 (* Glue code *)
 Module Type NoiseFloodingIsIndCpad
@@ -32,7 +32,7 @@ Module Type NoiseFloodingIsIndCpad
   Parameter security_bound : nat -> R.
   Axiom is_secure : forall (A : nom_package) max_queries,
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    IndCpadGame.winning_probability A <= security_bound max_queries.
+    IndCpadGame.winning_probability max_queries A <= security_bound max_queries.
 End NoiseFloodingIsIndCpad.
 
 (* Main theorem *)
@@ -77,7 +77,8 @@ Module NoiseFloodingSecure
 
   Theorem ind_cpa_reduction_bound :
     forall (A : nom_package) max_queries,
-      IndCpadGame.winning_probability A <=
+      Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
+      IndCpadGame.winning_probability max_queries A <=
       IndCpaSecurity.IndCpaGame.winning_probability
         (ind_cpa_reduction A max_queries) +
       security_loss max_queries.
@@ -85,11 +86,11 @@ Module NoiseFloodingSecure
 
   Theorem is_secure : forall (A : nom_package) max_queries,
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    IndCpadGame.winning_probability A <= security_bound max_queries.
+    IndCpadGame.winning_probability max_queries A <= security_bound max_queries.
   Proof.
     move=> A max_queries A_valid.
     rewrite /security_bound /security_loss.
-    apply: (le_trans (ind_cpa_reduction_bound A max_queries)).
+    apply: (le_trans (ind_cpa_reduction_bound A max_queries A_valid)).
     rewrite lerD2r.
     exact: (IndCpaSecurity.is_secure
       (ind_cpa_reduction A max_queries)

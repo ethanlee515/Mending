@@ -59,7 +59,7 @@ Module IndCpad(Import S: ApproxFheScheme).
     ].
   Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; sk_addr; table_addr].
 
-  Definition IndCpadOracle (b: bool) : IndCpaOracle_t :=
+  Definition IndCpadOracle (b: bool) (max_queries : nat) : IndCpaOracle_t :=
     [package oracle_mem_spec ;
       #def #[oracle_encrypt] ('(m0, m1) : 'message × 'message ) : 'ciphertext
       {
@@ -70,6 +70,7 @@ Module IndCpad(Import S: ApproxFheScheme).
         c <$ (ciphertext; encrypt pk m) ;;
         table ← get table_addr ;;
         let updated_table := (table ++ [ :: (m0,m1, c)]) in
+        #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         ret c
       } ; 
@@ -85,6 +86,7 @@ Module IndCpad(Import S: ApproxFheScheme).
         let m1' := interpret_unary gate m1 in
         c' <$ (ciphertext; eval1 evk gate c) ;;
         let updated_table := (table ++ [ :: (m0', m1', c')]) in
+        #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         ret c'
       } ;
@@ -102,6 +104,7 @@ Module IndCpad(Import S: ApproxFheScheme).
         let evk := getSome o oevk in
         c' <$ (ciphertext; eval2 evk gate ci cj) ;;
         let updated_table := (table ++ [ :: (m0', m1', c')]) in
+        #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         ret c'
       } ;
@@ -151,16 +154,19 @@ Module IndCpad(Import S: ApproxFheScheme).
       }
     ].
 
-  Definition IndCpadGame (b : bool) (Adv : nom_package) : nom_package :=
-    ((IndCpadChallenger ∘ Adv)%sep ∘ IndCpadOracle b)%share.
+  Definition IndCpadGame
+    (b : bool) (max_queries : nat) (Adv : nom_package) : nom_package :=
+    ((IndCpadChallenger ∘ Adv)%sep ∘ IndCpadOracle b max_queries)%share.
 
-  Definition game_out (b : bool) (Adv : nom_package) : distr R bool :=
-    dfst (Pr_op (IndCpadGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
+  Definition game_out
+    (b : bool) (max_queries : nat) (Adv : nom_package) : distr R bool :=
+    dfst (Pr_op (IndCpadGame b max_queries Adv) (main, ('unit, 'bool)) tt empty_heap).
 
   Local Open Scope ring_scope.
 
-  Definition winning_probability (Adv : nom_package) :=
-    `|(game_out false Adv) true - (game_out true Adv) true|.
+  Definition winning_probability (max_queries : nat) (Adv : nom_package) :=
+    `|(game_out false max_queries Adv) true -
+      (game_out true max_queries Adv) true|.
 
   Definition FactoredAdversary_t := package
     [interface
@@ -210,5 +216,5 @@ Module Type IsIndCpad(Import Scheme: ApproxFheScheme).
   Parameter security_bound : nat -> R.
   Axiom is_secure : forall (A : nom_package) max_queries,
     Package IndCpadAdv_import IndCpadAdv_export A ->
-    winning_probability A <= security_bound max_queries.
+    winning_probability max_queries A <= security_bound max_queries.
 End IsIndCpad.

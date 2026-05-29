@@ -19,6 +19,10 @@ Local Open Scope ring_scope.
 Definition n_dg (n : nat) (s : R) : distr R (n.-tuple int) :=
   nfold_distr n (centered_discrete_gaussian s).
 
+Definition noise_flooding_dg_stdev
+    (gaussian_width_multiplier : R) (error_bound : nat) : R :=
+  (error_bound * error_bound + 1)%:~R * gaussian_width_multiplier.
+
 Module Type NoiseFloodingParams.
 Parameter gaussian_width_multiplier : R.
 Axiom gt0_gaussian_width_multiplier :
@@ -47,7 +51,7 @@ Definition eval1 := Scheme.eval1.
 Definition eval2 := Scheme.eval2.
 (* TODO find out if this is the "right" amount of noise. *)
 Definition dg_stdev (error_bound : nat) : R :=
-  (error_bound * error_bound + 1)%:~R * gaussian_width_multiplier.
+  noise_flooding_dg_stdev gaussian_width_multiplier error_bound.
 (* Maybe it's not ideal that decrypting an invalid ciphertext crashes the entire experiment.
  * This makes any sense only if invalid ciphertexts result only from misuse. *)
 Definition decrypt (sk: sk_t) (c: ciphertext) : distr R message :=
