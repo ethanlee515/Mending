@@ -179,38 +179,31 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
       }
     ].
 
-  Definition IndCpaReduction_nom (A : IndCpadAdv_t) (max_queries: nat) : nom_package :=
+  Definition IndCpaReduction (A : nom_package) (max_queries: nat) : nom_package :=
     ((IndCpaSimTop ∘ A)%sep ∘ IndCpadOracle max_queries)%share.
 
-  Definition IndCpaReduction_package (A : IndCpadAdv_t) (max_queries: nat) : raw_package :=
-    IndCpaReduction_nom A max_queries.
-
-  Definition IndCpaReduction (A : raw_package) (max_queries: nat) : raw_package :=
-    (IndCpaSimTop ∘ A ∘ IndCpadOracle max_queries)%pack.
-
-  Definition IndCpaReduction_locs (A : IndCpadAdv_t) (max_queries: nat) : Locations :=
-    loc (IndCpaReduction_nom A max_queries).
+  Definition IndCpaReduction_locs (A : nom_package) (max_queries: nat) : Locations :=
+    loc (IndCpaReduction A max_queries).
 
   Lemma IndCpaReduction_valid :
-    forall (A : IndCpadAdv_t) max_queries,
-      ValidPackage (IndCpaReduction_locs A max_queries)
-        IndCpaGame.IndCpaAdv_import
+    forall (A : nom_package) max_queries,
+      Package IndCpadAdv_import IndCpadAdv_export A ->
+      Package IndCpaGame.IndCpaAdv_import
         IndCpaGame.IndCpaAdv_export
-        (IndCpaReduction_package A max_queries).
+        (IndCpaReduction A max_queries).
   Proof.
-    move=> A max_queries.
-    rewrite /IndCpaReduction_locs /IndCpaReduction_package /IndCpaReduction_nom.
+    move=> A max_queries A_valid.
+    rewrite /IndCpaReduction_locs /IndCpaReduction.
     typeclasses eauto with ssprove_valid_db.
     Unshelve.
     all: try fmap_solve.
-    rewrite sep_linkE /=; apply union_fcompat.
-    - fmap_solve.
-    - apply fseparate_compat.
-      rewrite fseparate_disj.
-      change (disj (fresh (IndCpaSimTop : nom_package) (A : nom_package) ∙ (A : nom_package))
-        (IndCpaSimTop : nom_package)).
-      rewrite disjC.
-      apply fresh_disjoint.
+    all: try (rewrite sep_linkE /=; apply union_fcompat; [fmap_solve|]).
+    apply fseparate_compat.
+    rewrite fseparate_disj.
+    change (disj (fresh (IndCpaSimTop : nom_package) (A : nom_package) ∙ (A : nom_package))
+      (IndCpaSimTop : nom_package)).
+    rewrite disjC.
+    apply fresh_disjoint.
   Qed.
 
 (* TODO maybe adversary map from A to R in the end...

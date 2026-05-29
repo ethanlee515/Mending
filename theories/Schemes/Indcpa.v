@@ -9,6 +9,7 @@ From Mending.Schemes Require Import ApproxFHE.
 
 Import PackageNotation.
 Local Open Scope package_scope.
+Local Open Scope sep_scope.
 Local Open Scope ring_scope.
 
 Module IndCpa(Import S: ApproxFheScheme).
@@ -85,13 +86,13 @@ Module IndCpa(Import S: ApproxFheScheme).
       }
     ].
 
-  Definition IndCpaGame (b : bool) (Adv: raw_package) :=
-    IndCpaChallenger ∘ Adv ∘ IndCpaOracle b .
+  Definition IndCpaGame (b : bool) (Adv: nom_package) : nom_package :=
+    ((IndCpaChallenger ∘ Adv)%sep ∘ IndCpaOracle b)%share.
   
-  Definition game_out (b : bool) (Adv: raw_package) : distr R bool :=
+  Definition game_out (b : bool) (Adv: nom_package) : distr R bool :=
     dfst (Pr_op (IndCpaGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
 
-  Definition winning_probability (Adv: raw_package) :=
+  Definition winning_probability (Adv: nom_package) :=
     `|(game_out false Adv) true - (game_out true Adv) true|.
 End IndCpa.
 
@@ -99,8 +100,7 @@ Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
   Module IndCpaGame := IndCpa Scheme.
   Import IndCpaGame.
   Parameter security_loss : R.
-  Axiom is_secure : forall LA A,
-    ValidPackage LA IndCpaAdv_import IndCpaAdv_export A ->
-    fseparate LA IndCpa_locs ->
+  Axiom is_secure : forall (A : nom_package),
+    Package IndCpaAdv_import IndCpaAdv_export A ->
     winning_probability A <= security_loss.
 End IsIndCpa.

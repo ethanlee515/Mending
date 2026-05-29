@@ -5,6 +5,7 @@ Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_boot all_order all_algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
+From SSProve Require Import NominalPrelude.
 From Mending.Schemes Require Import ApproxFHE Indcpa Indcpad.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.LibExtras.MathcompExtras Require Import DTuple.
@@ -12,6 +13,7 @@ From Mending.Probability Require Import DiscreteGaussian.
 From extructures Require Import ord fset fmap.
 Import PackageNotation.
 Local Open Scope package_scope.
+Local Open Scope sep_scope.
 Local Open Scope ring_scope.
 
 Definition n_dg (n : nat) (s : R) : distr R (n.-tuple int) :=

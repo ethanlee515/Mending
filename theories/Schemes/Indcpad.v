@@ -11,6 +11,7 @@ From Mending.Schemes Require Import ApproxFHE.
 
 Import PackageNotation.
 Local Open Scope package_scope.
+Local Open Scope sep_scope.
 Local Open Scope seq_scope.
 
 Module IndCpad(Import S: ApproxFheScheme).
@@ -150,15 +151,15 @@ Module IndCpad(Import S: ApproxFheScheme).
       }
     ].
 
-  Definition IndCpadGame (b : bool) (Adv : raw_package) :=
-    IndCpadChallenger ∘ Adv ∘ IndCpadOracle b.
+  Definition IndCpadGame (b : bool) (Adv : nom_package) : nom_package :=
+    ((IndCpadChallenger ∘ Adv)%sep ∘ IndCpadOracle b)%share.
 
-  Definition game_out (b : bool) (Adv : raw_package) : distr R bool :=
+  Definition game_out (b : bool) (Adv : nom_package) : distr R bool :=
     dfst (Pr_op (IndCpadGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
 
   Local Open Scope ring_scope.
 
-  Definition winning_probability (Adv : raw_package) :=
+  Definition winning_probability (Adv : nom_package) :=
     `|(game_out false Adv) true - (game_out true Adv) true|.
 
   Definition FactoredAdversary_t := package
@@ -207,8 +208,7 @@ Module Type IsIndCpad(Import Scheme: ApproxFheScheme).
   Import IndCpadGame.
   (* Security loss depends on max queries. *)
   Parameter security_loss : nat -> R.
-  Axiom is_secure : forall LA A max_queries,
-    ValidPackage LA IndCpadAdv_import IndCpadAdv_export A ->
-    fseparate LA oracle_mem_spec ->
+  Axiom is_secure : forall (A : nom_package) max_queries,
+    Package IndCpadAdv_import IndCpadAdv_export A ->
     winning_probability A <= security_loss max_queries.
 End IsIndCpad.

@@ -26,14 +26,12 @@ Module Type NoiseFloodingIsIndCpad
   (Metric : ApproxFheMetric(Scheme))
   (Params : NoiseFloodingParams).
   Module NF := NoiseFlooding(Scheme)(Metric)(Params).
-  (* TODO Restore at some point after nominal upgrade
-  Include IsIndCpad(NF).
-  *)
   Module IndCpadGame := IndCpad NF.
   Module IndCpaDSim := IndCpadSimulator(Scheme)(Metric)(Params).
 
   Parameter security_loss : nat -> R.
-  Axiom is_secure_package : forall (A : IndCpaDSim.IndCpadAdv_t) max_queries,
+  Axiom is_secure : forall (A : nom_package) max_queries,
+    Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
     IndCpadGame.winning_probability A <= security_loss max_queries.
 End NoiseFloodingIsIndCpad.
 
@@ -55,47 +53,43 @@ Module NoiseFloodingSecure
   Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
 
-  Definition ind_cpa_reduction (A : IndCpaDSim.IndCpadAdv_t)
+  Definition ind_cpa_reduction (A : nom_package)
     (max_queries : nat) :=
-    IndCpaDSim.IndCpaReduction_package A max_queries.
+    IndCpaDSim.IndCpaReduction A max_queries.
 
-  Definition reduction_locs (A : IndCpaDSim.IndCpadAdv_t)
+  Definition reduction_locs (A : nom_package)
     (max_queries : nat) : Locations :=
     IndCpaDSim.IndCpaReduction_locs A max_queries.
 
   Lemma ind_cpa_reduction_valid :
-    forall (A : IndCpaDSim.IndCpadAdv_t) max_queries,
-      ValidPackage (reduction_locs A max_queries)
-        IndCpa.IndCpaGame.IndCpaAdv_import
+    forall (A : nom_package) max_queries,
+      Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
+      Package IndCpa.IndCpaGame.IndCpaAdv_import
         IndCpa.IndCpaGame.IndCpaAdv_export
         (ind_cpa_reduction A max_queries).
   Proof.
-    move=> A max_queries.
-    exact: IndCpaDSim.IndCpaReduction_valid.
+    move=> A max_queries A_valid.
+    rewrite /reduction_locs /ind_cpa_reduction.
+    exact: (IndCpaDSim.IndCpaReduction_valid A max_queries A_valid).
   Qed.
 
-  Axiom ind_cpa_reduction_fseparate :
-    forall (A : IndCpaDSim.IndCpadAdv_t) max_queries,
-      fseparate (reduction_locs A max_queries) IndCpa.IndCpaGame.IndCpa_locs.
-
   Axiom ind_cpa_reduction_bound :
-    forall (A : IndCpaDSim.IndCpadAdv_t) max_queries,
+    forall (A : nom_package) max_queries,
       IndCpadGame.winning_probability A <=
       IndCpa.IndCpaGame.winning_probability
         (ind_cpa_reduction A max_queries) +
       global_epsilon max_queries gaussian_width_multiplier.
 
-  Theorem is_secure_package : forall (A : IndCpaDSim.IndCpadAdv_t) max_queries,
+  Theorem is_secure : forall (A : nom_package) max_queries,
+    Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
     IndCpadGame.winning_probability A <= security_loss max_queries.
   Proof.
-    move=> A max_queries.
+    move=> A max_queries A_valid.
     rewrite /security_loss.
     apply: (le_trans (ind_cpa_reduction_bound A max_queries)).
     rewrite lerD2r.
     exact: (IndCpa.is_secure
-      (reduction_locs A max_queries)
       (ind_cpa_reduction A max_queries)
-      (ind_cpa_reduction_valid A max_queries)
-      (ind_cpa_reduction_fseparate A max_queries)).
+      (ind_cpa_reduction_valid A max_queries A_valid)).
   Qed.
 End NoiseFloodingSecure.
