@@ -14,7 +14,7 @@ there is still a lot of proof engineering to be done.
 Required system packages: `libgmp-dev`, `linux-libc-dev`, `pkg-config`, `git`
 
 Afterwards, run the usual Rocq and SSProve setup:
-```
+```bash
 opam repo add rocq-released https://rocq-prover.org/opam/released
 opam update
 opam pin add --no-action rocq-ssprove https://github.com/SSProve/ssprove.git

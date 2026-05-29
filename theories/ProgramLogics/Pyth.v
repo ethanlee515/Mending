@@ -16,8 +16,9 @@ From Mending.Probability Require Import KL.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
 From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
 From Mending.Probability Require Import Pyth.
-From Mending.ProgramLogics Require Import Ae.
+From Mending.ProgramLogics Require Import Ae Hoare.
 Local Open Scope AeNotations.
+Local Open Scope HoareNotations.
 
 Import PackageNotation.
 Import pkg_heap.
@@ -190,5 +191,24 @@ Lemma pythSeqRule
     (fun xL => yL ← progL xL ;; contL yL)
     ≈( cat_tuple s s' )
     (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
+Admitted.
+
+Lemma pythAeSeqRule
+  {ℓ : nat}
+  {inL_t inR_t mid_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code mid_t)
+  (progR : inR_t -> raw_code mid_t)
+  (cont : mid_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ mid ⦄ ->
+  ⊨Hoare ⦃ mid ⦄ cont ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; cont yL)
+    ≈( s )
+    (fun xR => yR ← progR xR ;; cont yR)
   ⦃ post ⦄.
 Admitted.
