@@ -59,6 +59,16 @@ Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code ou
   x <$ (existT _ out_t D) ;;
   ret x.
 
+Lemma sampleRawE {out_t : choice_type} (D : {distr out_t / R}) mem :
+  Pr_code (sampleRaw D) mem =1 dmargin (fun y => (y, mem)) D.
+Proof.
+move=> y.
+rewrite /sampleRaw Pr_code_sample dmarginE.
+apply: eq_in_dlet; last by [].
+move=> x _ z.
+by rewrite Pr_code_ret.
+Qed.
+
 Lemma klSampRule
   {inL_t inR_t : ord_choiceType} {out_t : choice_type}
   (DL : inL_t -> {distr out_t / R})
@@ -67,6 +77,8 @@ Lemma klSampRule
   (post : pred (out_t * heap))
   (ε : R) :
   0 <= ε ->
+  (forall memL memR xL xR,
+    pre ((xL, memL), (xR, memR)) -> memL = memR) ->
   (forall xL xR, absolute_continuous (DL xL) (DR xR)) ->
   (forall xL, dweight (DL xL) = 1) ->
   (forall xR, dweight (DR xR) = 1) ->
@@ -78,7 +90,45 @@ Lemma klSampRule
     pre ((xL, memL), (xR, memR)) -> y \in dinsupp (DR xR) -> post (y, memR)) ->
   ⊨Pyth ⦃ pre ⦄ (fun x => sampleRaw (DL x)) ≈( [tuple ε] )
     (fun x => sampleRaw (DR x)) ⦃ post ⦄.
-Admitted.
+Proof.
+move=> Heps Hsame Hac HmassL HmassR Hkl HpostL HpostR.
+move=> memL memR xL xR Hpre.
+have Hmem : memL = memR := Hsame memL memR xL xR Hpre.
+subst memR.
+exists out_t, empty_pyth_coord, (fun _ : 'I_0 => fun _ => tt),
+  (fun y => (y, memL)), (DL xL), (DR xR).
+split.
+- apply: pythDistWithFinal_kl_final.
+  + by move=> a b [].
+  + exact: Heps.
+  + exact: Hac.
+  + exact: HmassL.
+  + exact: HmassR.
+  + exact: (Hkl memL memL xL xR Hpre).
+split.
+- move=> y.
+  symmetry.
+  exact: sampleRawE.
+split.
+- move=> y.
+  symmetry.
+  exact: sampleRawE.
+split.
+- move=> y Hy.
+  have HyD : y \in dinsupp (dmargin (fun z => (z, memL)) (DL xL)).
+    by rewrite in_dinsupp -(sampleRawE (DL xL) memL y) -in_dinsupp.
+  rewrite dmarginE in HyD.
+  have [x Hx Hunit] := dinsupp_dlet HyD.
+  have -> : y = (x, memL) by exact: (in_dunit Hunit).
+  exact: (HpostL memL memL xL xR x Hpre Hx).
+- move=> y Hy.
+  have HyD : y \in dinsupp (dmargin (fun z => (z, memL)) (DR xR)).
+    by rewrite in_dinsupp -(sampleRawE (DR xR) memL y) -in_dinsupp.
+  rewrite dmarginE in HyD.
+  have [x Hx Hunit] := dinsupp_dlet HyD.
+  have -> : y = (x, memL) by exact: (in_dunit Hunit).
+  exact: (HpostR memL memL xL xR x Hpre Hx).
+Qed.
 
 Lemma klDgRule
   (centerL centerR : chInt)
@@ -88,6 +138,8 @@ Lemma klDgRule
   0 < stdev ->
   ((int_of_Z centerR - int_of_Z centerL)%:~R) ^+ 2 / (2 * stdev ^ 2) <= ε ->
   (forall memL memR,
+    pre ((tt, memL), (tt, memR)) -> memL = memR) ->
+  (forall memL memR,
     pre ((tt, memL), (tt, memR)) ->
     forall y, y \in dinsupp (ssp_dg centerL stdev) -> post (y, memL)) ->
   (forall memL memR,
@@ -95,7 +147,31 @@ Lemma klDgRule
     forall y, y \in dinsupp (ssp_dg centerR stdev) -> post (y, memR)) ->
   ⊨Pyth ⦃ pre ⦄ (fun _ : chUnit => sampleRaw (ssp_dg centerL stdev)) ≈( [tuple ε] )
     (fun _ : chUnit => sampleRaw (ssp_dg centerR stdev)) ⦃ post ⦄.
-Admitted.
+Proof.
+move=> Hstdev Hkl_bound Hsame HpostL HpostR.
+apply: (klSampRule (fun _ : chUnit => ssp_dg centerL stdev)
+                   (fun _ : chUnit => ssp_dg centerR stdev)
+                   pre post ε).
+- have Hkl := kl_ssp_dg centerL centerR stdev Hstdev.
+  have Hnonneg : 0 <= δ_KL (ssp_dg centerL stdev) (ssp_dg centerR stdev) :=
+    kl_nonnegative _ _.
+  lra.
+- move=> memL memR [] [].
+  exact: Hsame.
+- move=> [] [].
+  exact: ssp_dg_absolute_continuous.
+- move=> [].
+  exact: ssp_dg_mass1.
+- move=> [].
+  exact: ssp_dg_mass1.
+- move=> memL memR [] [] Hpre.
+  have Hkl := kl_ssp_dg centerL centerR stdev Hstdev.
+  lra.
+- move=> memL memR [] [] y Hpre Hy.
+  exact: (HpostL memL memR Hpre y Hy).
+- move=> memL memR [] [] y Hpre Hy.
+  exact: (HpostR memL memR Hpre y Hy).
+Qed.
 
 Lemma MicciancioWalterRule
   {ℓ : nat}

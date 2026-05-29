@@ -63,6 +63,37 @@ Definition pythDistWithFinal
     (P Q : {distr Ω / R}) (eps : n.+1.-tuple R) : Prop :=
   pythDist (rcons_coord coord final) P Q eps.
 
+Definition singleton_pyth_choice (A : choiceType) (_ : 'I_1) : choiceType := A.
+
+Definition singleton_pyth_coord {A : choiceType}
+    (i : 'I_1) : A -> singleton_pyth_choice A i :=
+  fun x => x.
+
+Lemma pythDist_kl_singleton
+    {A : choiceType} (P Q : {distr A / R}) (eps : R) :
+  0 <= eps ->
+  absolute_continuous P Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  δ_KL P Q <= eps ->
+  pythDist (@singleton_pyth_coord A) P Q [tuple eps].
+Admitted.
+
+Definition empty_pyth_coord (_ : 'I_0) : choiceType := unit.
+
+Lemma pythDistWithFinal_kl_final
+    {Ω A : choiceType} (final : Ω -> A)
+    (P Q : {distr Ω / R}) (eps : R) :
+  injective final ->
+  0 <= eps ->
+  absolute_continuous P Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  δ_KL P Q <= eps ->
+  pythDistWithFinal (X := empty_pyth_coord) (fun i : 'I_0 => fun _ => tt)
+    final P Q [tuple eps].
+Admitted.
+
 Lemma pythDistWithFinal_total_variation
     {n : nat} {Ω A : choiceType} {X : 'I_n -> choiceType}
     (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
