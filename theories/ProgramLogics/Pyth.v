@@ -11,6 +11,7 @@ From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve.Crypt Require Import choice_type SubDistr.
+From SSProve.Crypt.nominal Require Import Pr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
 From Mending.Probability Require Import KL.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
@@ -48,11 +49,11 @@ Definition pythJudgment
   (forall x, x \in dinsupp outL -> post x) /\
   (forall x, x \in dinsupp outR -> post x).
 
-Declare Scope pyth_scope.
-Local Open Scope pyth_scope.
+Declare Scope PythNotations.
+Local Open Scope PythNotations.
 
 Notation "⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
-  (pythJudgment progL progR pre post s) : pyth_scope.
+  (pythJudgment progL progR pre post s) : PythNotations.
 
 Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code out_t :=
   x <$ (existT _ out_t D) ;;
@@ -211,4 +212,37 @@ Lemma pythAeSeqRule
     ≈( s )
     (fun xR => yR ← progR xR ;; cont yR)
   ⦃ post ⦄.
-Admitted.
+Proof.
+move=> Hpyth Hhoare memL memR xL xR Hpre.
+have [Ω [X [coord [final [P [Q
+    [Hdist [HmarginL [HmarginR [HmidL HmidR]]]]]]]]]] :=
+  Hpyth memL memR xL xR Hpre.
+pose K (x : mid_t * heap) := Pr_code (cont x.1) x.2.
+have [Ω' [X' [coord' [final' [P' [Q'
+    [Hdist' [HmarginL' HmarginR']]]]]]]] :=
+  pythDistWithFinal_postprocess coord final P Q s K Hdist.
+exists Ω', X', coord', final', P', Q'.
+rewrite !Pr_code_bind.
+split; first exact: Hdist'.
+split.
+- move=> y.
+  rewrite HmarginL'.
+  apply: eq_in_dlet; last exact: HmarginL.
+  by move=> x _ z.
+split.
+- move=> y.
+  rewrite HmarginR'.
+  apply: eq_in_dlet; last exact: HmarginR.
+  by move=> x _ z.
+split.
+- move=> y Hy.
+  have [x Hx Hxy] := dinsupp_dlet Hy.
+  case: x Hx Hxy => [x mem] Hx Hxy.
+  apply: (Hhoare x mem (HmidL (x, mem) Hx) y).
+  by rewrite in_dinsupp.
+- move=> y Hy.
+  have [x Hx Hxy] := dinsupp_dlet Hy.
+  case: x Hx Hxy => [x mem] Hx Hxy.
+  apply: (Hhoare x mem (HmidR (x, mem) Hx) y).
+  by rewrite in_dinsupp.
+Qed.

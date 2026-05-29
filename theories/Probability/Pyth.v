@@ -72,4 +72,21 @@ Lemma pythDistWithFinal_total_variation
     pythagorean_tv_bound eps.
 Admitted.
 
+Lemma pythDistWithFinal_postprocess
+    {n : nat} {Ω A B : choiceType} {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
+    (P Q : {distr Ω / R}) (eps : n.+1.-tuple R)
+    (K : A -> {distr B / R}) :
+  pythDistWithFinal coord final P Q eps ->
+  exists
+  (Ω' : choiceType)
+  (X' : 'I_n -> choiceType)
+  (coord' : forall i : 'I_n, Ω' -> X' i)
+  (final' : Ω' -> B)
+  (P' Q' : {distr Ω' / R}),
+    pythDistWithFinal coord' final' P' Q' eps /\
+    dmargin final' P' =1 \dlet_(x <- dmargin final P) K x /\
+    dmargin final' Q' =1 \dlet_(x <- dmargin final Q) K x.
+Admitted.
+
 End PythagoreanDistributionJudgments.
