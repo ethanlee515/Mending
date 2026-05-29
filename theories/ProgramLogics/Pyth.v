@@ -150,7 +150,35 @@ Lemma pythConseqRule
   (forall i : 'I_(ℓ.+1), tnth s i <= tnth s' i) ->
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   ⊨Pyth ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
-Admitted.
+Proof.
+move=> Hpre Hpost Hs Hpyth memL memR xL xR Hpre'.
+have [Ω [X [coord [final [P [Q
+    [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+  Hpyth memL memR xL xR (Hpre _ Hpre').
+exists Ω, X, coord, final, P, Q.
+split.
+- move: Hdist=> [Hsep [Heps [Hac [HP [HQ Hcond]]]]].
+  split; first exact: Hsep.
+  split.
+    move=> i.
+    have := Heps i.
+    have := Hs i.
+    lra.
+  split; first exact: Hac.
+  split; first exact: HP.
+  split; first exact: HQ.
+  move=> i a.
+  have := Hcond i a.
+  have := Hs i.
+  lra.
+split; first exact: HmarginL.
+split; first exact: HmarginR.
+split.
+- move=> y Hy.
+  exact: Hpost (HpostL y Hy).
+- move=> y Hy.
+  exact: Hpost (HpostR y Hy).
+Qed.
 
 Lemma aePythSeqRule
   {ℓ : nat}
