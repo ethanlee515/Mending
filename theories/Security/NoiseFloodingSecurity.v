@@ -75,12 +75,13 @@ Module NoiseFloodingSecure
     exact: (IndCpaDSim.IndCpaReduction_valid A max_queries A_valid).
   Qed.
 
-  Axiom ind_cpa_reduction_bound :
+  Theorem ind_cpa_reduction_bound :
     forall (A : nom_package) max_queries,
       IndCpadGame.winning_probability A <=
       IndCpaSecurity.IndCpaGame.winning_probability
         (ind_cpa_reduction A max_queries) +
       security_loss max_queries.
+  Admitted.
 
   Theorem is_secure : forall (A : nom_package) max_queries,
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
