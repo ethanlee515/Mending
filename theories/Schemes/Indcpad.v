@@ -206,9 +206,9 @@ Local Open Scope ring_scope.
 Module Type IsIndCpad(Import Scheme: ApproxFheScheme).
   Module IndCpadGame := IndCpad Scheme.
   Import IndCpadGame.
-  (* Security loss depends on max queries. *)
-  Parameter security_loss : nat -> R.
+  (* Security bound depends on max queries. *)
+  Parameter security_bound : nat -> R.
   Axiom is_secure : forall (A : nom_package) max_queries,
     Package IndCpadAdv_import IndCpadAdv_export A ->
-    winning_probability A <= security_loss max_queries.
+    winning_probability A <= security_bound max_queries.
 End IsIndCpad.

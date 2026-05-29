@@ -29,10 +29,10 @@ Module Type NoiseFloodingIsIndCpad
   Module IndCpadGame := IndCpad NF.
   Module IndCpaDSim := IndCpadSimulator(Scheme)(Metric)(Params).
 
-  Parameter security_loss : nat -> R.
+  Parameter security_bound : nat -> R.
   Axiom is_secure : forall (A : nom_package) max_queries,
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    IndCpadGame.winning_probability A <= security_loss max_queries.
+    IndCpadGame.winning_probability A <= security_bound max_queries.
 End NoiseFloodingIsIndCpad.
 
 (* Main theorem *)
@@ -40,12 +40,14 @@ Module NoiseFloodingSecure
   (Import Scheme : ApproxFheScheme)
   (Import Metric : ApproxFheMetric(Scheme))
   (Import Correctness : ApproxCorrectness(Scheme)(Metric))
-  (Import IndCpa : IsIndCpa(Scheme))
+  (Import IndCpaSecurity : IsIndCpa(Scheme))
   (Import Params : NoiseFloodingParams)
   : NoiseFloodingIsIndCpad(Scheme)(Metric)(Params).
   Module NF := NoiseFlooding(Scheme)(Metric)(Params).
   Definition security_loss (max_queries : nat) :=
-    IndCpa.security_loss + global_epsilon max_queries gaussian_width_multiplier.
+    global_epsilon max_queries gaussian_width_multiplier.
+  Definition security_bound (max_queries : nat) :=
+    IndCpaSecurity.security_bound + security_loss max_queries.
   Module IndCpadGame := IndCpad NF.
   Module IndCpaDSim := IndCpadSimulator(Scheme)(Metric)(Params).
 
@@ -64,8 +66,8 @@ Module NoiseFloodingSecure
   Lemma ind_cpa_reduction_valid :
     forall (A : nom_package) max_queries,
       Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-      Package IndCpa.IndCpaGame.IndCpaAdv_import
-        IndCpa.IndCpaGame.IndCpaAdv_export
+      Package IndCpaSecurity.IndCpaGame.IndCpaAdv_import
+        IndCpaSecurity.IndCpaGame.IndCpaAdv_export
         (ind_cpa_reduction A max_queries).
   Proof.
     move=> A max_queries A_valid.
@@ -76,19 +78,19 @@ Module NoiseFloodingSecure
   Axiom ind_cpa_reduction_bound :
     forall (A : nom_package) max_queries,
       IndCpadGame.winning_probability A <=
-      IndCpa.IndCpaGame.winning_probability
+      IndCpaSecurity.IndCpaGame.winning_probability
         (ind_cpa_reduction A max_queries) +
-      global_epsilon max_queries gaussian_width_multiplier.
+      security_loss max_queries.
 
   Theorem is_secure : forall (A : nom_package) max_queries,
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    IndCpadGame.winning_probability A <= security_loss max_queries.
+    IndCpadGame.winning_probability A <= security_bound max_queries.
   Proof.
     move=> A max_queries A_valid.
-    rewrite /security_loss.
+    rewrite /security_bound /security_loss.
     apply: (le_trans (ind_cpa_reduction_bound A max_queries)).
     rewrite lerD2r.
-    exact: (IndCpa.is_secure
+    exact: (IndCpaSecurity.is_secure
       (ind_cpa_reduction A max_queries)
       (ind_cpa_reduction_valid A max_queries A_valid)).
   Qed.
