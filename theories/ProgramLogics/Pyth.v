@@ -170,7 +170,79 @@ Lemma aePythSeqRule
     ≈( s )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
-Admitted.
+Proof.
+move=> [_ Hae] Hpyth memL memR xL xR Hpre.
+pose ML := Pr_code (progL xL) memL.
+pose MR := Pr_code (progR xR) memR.
+pose KL (x : midL_t * heap) := Pr_code (contL x.1) x.2.
+pose KR (x : midR_t * heap) := Pr_code (contR x.1) x.2.
+have [d0 [Hd0 Hmidprob]] := Hae memL memR xL xR Hpre.
+have Hmidprob1 : \P_[ d0 ] mid >= 1 by lra.
+have Hcont_wit :
+    forall aL aR,
+      mid (aL, aR) ->
+      exists
+      (Ω : choiceType)
+      (X : 'I_ℓ -> choiceType)
+      (coord : forall i : 'I_ℓ, Ω -> X i)
+      (final : Ω -> out_t * heap)
+      (P Q : {distr Ω / R}),
+        pythDistWithFinal coord final P Q s /\
+        dmargin final P =1 KL aL /\
+        dmargin final Q =1 KR aR.
+  move=> aL aR Hmid.
+  case: aL Hmid => [yL memL'] Hmid.
+  case: aR Hmid => [yR memR'] Hmid.
+  have [Ω [X [coord [final [P [Q
+      [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+    Hpyth memL' memR' yL yR Hmid.
+  exists Ω, X, coord, final, P, Q.
+  split; first exact: Hdist.
+  split; [exact: HmarginL | exact: HmarginR].
+have Hbind :=
+  pythDistWithFinal_bind_coupling ML MR KL KR mid d0 s
+    Hd0 Hmidprob1 Hcont_wit.
+case: Hbind => Ωc [Xc [coordc [finalc [Pc [Qc
+    [Hdistc [HmarginLc HmarginRc]]]]]]].
+exists Ωc, Xc, coordc, finalc, Pc, Qc.
+rewrite !Pr_code_bind.
+split; first exact: Hdistc.
+split.
+- move=> y.
+  rewrite HmarginLc.
+  apply: eq_in_dlet; last by [].
+  by move=> x _ z.
+split.
+- move=> y.
+  rewrite HmarginRc.
+  apply: eq_in_dlet; last by [].
+  by move=> x _ z.
+split.
+- move=> y Hy.
+  have [a Ha Hay] := dinsupp_dlet Hy.
+  case: a Ha Hay => [a mem] Ha Hay.
+  have [aR Hmid'] :=
+    coupling_with_loss_prob1_left_support ML MR mid d0 Hd0 Hmidprob1
+      (a, mem) Ha.
+  case: aR Hmid' => [aR memR'] Hmid'.
+  have [Ω [X [coord [final [P [Q
+      [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+    Hpyth mem memR' a aR Hmid'.
+  apply: (HpostL y).
+  exact: Hay.
+- move=> y Hy.
+  have [a Ha Hay] := dinsupp_dlet Hy.
+  case: a Ha Hay => [a mem] Ha Hay.
+  have [aL Hmid'] :=
+    coupling_with_loss_prob1_right_support ML MR mid d0 Hd0 Hmidprob1
+      (a, mem) Ha.
+  case: aL Hmid' => [aL memL'] Hmid'.
+  have [Ω [X [coord [final [P [Q
+      [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+    Hpyth memL' mem aL a Hmid'.
+  apply: (HpostR y).
+  exact: Hay.
+Qed.
 
 Lemma pythSeqRule
   {ℓ ℓ' : nat}
@@ -193,7 +265,84 @@ Lemma pythSeqRule
     ≈( cat_tuple s s' )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
-Admitted.
+Proof.
+move=> Hmid Hpyth Hcont memL memR xL xR Hpre.
+have [Ω [X [coord [final [P [Q
+    [Hdist [HmarginL [HmarginR [HleftL HleftR]]]]]]]]]] :=
+  Hpyth memL memR xL xR Hpre.
+pose KL (x : mid_t * heap) := Pr_code (contL x.1) x.2.
+pose KR (x : mid_t * heap) := Pr_code (contR x.1) x.2.
+have Hcont_wit :
+    forall aL aR,
+      aL \in dinsupp (dmargin final P) ->
+      aR \in dinsupp (dmargin final Q) ->
+      exists
+      (Ω' : choiceType)
+      (X' : 'I_ℓ' -> choiceType)
+      (coord' : forall i : 'I_ℓ', Ω' -> X' i)
+      (final' : Ω' -> out_t * heap)
+      (P' Q' : {distr Ω' / R}),
+        pythDistWithFinal coord' final' P' Q' s' /\
+        dmargin final' P' =1 KL aL /\
+        dmargin final' Q' =1 KR aR.
+  move=> aL aR HaL HaR.
+  case: aL HaL => [yL memL'] HaL.
+  case: aR HaR => [yR memR'] HaR.
+  have Hmid' : mid ((yL, memL'), (yR, memR')).
+    apply: Hmid.
+    - apply: HleftL.
+      by rewrite in_dinsupp -(HmarginL (yL, memL')).
+    - apply: HleftR.
+      by rewrite in_dinsupp -(HmarginR (yR, memR')).
+  have [Ω' [X' [coord' [final' [P' [Q'
+      [Hdist' [HmarginL' [HmarginR' [HpostL2 HpostR2]]]]]]]]]] :=
+    Hcont memL' memR' yL yR Hmid'.
+  exists Ω', X', coord', final', P', Q'.
+  split; first exact: Hdist'.
+  split; [exact: HmarginL' | exact: HmarginR'].
+have Hbind :=
+  pythDistWithFinal_bind coord final P Q s s' KL KR Hdist Hcont_wit.
+case: Hbind => Ωc [Xc [coordc [finalc [Pc [Qc
+    [Hdistc [HmarginLc HmarginRc]]]]]]].
+exists Ωc, Xc, coordc, finalc, Pc, Qc.
+rewrite !Pr_code_bind.
+split; first exact: Hdistc.
+split.
+- move=> y.
+  rewrite HmarginLc.
+  apply: eq_in_dlet; last exact: HmarginL.
+  by move=> x _ z.
+split.
+- move=> y.
+  rewrite HmarginRc.
+  apply: eq_in_dlet; last exact: HmarginR.
+  by move=> x _ z.
+split.
+- move=> y Hy.
+  have [a Ha Hay] := dinsupp_dlet Hy.
+  case: a Ha Hay => [a mem] Ha Hay.
+  have Hleft : left_post (a, mem).
+    exact: HleftL.
+  have Hmid' : mid ((a, mem), (a, mem)).
+    by apply: Hmid.
+  have [Ω' [X' [coord' [final' [P' [Q'
+      [Hdist' [HmarginL' [HmarginR' [HpostL2 HpostR2]]]]]]]]]] :=
+    Hcont mem mem a a Hmid'.
+  apply: (HpostL2 y).
+  exact: Hay.
+- move=> y Hy.
+  have [a Ha Hay] := dinsupp_dlet Hy.
+  case: a Ha Hay => [a mem] Ha Hay.
+  have Hleft : left_post (a, mem).
+    exact: HleftR.
+  have Hmid' : mid ((a, mem), (a, mem)).
+    by apply: Hmid.
+  have [Ω' [X' [coord' [final' [P' [Q'
+      [Hdist' [HmarginL' [HmarginR' [HpostL2 HpostR2]]]]]]]]]] :=
+    Hcont mem mem a a Hmid'.
+  apply: (HpostR2 y).
+  exact: Hay.
+Qed.
 
 Lemma pythAeSeqRule
   {ℓ : nat}

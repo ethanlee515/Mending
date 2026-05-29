@@ -5,7 +5,7 @@ From mathcomp Require Import all_boot all_order all_algebra.
 From mathcomp Require Import reals distr.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
-From Mending.Probability Require Import KL.
+From Mending.Probability Require Import Ae KL.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.
@@ -87,6 +87,83 @@ Lemma pythDistWithFinal_postprocess
     pythDistWithFinal coord' final' P' Q' eps /\
     dmargin final' P' =1 \dlet_(x <- dmargin final P) K x /\
     dmargin final' Q' =1 \dlet_(x <- dmargin final Q) K x.
+Admitted.
+
+Lemma pythDistWithFinal_bind
+    {n m : nat} {Ω A B : choiceType} {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
+    (P Q : {distr Ω / R}) (eps : n.+1.-tuple R) (eps' : m.+1.-tuple R)
+    (KL KR : A -> {distr B / R}) :
+  pythDistWithFinal coord final P Q eps ->
+  (forall aL aR,
+    aL \in dinsupp (dmargin final P) ->
+    aR \in dinsupp (dmargin final Q) ->
+    exists
+    (Ω' : choiceType)
+    (X' : 'I_m -> choiceType)
+    (coord' : forall i : 'I_m, Ω' -> X' i)
+    (final' : Ω' -> B)
+    (P' Q' : {distr Ω' / R}),
+      pythDistWithFinal coord' final' P' Q' eps' /\
+      dmargin final' P' =1 KL aL /\
+      dmargin final' Q' =1 KR aR) ->
+  exists
+  (Ωc : choiceType)
+  (Xc : 'I_(n + m.+1) -> choiceType)
+  (coordc : forall i : 'I_(n + m.+1), Ωc -> Xc i)
+  (finalc : Ωc -> B)
+  (Pc Qc : {distr Ωc / R}),
+    pythDistWithFinal coordc finalc Pc Qc (cat_tuple eps eps') /\
+    dmargin finalc Pc =1 \dlet_(a <- dmargin final P) KL a /\
+    dmargin finalc Qc =1 \dlet_(a <- dmargin final Q) KR a.
+Admitted.
+
+Lemma pythDistWithFinal_bind_coupling
+    {n : nat} {A B C : choiceType}
+    (ML : {distr A / R}) (MR : {distr B / R})
+    (KL : A -> {distr C / R}) (KR : B -> {distr C / R})
+    (mid : pred (A * B)) (d0 : {distr (A * B) / R})
+    (eps : n.+1.-tuple R) :
+  coupling_with_loss d0 ML MR ->
+  \P_[ d0 ] mid >= 1 ->
+  (forall a b,
+    mid (a, b) ->
+    exists
+    (Ω : choiceType)
+    (X : 'I_n -> choiceType)
+    (coord : forall i : 'I_n, Ω -> X i)
+    (final : Ω -> C)
+    (P Q : {distr Ω / R}),
+      pythDistWithFinal coord final P Q eps /\
+      dmargin final P =1 KL a /\
+      dmargin final Q =1 KR b) ->
+  exists
+  (Ωc : choiceType)
+  (Xc : 'I_n -> choiceType)
+  (coordc : forall i : 'I_n, Ωc -> Xc i)
+  (finalc : Ωc -> C)
+  (Pc Qc : {distr Ωc / R}),
+    pythDistWithFinal coordc finalc Pc Qc eps /\
+    dmargin finalc Pc =1 \dlet_(a <- ML) KL a /\
+    dmargin finalc Qc =1 \dlet_(b <- MR) KR b.
+Admitted.
+
+Lemma coupling_with_loss_prob1_left_support
+    {A B : choiceType}
+    (ML : {distr A / R}) (MR : {distr B / R})
+    (mid : pred (A * B)) (d0 : {distr (A * B) / R}) :
+  coupling_with_loss d0 ML MR ->
+  \P_[ d0 ] mid >= 1 ->
+  forall a, a \in dinsupp ML -> exists b, mid (a, b).
+Admitted.
+
+Lemma coupling_with_loss_prob1_right_support
+    {A B : choiceType}
+    (ML : {distr A / R}) (MR : {distr B / R})
+    (mid : pred (A * B)) (d0 : {distr (A * B) / R}) :
+  coupling_with_loss d0 ML MR ->
+  \P_[ d0 ] mid >= 1 ->
+  forall b, b \in dinsupp MR -> exists a, mid (a, b).
 Admitted.
 
 End PythagoreanDistributionJudgments.
