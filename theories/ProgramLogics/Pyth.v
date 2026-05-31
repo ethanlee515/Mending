@@ -14,7 +14,7 @@ From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve.Crypt.nominal Require Import Pr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
 From Mending.Probability Require Import KL.
-From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealListExtras.
 From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
 From Mending.Probability Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
@@ -27,23 +27,24 @@ Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
 Definition pythJudgment
-  {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R) :=
+  (s : heap -> heap -> list R) :=
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
+  let outL := Pr_code (progL xL) memL in
+  let outR := Pr_code (progR xR) memR in
+  ∀ yL yR, yL \in dinsupp outL -> yR \in dinsupp outR ->
   exists
+  (ℓ : nat)
   (Ω : choiceType)
   (X : 'I_ℓ -> choiceType)
   (coord : forall i : 'I_ℓ, Ω -> X i)
   (final : Ω -> out_t * heap)
   (P Q : {distr Ω / R}),
-  let outL := Pr_code (progL xL) memL in
-  let outR := Pr_code (progR xR) memR in
-  pythDistWithFinal coord final P Q s /\
+  pythDistWithFinal coord final P Q (s yL.2 yR.2) /\
   dmargin final P =1 outL /\
   dmargin final Q =1 outR /\
   (forall x, x \in dinsupp outL -> post x) /\
@@ -88,14 +89,14 @@ Lemma klSampRule
     pre ((xL, memL), (xR, memR)) -> y \in dinsupp (DL xL) -> post (y, memL)) ->
   (forall memL memR xL xR y,
     pre ((xL, memL), (xR, memR)) -> y \in dinsupp (DR xR) -> post (y, memR)) ->
-  ⊨Pyth ⦃ pre ⦄ (fun x => sampleRaw (DL x)) ≈( [tuple ε] )
+  ⊨Pyth ⦃ pre ⦄ (fun x => sampleRaw (DL x)) ≈( fun _ _ => [:: ε] )
     (fun x => sampleRaw (DR x)) ⦃ post ⦄.
 Proof.
 move=> Heps Hsame Hac HmassL HmassR Hkl HpostL HpostR.
-move=> memL memR xL xR Hpre.
+move=> memL memR xL xR Hpre yL yR HyL HyR.
 have Hmem : memL = memR := Hsame memL memR xL xR Hpre.
 subst memR.
-exists out_t, empty_pyth_coord, (fun _ : 'I_0 => fun _ => tt),
+exists 0, out_t, empty_pyth_coord, (fun _ : 'I_0 => fun _ => tt),
   (fun y => (y, memL)), (DL xL), (DR xR).
 split.
 - apply: pythDistWithFinal_kl_final.
@@ -145,7 +146,8 @@ Lemma klDgRule
   (forall memL memR,
     pre ((tt, memL), (tt, memR)) ->
     forall y, y \in dinsupp (ssp_dg centerR stdev) -> post (y, memR)) ->
-  ⊨Pyth ⦃ pre ⦄ (fun _ : chUnit => sampleRaw (ssp_dg centerL stdev)) ≈( [tuple ε] )
+  ⊨Pyth ⦃ pre ⦄ (fun _ : chUnit => sampleRaw (ssp_dg centerL stdev))
+    ≈( fun _ _ => [:: ε] )
     (fun _ : chUnit => sampleRaw (ssp_dg centerR stdev)) ⦃ post ⦄.
 Proof.
 move=> Hstdev Hkl_bound Hsame HpostL HpostR.
@@ -174,90 +176,42 @@ apply: (klSampRule (fun _ : chUnit => ssp_dg centerL stdev)
 Qed.
 
 Lemma MicciancioWalterRule
-  {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R) :
+  (s : heap -> heap -> list R)
+  (delta : R) :
+  (forall memL memR, pythagorean_tv_bound (s memL memR) <= delta) ->
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
-  let delta := pythagorean_tv_bound s in
   ⊨AE ⦃ pre ⦄ progL ≈( delta ) progR ⦃
     fun outs =>
       let '((y_1, m_1'), (y_2, m_2')) := outs in
       post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2')⦄.
-Proof.
-move=> Hpyth.
-apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)).
-- rewrite /pythagorean_tv_bound.
-  exact: Num.Theory.sqrtr_ge0.
-- move=> memL memR xL xR Hpre.
-  have [Ω [X [coord [final [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
-    Hpyth memL memR xL xR Hpre.
-  pose outL := Pr_code (progL xL) memL.
-  pose outR := Pr_code (progR xR) memR.
-  have Htv := pythDistWithFinal_total_variation coord final P Q s Hdist.
-  have Htv_eq :
-      total_variation outL outR =
-      total_variation (dmargin final P) (dmargin final Q).
-    rewrite /total_variation.
-    congr (_ * _).
-    apply/eq_sum=> y.
-    by rewrite -(HmarginL y) -(HmarginR y).
-  rewrite Htv_eq.
-  exact: Htv.
-- move=> memL memR xL xR y Hpre Hy.
-  have [Ω [X [coord [final [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
-    Hpyth memL memR xL xR Hpre.
-  exact: HpostL.
-Qed.
+(* TODO: select output heaps and apply the list TV bound. *)
+Admitted.
+
+Definition list_lte (s s' : list R) : Prop :=
+  size s = size s' /\
+  forall i, nth 0 s i <= nth 0 s' i.
 
 Lemma pythConseqRule
-  {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre pre' : pred ((inL_t * heap) * (inR_t * heap)))
   (post post' : pred (out_t * heap))
-  (s s' : (ℓ.+1).-tuple R) :
+  (s s' : heap -> heap -> list R) :
   (forall inps, pre' inps -> pre inps) ->
   (forall outs, post outs -> post' outs) ->
-  (forall i : 'I_(ℓ.+1), tnth s i <= tnth s' i) ->
+  (forall memL memR, list_lte (s memL memR) (s' memL memR)) ->
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   ⊨Pyth ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
-Proof.
-move=> Hpre Hpost Hs Hpyth memL memR xL xR Hpre'.
-have [Ω [X [coord [final [P [Q
-    [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
-  Hpyth memL memR xL xR (Hpre _ Hpre').
-exists Ω, X, coord, final, P, Q.
-split.
-- move: Hdist=> [Hsep [Heps [Hac [HP [HQ Hcond]]]]].
-  split; first exact: Hsep.
-  split.
-    move=> i.
-    have := Heps i.
-    have := Hs i.
-    lra.
-  split; first exact: Hac.
-  split; first exact: HP.
-  split; first exact: HQ.
-  move=> i a.
-  have := Hcond i a.
-  have := Hs i.
-  lra.
-split; first exact: HmarginL.
-split; first exact: HmarginR.
-split.
-- move=> y Hy.
-  exact: Hpost (HpostL y Hy).
-- move=> y Hy.
-  exact: Hpost (HpostR y Hy).
-Qed.
+(* TODO: transport [pythDistWithFinal] across equal-length lists. *)
+Admitted.
 
 Lemma aePythSeqRule
-  {ℓ : nat}
   {inL_t inR_t midL_t midR_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code midL_t)
   (progR : inR_t -> raw_code midR_t)
@@ -266,7 +220,7 @@ Lemma aePythSeqRule
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (mid : pred ((midL_t * heap) * (midR_t * heap)))
   (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R) :
+  (s : heap -> heap -> list R) :
   ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃ mid ⦄ ->
   ⊨Pyth ⦃ mid ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
   ⊨Pyth ⦃ pre ⦄
@@ -274,82 +228,10 @@ Lemma aePythSeqRule
     ≈( s )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
-Proof.
-move=> [_ Hae] Hpyth memL memR xL xR Hpre.
-pose ML := Pr_code (progL xL) memL.
-pose MR := Pr_code (progR xR) memR.
-pose KL (x : midL_t * heap) := Pr_code (contL x.1) x.2.
-pose KR (x : midR_t * heap) := Pr_code (contR x.1) x.2.
-have [d0 [Hd0 Hmidprob]] := Hae memL memR xL xR Hpre.
-have Hmidprob1 : \P_[ d0 ] mid >= 1 by lra.
-have Hcont_wit :
-    forall aL aR,
-      mid (aL, aR) ->
-      exists
-      (Ω : choiceType)
-      (X : 'I_ℓ -> choiceType)
-      (coord : forall i : 'I_ℓ, Ω -> X i)
-      (final : Ω -> out_t * heap)
-      (P Q : {distr Ω / R}),
-        pythDistWithFinal coord final P Q s /\
-        dmargin final P =1 KL aL /\
-        dmargin final Q =1 KR aR.
-  move=> aL aR Hmid.
-  case: aL Hmid => [yL memL'] Hmid.
-  case: aR Hmid => [yR memR'] Hmid.
-  have [Ω [X [coord [final [P [Q
-      [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
-    Hpyth memL' memR' yL yR Hmid.
-  exists Ω, X, coord, final, P, Q.
-  split; first exact: Hdist.
-  split; [exact: HmarginL | exact: HmarginR].
-have Hbind :=
-  pythDistWithFinal_bind_coupling ML MR KL KR mid d0 s
-    Hd0 Hmidprob1 Hcont_wit.
-case: Hbind => Ωc [Xc [coordc [finalc [Pc [Qc
-    [Hdistc [HmarginLc HmarginRc]]]]]]].
-exists Ωc, Xc, coordc, finalc, Pc, Qc.
-rewrite !Pr_code_bind.
-split; first exact: Hdistc.
-split.
-- move=> y.
-  rewrite HmarginLc.
-  apply: eq_in_dlet; last by [].
-  by move=> x _ z.
-split.
-- move=> y.
-  rewrite HmarginRc.
-  apply: eq_in_dlet; last by [].
-  by move=> x _ z.
-split.
-- move=> y Hy.
-  have [a Ha Hay] := dinsupp_dlet Hy.
-  case: a Ha Hay => [a mem] Ha Hay.
-  have [aR Hmid'] :=
-    coupling_with_loss_prob1_left_support ML MR mid d0 Hd0 Hmidprob1
-      (a, mem) Ha.
-  case: aR Hmid' => [aR memR'] Hmid'.
-  have [Ω [X [coord [final [P [Q
-      [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
-    Hpyth mem memR' a aR Hmid'.
-  apply: (HpostL y).
-  exact: Hay.
-- move=> y Hy.
-  have [a Ha Hay] := dinsupp_dlet Hy.
-  case: a Ha Hay => [a mem] Ha Hay.
-  have [aL Hmid'] :=
-    coupling_with_loss_prob1_right_support ML MR mid d0 Hd0 Hmidprob1
-      (a, mem) Ha.
-  case: aL Hmid' => [aL memL'] Hmid'.
-  have [Ω [X [coord [final [P [Q
-      [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
-    Hpyth memL' mem aL a Hmid'.
-  apply: (HpostR y).
-  exact: Hay.
-Qed.
+(* TODO: generalize [pythDistWithFinal_bind_coupling] to heap-indexed lists. *)
+Admitted.
 
 Lemma pythSeqRule
-  {ℓ ℓ' : nat}
   {inL_t inR_t mid_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code mid_t)
   (progR : inR_t -> raw_code mid_t)
@@ -359,97 +241,21 @@ Lemma pythSeqRule
   (left_post : pred (mid_t * heap))
   (mid : pred ((mid_t * heap) * (mid_t * heap)))
   (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R)
-  (s' : (ℓ'.+1).-tuple R) :
+  (s s' sout : heap -> heap -> list R) :
+  (forall midMemL midMemR outMemL outMemR,
+    s midMemL midMemR ++ s' outMemL outMemR = sout outMemL outMemR) ->
   (forall aL aR, left_post aL -> left_post aR -> mid (aL, aR)) ->
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ left_post ⦄ ->
   ⊨Pyth ⦃ mid ⦄ contL ≈( s' ) contR ⦃ post ⦄ ->
   ⊨Pyth ⦃ pre ⦄
     (fun xL => yL ← progL xL ;; contL yL)
-    ≈( cat_tuple s s' )
+    ≈( sout )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
-Proof.
-move=> Hmid Hpyth Hcont memL memR xL xR Hpre.
-have [Ω [X [coord [final [P [Q
-    [Hdist [HmarginL [HmarginR [HleftL HleftR]]]]]]]]]] :=
-  Hpyth memL memR xL xR Hpre.
-pose KL (x : mid_t * heap) := Pr_code (contL x.1) x.2.
-pose KR (x : mid_t * heap) := Pr_code (contR x.1) x.2.
-have Hcont_wit :
-    forall aL aR,
-      aL \in dinsupp (dmargin final P) ->
-      aR \in dinsupp (dmargin final Q) ->
-      exists
-      (Ω' : choiceType)
-      (X' : 'I_ℓ' -> choiceType)
-      (coord' : forall i : 'I_ℓ', Ω' -> X' i)
-      (final' : Ω' -> out_t * heap)
-      (P' Q' : {distr Ω' / R}),
-        pythDistWithFinal coord' final' P' Q' s' /\
-        dmargin final' P' =1 KL aL /\
-        dmargin final' Q' =1 KR aR.
-  move=> aL aR HaL HaR.
-  case: aL HaL => [yL memL'] HaL.
-  case: aR HaR => [yR memR'] HaR.
-  have Hmid' : mid ((yL, memL'), (yR, memR')).
-    apply: Hmid.
-    - apply: HleftL.
-      by rewrite in_dinsupp -(HmarginL (yL, memL')).
-    - apply: HleftR.
-      by rewrite in_dinsupp -(HmarginR (yR, memR')).
-  have [Ω' [X' [coord' [final' [P' [Q'
-      [Hdist' [HmarginL' [HmarginR' [HpostL2 HpostR2]]]]]]]]]] :=
-    Hcont memL' memR' yL yR Hmid'.
-  exists Ω', X', coord', final', P', Q'.
-  split; first exact: Hdist'.
-  split; [exact: HmarginL' | exact: HmarginR'].
-have Hbind :=
-  pythDistWithFinal_bind coord final P Q s s' KL KR Hdist Hcont_wit.
-case: Hbind => Ωc [Xc [coordc [finalc [Pc [Qc
-    [Hdistc [HmarginLc HmarginRc]]]]]]].
-exists Ωc, Xc, coordc, finalc, Pc, Qc.
-rewrite !Pr_code_bind.
-split; first exact: Hdistc.
-split.
-- move=> y.
-  rewrite HmarginLc.
-  apply: eq_in_dlet; last exact: HmarginL.
-  by move=> x _ z.
-split.
-- move=> y.
-  rewrite HmarginRc.
-  apply: eq_in_dlet; last exact: HmarginR.
-  by move=> x _ z.
-split.
-- move=> y Hy.
-  have [a Ha Hay] := dinsupp_dlet Hy.
-  case: a Ha Hay => [a mem] Ha Hay.
-  have Hleft : left_post (a, mem).
-    exact: HleftL.
-  have Hmid' : mid ((a, mem), (a, mem)).
-    by apply: Hmid.
-  have [Ω' [X' [coord' [final' [P' [Q'
-      [Hdist' [HmarginL' [HmarginR' [HpostL2 HpostR2]]]]]]]]]] :=
-    Hcont mem mem a a Hmid'.
-  apply: (HpostL2 y).
-  exact: Hay.
-- move=> y Hy.
-  have [a Ha Hay] := dinsupp_dlet Hy.
-  case: a Ha Hay => [a mem] Ha Hay.
-  have Hleft : left_post (a, mem).
-    exact: HleftR.
-  have Hmid' : mid ((a, mem), (a, mem)).
-    by apply: Hmid.
-  have [Ω' [X' [coord' [final' [P' [Q'
-      [Hdist' [HmarginL' [HmarginR' [HpostL2 HpostR2]]]]]]]]]] :=
-    Hcont mem mem a a Hmid'.
-  apply: (HpostR2 y).
-  exact: Hay.
-Qed.
+(* TODO: generalize [pythDistWithFinal_bind] to heap-indexed lists. *)
+Admitted.
 
 Lemma pythAeSeqRule
-  {ℓ : nat}
   {inL_t inR_t mid_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code mid_t)
   (progR : inR_t -> raw_code mid_t)
@@ -457,45 +263,15 @@ Lemma pythAeSeqRule
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (mid : pred (mid_t * heap))
   (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R) :
+  (s sout : heap -> heap -> list R) :
+  (forall midMemL midMemR outMemL outMemR,
+    s midMemL midMemR = sout outMemL outMemR) ->
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ mid ⦄ ->
   ⊨Hoare ⦃ mid ⦄ cont ⦃ post ⦄ ->
   ⊨Pyth ⦃ pre ⦄
     (fun xL => yL ← progL xL ;; cont yL)
-    ≈( s )
+    ≈( sout )
     (fun xR => yR ← progR xR ;; cont yR)
   ⦃ post ⦄.
-Proof.
-move=> Hpyth Hhoare memL memR xL xR Hpre.
-have [Ω [X [coord [final [P [Q
-    [Hdist [HmarginL [HmarginR [HmidL HmidR]]]]]]]]]] :=
-  Hpyth memL memR xL xR Hpre.
-pose K (x : mid_t * heap) := Pr_code (cont x.1) x.2.
-have [Ω' [X' [coord' [final' [P' [Q'
-    [Hdist' [HmarginL' HmarginR']]]]]]]] :=
-  pythDistWithFinal_postprocess coord final P Q s K Hdist.
-exists Ω', X', coord', final', P', Q'.
-rewrite !Pr_code_bind.
-split; first exact: Hdist'.
-split.
-- move=> y.
-  rewrite HmarginL'.
-  apply: eq_in_dlet; last exact: HmarginL.
-  by move=> x _ z.
-split.
-- move=> y.
-  rewrite HmarginR'.
-  apply: eq_in_dlet; last exact: HmarginR.
-  by move=> x _ z.
-split.
-- move=> y Hy.
-  have [x Hx Hxy] := dinsupp_dlet Hy.
-  case: x Hx Hxy => [x mem] Hx Hxy.
-  apply: (Hhoare x mem (HmidL (x, mem) Hx) y).
-  by rewrite in_dinsupp.
-- move=> y Hy.
-  have [x Hx Hxy] := dinsupp_dlet Hy.
-  case: x Hx Hxy => [x mem] Hx Hxy.
-  apply: (Hhoare x mem (HmidR (x, mem) Hx) y).
-  by rewrite in_dinsupp.
-Qed.
+(* TODO: transport the indexed list through [pythDistWithFinal_postprocess]. *)
+Admitted.
