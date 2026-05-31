@@ -228,7 +228,7 @@ Lemma aePythSeqRule
     ≈( s )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
-(* TODO: generalize [pythDistWithFinal_bind_coupling] to heap-indexed lists. *)
+(* TODO: state the probability-level AE/Pyth bind fact for heap-indexed lists. *)
 Admitted.
 
 Definition natLocation := (nat * nat)%type.
