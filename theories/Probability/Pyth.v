@@ -150,6 +150,37 @@ Lemma pythDistWithFinal_bind
     dmargin finalc Qc =1 \dlet_(a <- dmargin final Q) KR a.
 Admitted.
 
+Lemma pythDistWithFinal_bind_exists
+    {n : nat} {Ω A B : choiceType} {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
+    (P Q : {distr Ω / R}) (eps eps' : list R)
+    (KL KR : A -> {distr B / R}) :
+  pythDistWithFinal coord final P Q eps ->
+  (forall aL aR,
+    aL \in dinsupp (dmargin final P) ->
+    aR \in dinsupp (dmargin final Q) ->
+    exists
+    (m : nat)
+    (Ω' : choiceType)
+    (X' : 'I_m -> choiceType)
+    (coord' : forall i : 'I_m, Ω' -> X' i)
+    (final' : Ω' -> B)
+    (P' Q' : {distr Ω' / R}),
+      pythDistWithFinal coord' final' P' Q' eps' /\
+      dmargin final' P' =1 KL aL /\
+      dmargin final' Q' =1 KR aR) ->
+  exists
+  (m : nat)
+  (Ωc : choiceType)
+  (Xc : 'I_m -> choiceType)
+  (coordc : forall i : 'I_m, Ωc -> Xc i)
+  (finalc : Ωc -> B)
+  (Pc Qc : {distr Ωc / R}),
+    pythDistWithFinal coordc finalc Pc Qc (eps ++ eps') /\
+    dmargin finalc Pc =1 \dlet_(a <- dmargin final P) KL a /\
+    dmargin finalc Qc =1 \dlet_(a <- dmargin final Q) KR a.
+Admitted.
+
 Lemma pythDistWithFinal_bind_coupling
     {n : nat} {A B C : choiceType}
     (ML : {distr A / R}) (MR : {distr B / R})
