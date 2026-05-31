@@ -231,6 +231,21 @@ Lemma aePythSeqRule
 (* TODO: generalize [pythDistWithFinal_bind_coupling] to heap-indexed lists. *)
 Admitted.
 
+Definition intListLocation := (nat * list chInt)%type.
+
+Definition intListLoc (loc : intListLocation) : Location :=
+  mkloc loc.1 loc.2.
+
+Definition epsKls (get_kl : chInt -> chInt -> R)
+    (epsL epsR : list chInt) : list R :=
+  map (fun eps => get_kl eps.1 eps.2) (zip epsL epsR).
+
+Definition heapEpsKls (eps_loc : intListLocation)
+    (get_kl : chInt -> chInt -> R)
+    (memL memR : heap) : list R :=
+  epsKls get_kl (get_heap memL (intListLoc eps_loc))
+                   (get_heap memR (intListLoc eps_loc)).
+
 Lemma pythSeqRule
   {inL_t inR_t mid_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code mid_t)
@@ -241,18 +256,35 @@ Lemma pythSeqRule
   (left_post : pred (mid_t * heap))
   (mid : pred ((mid_t * heap) * (mid_t * heap)))
   (post : pred (out_t * heap))
-  (s s' sout : heap -> heap -> list R) :
-  (forall midMemL midMemR outMemL outMemR,
-    s midMemL midMemR ++ s' outMemL outMemR = sout outMemL outMemR) ->
+  (eps_loc : intListLocation)
+  (get_kl : chInt -> chInt -> R)
+  (cont_eps_L cont_eps_R : list chInt) :
+  size cont_eps_L = size cont_eps_R ->
+  (forall aL aR, left_post aL -> left_post aR ->
+    size (get_heap aL.2 (intListLoc eps_loc)) =
+    size (get_heap aR.2 (intListLoc eps_loc))) ->
+  (forall y mem eps, post (y, mem) ->
+    post (y, set_heap mem (intListLoc eps_loc) eps)) ->
   (forall aL aR, left_post aL -> left_post aR -> mid (aL, aR)) ->
-  ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ left_post ⦄ ->
-  ⊨Pyth ⦃ mid ⦄ contL ≈( s' ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄ progL ≈( heapEpsKls eps_loc get_kl ) progR ⦃ left_post ⦄ ->
+  ⊨Pyth ⦃ mid ⦄ contL ≈( fun _ _ => epsKls get_kl cont_eps_L cont_eps_R )
+    contR ⦃ post ⦄ ->
   ⊨Pyth ⦃ pre ⦄
-    (fun xL => yL ← progL xL ;; contL yL)
-    ≈( sout )
-    (fun xR => yR ← progR xR ;; contR yR)
+    (fun xL =>
+      yL ← progL xL ;;
+      eps ← get (intListLoc eps_loc) ;;
+      zL ← contL yL ;;
+      #put (intListLoc eps_loc) := (eps ++ cont_eps_L) ;;
+      ret zL)
+    ≈( heapEpsKls eps_loc get_kl )
+    (fun xR =>
+      yR ← progR xR ;;
+      eps ← get (intListLoc eps_loc) ;;
+      zR ← contR yR ;;
+      #put (intListLoc eps_loc) := (eps ++ cont_eps_R) ;;
+      ret zR)
   ⦃ post ⦄.
-(* TODO: generalize [pythDistWithFinal_bind] to heap-indexed lists. *)
+(* TODO: lift [pythDistWithFinal_bind] through the bookkeeping cell updates. *)
 Admitted.
 
 Lemma pythAeSeqRule
