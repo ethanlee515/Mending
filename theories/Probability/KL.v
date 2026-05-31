@@ -52,6 +52,12 @@ Lemma mass1_kl_left {T : choiceType} (P Q : {distr T / R}) :
     \E_[P] (fun x => ln (P x / Q x)).
 Proof. by []. Qed.
 
+Lemma kl_dmargin_injective {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  injective f ->
+  δ_KL (dmargin f P) (dmargin f Q) = δ_KL P Q.
+Admitted.
+
 Lemma expectation_le_const_on_support {T : choiceType}
     (P : {distr T / R}) (f : T -> R) (c : R) :
   dweight P = 1 ->
