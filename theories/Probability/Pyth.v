@@ -121,65 +121,92 @@ Lemma pythDistWithFinal_postprocess
     dmargin final' Q' =1 \dlet_(x <- dmargin final Q) K x.
 Admitted.
 
-Lemma pythDistWithFinal_bind
-    {n m : nat} {Ω A B : choiceType} {X : 'I_n -> choiceType}
-    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
-    (P Q : {distr Ω / R}) (eps eps' : list R)
-    (KL KR : A -> {distr B / R}) :
-  pythDistWithFinal coord final P Q eps ->
-  (forall aL aR,
-    aL \in dinsupp (dmargin final P) ->
-    aR \in dinsupp (dmargin final Q) ->
-    exists
-    (Ω' : choiceType)
-    (X' : 'I_m -> choiceType)
-    (coord' : forall i : 'I_m, Ω' -> X' i)
-    (final' : Ω' -> B)
-    (P' Q' : {distr Ω' / R}),
-      pythDistWithFinal coord' final' P' Q' eps' /\
-      dmargin final' P' =1 KL aL /\
-      dmargin final' Q' =1 KR aR) ->
-  exists
-  (Ωc : choiceType)
-  (Xc : 'I_(n + m.+1) -> choiceType)
-  (coordc : forall i : 'I_(n + m.+1), Ωc -> Xc i)
-  (finalc : Ωc -> B)
-  (Pc Qc : {distr Ωc / R}),
-    pythDistWithFinal coordc finalc Pc Qc (eps ++ eps') /\
-    dmargin finalc Pc =1 \dlet_(a <- dmargin final P) KL a /\
-    dmargin finalc Qc =1 \dlet_(a <- dmargin final Q) KR a.
-Admitted.
+Record pythDistWithFinalWitness (A : choiceType) (eps : list R) := {
+  pyth_wit_n : nat;
+  pyth_wit_Ω : choiceType;
+  pyth_wit_X : 'I_pyth_wit_n -> choiceType;
+  pyth_wit_coord : forall i : 'I_pyth_wit_n, pyth_wit_Ω -> pyth_wit_X i;
+  pyth_wit_final : pyth_wit_Ω -> A;
+  pyth_wit_P : {distr pyth_wit_Ω / R};
+  pyth_wit_Q : {distr pyth_wit_Ω / R};
+  pyth_wit_dist :
+    pythDistWithFinal pyth_wit_coord pyth_wit_final pyth_wit_P pyth_wit_Q eps;
+}.
 
-Lemma pythDistWithFinal_bind_exists
-    {n : nat} {Ω A B : choiceType} {X : 'I_n -> choiceType}
+Arguments pyth_wit_n {A eps}.
+Arguments pyth_wit_Ω {A eps}.
+Arguments pyth_wit_X {A eps}.
+Arguments pyth_wit_coord {A eps}.
+Arguments pyth_wit_final {A eps}.
+Arguments pyth_wit_P {A eps}.
+Arguments pyth_wit_Q {A eps}.
+Arguments pyth_wit_dist {A eps}.
+
+Definition pythBindMargins {A B : choiceType}
+    (KL KR : A -> {distr B / R}) (aL aR : A)
+    {eps : list R} (wit : pythDistWithFinalWitness B eps) : Prop :=
+  dmargin wit.(pyth_wit_final) wit.(pyth_wit_P) =1 KL aL /\
+  dmargin wit.(pyth_wit_final) wit.(pyth_wit_Q) =1 KR aR.
+
+(* Core sequencing construction.  Keeping the selector proof-relevant makes
+   the dependent latent-space construction explicit and separates it from the
+   constructive-choice wrapper below. *)
+Lemma pythDistWithFinal_bind_selected
+    {n : nat} {Ω A B C : choiceType} {X : 'I_n -> choiceType}
     (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
     (P Q : {distr Ω / R}) (eps eps' : list R)
-    (KL KR : A -> {distr B / R}) :
+    (KL KR : A -> {distr B / R}) (finish : A -> B -> C)
+    (select : forall aL aR,
+      aL \in dinsupp (dmargin final P) ->
+      aR \in dinsupp (dmargin final Q) ->
+      { wit : pythDistWithFinalWitness B eps' |
+        pythBindMargins KL KR aL aR wit }) :
   pythDistWithFinal coord final P Q eps ->
-  (forall aL aR,
-    aL \in dinsupp (dmargin final P) ->
-    aR \in dinsupp (dmargin final Q) ->
-    exists
-    (m : nat)
-    (Ω' : choiceType)
-    (X' : 'I_m -> choiceType)
-    (coord' : forall i : 'I_m, Ω' -> X' i)
-    (final' : Ω' -> B)
-    (P' Q' : {distr Ω' / R}),
-      pythDistWithFinal coord' final' P' Q' eps' /\
-      dmargin final' P' =1 KL aL /\
-      dmargin final' Q' =1 KR aR) ->
   exists
   (m : nat)
   (Ωc : choiceType)
   (Xc : 'I_m -> choiceType)
   (coordc : forall i : 'I_m, Ωc -> Xc i)
-  (finalc : Ωc -> B)
+  (finalc : Ωc -> C)
   (Pc Qc : {distr Ωc / R}),
     pythDistWithFinal coordc finalc Pc Qc (eps ++ eps') /\
-    dmargin finalc Pc =1 \dlet_(a <- dmargin final P) KL a /\
-    dmargin finalc Qc =1 \dlet_(a <- dmargin final Q) KR a.
+    dmargin finalc Pc =1
+      \dlet_(a <- dmargin final P) \dlet_(b <- KL a) dunit (finish a b) /\
+    dmargin finalc Qc =1
+      \dlet_(a <- dmargin final Q) \dlet_(b <- KR a) dunit (finish a b).
 Admitted.
+
+Lemma pythDistWithFinal_bind
+    {n : nat} {Ω A B C : choiceType} {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
+    (P Q : {distr Ω / R}) (eps eps' : list R)
+    (KL KR : A -> {distr B / R}) (finish : A -> B -> C) :
+  pythDistWithFinal coord final P Q eps ->
+  (forall aL aR,
+    aL \in dinsupp (dmargin final P) ->
+    aR \in dinsupp (dmargin final Q) ->
+    exists wit : pythDistWithFinalWitness B eps',
+      pythBindMargins KL KR aL aR wit) ->
+  exists
+  (m : nat)
+  (Ωc : choiceType)
+  (Xc : 'I_m -> choiceType)
+  (coordc : forall i : 'I_m, Ωc -> Xc i)
+  (finalc : Ωc -> C)
+  (Pc Qc : {distr Ωc / R}),
+    pythDistWithFinal coordc finalc Pc Qc (eps ++ eps') /\
+    dmargin finalc Pc =1
+      \dlet_(a <- dmargin final P) \dlet_(b <- KL a) dunit (finish a b) /\
+    dmargin finalc Qc =1
+      \dlet_(a <- dmargin final Q) \dlet_(b <- KR a) dunit (finish a b).
+Proof.
+move=> Hdist Hwit.
+apply: (pythDistWithFinal_bind_selected coord final P Q eps eps'
+          KL KR finish _ Hdist).
+move=> aL aR HaL HaR.
+apply: boolp.constructive_indefinite_description.
+exact: Hwit aL aR HaL HaR.
+Qed.
 
 Lemma pythDistWithFinal_bind_coupling
     {n : nat} {A B C : choiceType}

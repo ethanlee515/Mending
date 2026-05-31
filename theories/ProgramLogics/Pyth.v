@@ -261,8 +261,6 @@ Lemma pythSeqRule
   (post : pred (out_t * heap))
   (ctr_loc : natLocation)
   (cont_eps : list R) :
-  (forall aL aR, left_post aL -> left_post aR ->
-    get_heap aL.2 (natLoc ctr_loc) = get_heap aR.2 (natLoc ctr_loc)) ->
   (forall y mem ctr, post (y, mem) ->
     post (y, set_heap mem (natLoc ctr_loc) ctr)) ->
   (forall aL aR, left_post aL -> left_post aR -> mid (aL, aR)) ->
@@ -288,7 +286,7 @@ Lemma pythSeqRule
       ret zR)
   ⦃ post ⦄.
 Proof.
-move=> Hctr Hpost Hmid HsuppL HsuppR Hprog Hcont.
+move=> Hpost Hmid HsuppL HsuppR Hprog Hcont.
 move=> memL memR xL xR Hpre /= yL yR HyL HyR.
 have HyL0 := HyL.
 have HyR0 := HyR.
@@ -306,16 +304,11 @@ have Hmid_eta :
       mid ((bL.1, bL.2), (bR.1, bR.2)).
   by move=> [bLv bLm] [bRv bRm] /=; apply: Hmid.
 set ctr := get_heap aL.2 (natLoc ctr_loc).
-set KL := fun a : mid_t * heap =>
-  Pr_code
-    (z ← contL a.1 ;;
-     #put (natLoc ctr_loc) := (get_heap a.2 (natLoc ctr_loc)).+1 ;;
-     ret z) a.2.
-set KR := fun a : mid_t * heap =>
-  Pr_code
-    (z ← contR a.1 ;;
-     #put (natLoc ctr_loc) := (get_heap a.2 (natLoc ctr_loc)).+1 ;;
-     ret z) a.2.
+set KL := fun a : mid_t * heap => Pr_code (contL a.1) a.2.
+set KR := fun a : mid_t * heap => Pr_code (contR a.1) a.2.
+set finish := fun (a : mid_t * heap) (z : out_t * heap) =>
+  (z.1, set_heap z.2 (natLoc ctr_loc)
+    (get_heap a.2 (natLoc ctr_loc)).+1).
 have Hcont_postL :
     forall bL bR, left_post bL -> left_post bR ->
     forall z, z \in dinsupp (Pr_code (contL bL.1) bL.2) -> post z.
@@ -340,16 +333,8 @@ have Hcont_wit :
     forall bL bR,
       bL \in dinsupp (dmargin final P) ->
       bR \in dinsupp (dmargin final Q) ->
-      exists
-      (ℓ' : nat)
-      (Ω' : choiceType)
-      (X' : 'I_ℓ' -> choiceType)
-      (coord' : forall i : 'I_ℓ', Ω' -> X' i)
-      (final' : Ω' -> out_t * heap)
-      (P' Q' : {distr Ω' / R}),
-        pythDistWithFinal coord' final' P' Q' cont_eps /\
-        dmargin final' P' =1 KL bL /\
-        dmargin final' Q' =1 KR bR.
+      exists wit : pythDistWithFinalWitness (out_t * heap)%type cont_eps,
+        pythBindMargins KL KR bL bR wit.
   move=> bL bR HbL HbR.
   have HbLprog : bL \in dinsupp (Pr_code (progL xL) memL).
     by rewrite in_dinsupp -HP -in_dinsupp.
@@ -357,38 +342,25 @@ have Hcont_wit :
     by rewrite in_dinsupp -HQ -in_dinsupp.
   have HleftbL : left_post bL := HleftL bL HbLprog.
   have HleftbR : left_post bR := HleftR bR HbRprog.
-  have Hctrb : get_heap bL.2 (natLoc ctr_loc) =
-               get_heap bR.2 (natLoc ctr_loc) :=
-    Hctr bL bR HleftbL HleftbR.
   have [zL HzL] := HsuppL bL HleftbL.
   have [zR HzR] := HsuppR bR HleftbR.
   have [ℓ' [Ω' [X' [coord' [final' [P' [Q' Hwit']]]]]]] :=
     Hcont bL.2 bR.2 bL.1 bR.1 (Hmid_eta bL bR HleftbL HleftbR)
       zL zR HzL HzR.
   have [Hdist' [HP' [HQ' [HpostL HpostR]]]] := Hwit'.
-  have [Ω'' [X'' [coord'' [final'' [P'' [Q'' Hwit'']]]]]] :=
-    pythDistWithFinal_postprocess coord' final' P' Q' cont_eps
-      (fun z => dunit (z.1,
-        set_heap z.2 (natLoc ctr_loc)
-          (get_heap bL.2 (natLoc ctr_loc)).+1)) Hdist'.
-  have [Hdist'' [HP'' HQ'']] := Hwit''.
-  exists _, Ω'', X'', coord'', final'', P'', Q''.
-  split; first exact: Hdist''.
-  split.
-  - move=> out.
-    rewrite HP'' /KL Pr_code_bind.
-    apply: eq_in_dlet; last exact: HP'.
-    move=> z _ out'.
-    by rewrite Pr_code_put Pr_code_ret.
-  - move=> out.
-    rewrite HQ'' /KR Pr_code_bind.
-    apply: eq_in_dlet; last exact: HQ'.
-    move=> z _ out'.
-    rewrite Pr_code_put Pr_code_ret.
-    by rewrite Hctrb.
+  exists {| pyth_wit_n := ℓ';
+            pyth_wit_Ω := Ω';
+            pyth_wit_X := X';
+            pyth_wit_coord := coord';
+            pyth_wit_final := final';
+            pyth_wit_P := P';
+            pyth_wit_Q := Q';
+            pyth_wit_dist := Hdist' |}.
+  by split.
 have [ℓc [Ωc [Xc [coordc [finalc [Pc [Qc Hwitc]]]]]]] :=
-  pythDistWithFinal_bind_exists coord final P Q
-    (heapCtrEps ctr_loc cont_eps aL.2 aR.2) cont_eps KL KR Hdist Hcont_wit.
+  pythDistWithFinal_bind coord final P Q
+    (heapCtrEps ctr_loc cont_eps aL.2 aR.2) cont_eps KL KR finish
+    Hdist Hcont_wit.
 have [Hdistc [HPc HQc]] := Hwitc.
 have HoutLctr : get_heap yL.2 (natLoc ctr_loc) = ctr.+1.
   rewrite Pr_code_get Pr_code_bind in HoutL'.
@@ -405,15 +377,19 @@ split.
   rewrite HPc Pr_code_bind.
   apply: eq_in_dlet; last exact: HP.
   move=> a _ out'.
-  rewrite /KL Pr_code_get.
-  by [].
+  rewrite /KL /finish Pr_code_get Pr_code_bind.
+  apply: eq_in_dlet; last by [].
+  move=> z _ out''.
+  by rewrite Pr_code_put Pr_code_ret.
 split.
 - move=> out.
   rewrite HQc Pr_code_bind.
   apply: eq_in_dlet; last exact: HQ.
   move=> a _ out'.
-  rewrite /KR Pr_code_get.
-  by [].
+  rewrite /KR /finish Pr_code_get Pr_code_bind.
+  apply: eq_in_dlet; last by [].
+  move=> z _ out''.
+  by rewrite Pr_code_put Pr_code_ret.
 split.
 - move=> out Hout.
   rewrite Pr_code_bind in Hout.
