@@ -15,61 +15,19 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
 Import PackageNotation.
 Local Open Scope package_scope.
 
-(** A trace entry records the outcome of one effectful [raw_code] node.
+Definition trace_t : choice_type := 'list 'nat.
 
-  The trace itself is an SSProve [choice_type]. Since SSProve lists are
-  homogeneous, every entry is a [nat], with the underlying value pickled into
-  that common representation.
-
-  Entries are intentionally untagged: the [raw_code] being continued tells us
-  whether the next entry should be decoded as a heap-read result, random sample
-  result, or external call result.
-*)
-Definition trace_entry_t : choice_type := chNat.
-
-Definition trace_t : choice_type := chList trace_entry_t.
-
-Definition trace_entry : choiceType := trace_entry_t.
-
-Definition trace : choiceType := trace_t.
-
-Definition sample_trace_entry {op : Op} (x : Arit op) : trace_entry :=
-  pickle x.
-
-Definition call_trace_entry {o : opsig} (x : tgt o) : trace_entry :=
-  pickle x.
-
-Definition get_trace_entry {l : Location} (x : l) : trace_entry :=
-  pickle x.
-
-Definition decode_sample_trace_entry (op : Op)
-    (e : trace_entry) : option (Arit op) :=
+Definition decode_sample_entry (op : Op)
+    (e : 'nat) : option (Arit op) :=
   unpickle e.
 
-Definition decode_call_trace_entry (o : opsig)
-    (e : trace_entry) : option (tgt o) :=
+Definition decode_call_entry (o : opsig)
+    (e : 'nat) : option (tgt o) :=
   unpickle e.
 
-Definition decode_get_trace_entry (l : Location)
-    (e : trace_entry) : option l :=
+Definition decode_get_entry (l : Location)
+    (e : 'nat) : option l :=
   unpickle e.
-
-Lemma decode_sample_trace_entryK {op : Op} (x : Arit op) :
-  decode_sample_trace_entry op (sample_trace_entry x) = Some x.
-Proof. by rewrite /decode_sample_trace_entry /sample_trace_entry pickleK. Qed.
-
-Lemma decode_call_trace_entryK {o : opsig} (x : tgt o) :
-  decode_call_trace_entry o (call_trace_entry x) = Some x.
-Proof. by rewrite /decode_call_trace_entry /call_trace_entry pickleK. Qed.
-
-Lemma decode_get_trace_entryK {l : Location} (x : l) :
-  decode_get_trace_entry l (get_trace_entry x) = Some x.
-Proof. by rewrite /decode_get_trace_entry /get_trace_entry pickleK. Qed.
-
-Section ContinueFromTrace.
-
-Context {Loc : Locations}.
-Context {Import : Interface}.
 
 (** [continue_from_trace p t] consumes the trace [t] as a prefix of [p].
 
@@ -81,31 +39,30 @@ Context {Import : Interface}.
   node, or the trace is longer than the remaining effectful events in the
   program.
 *)
-Fixpoint continue_from_trace {A : choiceType}
-    (p : raw_code A) (t : trace) : option (raw_code A) :=
+Fixpoint continue_from_trace {A : choice_type}
+    (p : raw_code A) (t : trace_t) : option (raw_code A) :=
   match t with
-  | [::] => Some p
+  | nil => Some p
   | e :: t' =>
       match p with
       | ret _ => None
       | opr o x k =>
-          match decode_call_trace_entry o e with
+          match decode_call_entry o e with
           | Some y => continue_from_trace (k y) t'
           | None => None
           end
       | getr l k =>
-          match decode_get_trace_entry l e with
+          match decode_get_entry l e with
           | Some y => continue_from_trace (k y) t'
           | None => None
           end
       | putr l v k =>
           continue_from_trace k t
       | sampler op k =>
-          match decode_sample_trace_entry op e with
+          match decode_sample_entry op e with
           | Some y => continue_from_trace (k y) t'
           | None => None
           end
       end
   end.
 
-End ContinueFromTrace.
