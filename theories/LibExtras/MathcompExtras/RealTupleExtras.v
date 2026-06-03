@@ -7,7 +7,7 @@ Import GRing.Theory Num.Theory.
 
 Local Open Scope ring_scope.
 
-Section RealListExtras.
+Section RealTupleExtras.
 
 Context {R : realType}.
 
@@ -19,13 +19,16 @@ Fixpoint sum_squares (lst : list R) : R :=
 
 Definition l2_norm (eps_lst : list R) := Num.sqrt (sum_squares eps_lst).
 
-Fixpoint list_sum (s : list R) : R :=
-  match s with
-  | [::] => 0
-  | head :: tail => head + list_sum tail
-  end.
+Definition tuple_sum {n : nat} (s : n.-tuple R) : R :=
+  \sum_(i < n) tnth s i.
 
-Definition pythagorean_tv_bound (s : list R) : R :=
-  Num.sqrt (list_sum s / 2).
+Definition tuple_sum_squares {n : nat} (s : n.-tuple R) : R :=
+  \sum_(i < n) (tnth s i) ^+ 2.
 
-End RealListExtras.
+Definition two_norm {n : nat} (s : n.-tuple R) : R :=
+  Num.sqrt (tuple_sum_squares s).
+
+Definition pythagorean_tv_bound {n : nat} (s : n.-tuple R) : R :=
+  Num.sqrt (tuple_sum s / 2).
+
+End RealTupleExtras.
