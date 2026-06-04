@@ -8,29 +8,86 @@ From SSProve Require Import NominalPrelude.
 Import PackageNotation.
 Local Open Scope package_scope.
 
-Definition trace_t : choice_type := 'list 'nat.
+Inductive trace_entry :=
+| call_entry (out : nat)
+| get_entry (res : nat)
+| put_entry
+| sample_entry (res : nat).
+
+Definition trace_t := seq trace_entry.
+
+Definition packed_trace_entry_t : choice_type :=
+  'nat + ('nat + ('unit + 'nat)).
+
+Definition packed_trace_t : choice_type := 'list packed_trace_entry_t.
+
+Definition pack_trace_entry (e : trace_entry) : packed_trace_entry_t :=
+  match e with
+  | call_entry out => inl out
+  | get_entry res => inr (inl res)
+  | put_entry => inr (inr (inl tt))
+  | sample_entry res => inr (inr (inr res))
+  end.
+
+Definition unpack_trace_entry (e : packed_trace_entry_t) : trace_entry :=
+  match e with
+  | inl out => call_entry out
+  | inr (inl res) => get_entry res
+  | inr (inr (inl tt)) => put_entry
+  | inr (inr (inr res)) => sample_entry res
+  end.
+
+Definition pack_trace (t : trace_t) : packed_trace_t :=
+  map pack_trace_entry t.
+
+Definition unpack_trace (t : packed_trace_t) : trace_t :=
+  map unpack_trace_entry t.
+
+Lemma unpack_pack_trace_entry (e : trace_entry) :
+  unpack_trace_entry (pack_trace_entry e) = e.
+Proof. by case: e. Qed.
+
+Lemma unpack_pack_trace (t : trace_t) :
+  unpack_trace (pack_trace t) = t.
+Proof. by elim: t => //= e t ->; rewrite unpack_pack_trace_entry. Qed.
+
+Lemma map_unpack_pack_trace (t : trace_t) :
+  map unpack_trace_entry (map pack_trace_entry t) = t.
+Proof. exact: unpack_pack_trace. Qed.
 
 Definition decode_sample_entry (op : Op)
-    (e : 'nat) : option (Arit op) :=
-  unpickle e.
+    (e : trace_entry) : option (Arit op) :=
+  match e with
+  | sample_entry res => unpickle res
+  | _ => None
+  end.
 
 Definition decode_call_entry (o : opsig)
-    (e : 'nat) : option (tgt o) :=
-  unpickle e.
+    (e : trace_entry) : option (tgt o) :=
+  match e with
+  | call_entry out => unpickle out
+  | _ => None
+  end.
 
 Definition decode_get_entry (l : Location)
-    (e : 'nat) : option l :=
-  unpickle e.
+    (e : trace_entry) : option l :=
+  match e with
+  | get_entry res => unpickle res
+  | _ => None
+  end.
 
 (** [continue_from_trace p t] consumes the trace [t] as a prefix of [p].
 
-  Heap reads, external calls, and random samples each consume one entry. Heap
-  writes consume no entry because their continuation does not depend on an
-  external outcome. When successful, the result is the residual program after
-  the traced prefix. Failure means that the trace is inconsistent with [p]: a
-  payload cannot be unpickled at the type expected by the current [raw_code]
-  node, or the trace is longer than the remaining effectful events in the
-  program.
+  Heap reads, heap writes, external calls, and random samples each consume one
+  tagged entry. Write entries carry no payload, but their tag is still needed:
+  when resuming from a suspended trace, the write has already happened in the
+  suspended run, so replay must skip exactly that write in the original program.
+
+  When successful, the result is the residual program after the traced prefix.
+  Failure means that the trace is inconsistent with [p]: an entry has the wrong
+  tag, a payload cannot be unpickled at the type expected by the current
+  [raw_code] node, or the trace is longer than the remaining effectful events in
+  the program.
 *)
 Fixpoint continue_from_trace {A : choice_type}
     (p : raw_code A) (t : trace_t) : option (raw_code A) :=
@@ -50,7 +107,10 @@ Fixpoint continue_from_trace {A : choice_type}
           | None => None
           end
       | putr l v k =>
-          continue_from_trace k t
+          match e with
+          | put_entry => continue_from_trace k t'
+          | _ => None
+          end
       | sampler op k =>
           match decode_sample_entry op e with
           | Some y => continue_from_trace (k y) t'
@@ -63,11 +123,45 @@ Lemma continue_from_trace_nil {A : choice_type} (p : raw_code A) :
   continue_from_trace p nil = Some p.
 Proof. by case: p. Qed.
 
+Lemma continue_from_trace_cat {A : choice_type}
+    (p p' : raw_code A) (t1 t2 : trace_t) :
+  continue_from_trace p t1 = Some p' ->
+  continue_from_trace p (t1 ++ t2) = continue_from_trace p' t2.
+Proof.
+  elim: t1 p => [|e t1 IH] p /=.
+  - move=> H.
+    rewrite continue_from_trace_nil in H.
+    by inversion H; subst.
+  - case: p => //=.
+    + move=> o x k.
+      case Hdec: (decode_call_entry o e) => [y|] //=.
+      exact: IH.
+    + move=> l k.
+      case Hdec: (decode_get_entry l e) => [y|] //=.
+      exact: IH.
+    + move=> l v k.
+      case: e => //=.
+      exact: IH.
+    + move=> op k.
+      case Hdec: (decode_sample_entry op e) => [y|] //=.
+      exact: IH.
+Qed.
+
+Lemma continue_from_trace_rcons {A : choice_type}
+    (p p' : raw_code A) (t : trace_t) (e : trace_entry) :
+  continue_from_trace p t = Some p' ->
+  continue_from_trace p (rcons t e) = continue_from_trace p' [:: e].
+Proof.
+  move=> H.
+  rewrite -cats1.
+  exact: continue_from_trace_cat H.
+Qed.
+
 Definition packed_input := 'nat.
 
 (* left = suspended; right = done *)
 Definition suspended_program {A : choice_type} : choice_type :=
-  (packed_input * trace_t) + A.
+  (packed_input * packed_trace_t) + A.
 
 Fixpoint run_until_next_call_aux {T : choice_type} (prog : raw_code T) (fn : ident) (trace : trace_t) :
   raw_code suspended_program :=
@@ -76,19 +170,19 @@ Fixpoint run_until_next_call_aux {T : choice_type} (prog : raw_code T) (fn : ide
   | opr o x k =>
     let '(f, _) := o in
     if f == fn then
-      ret (inl (pickle x, trace))
+      ret (inl (pickle x, pack_trace trace))
     else (
       y ← op o ⋅ x ;;
-      run_until_next_call_aux (k y) fn (rcons trace (pickle y))
+      run_until_next_call_aux (k y) fn (rcons trace (call_entry (pickle y)))
     )
   | getr l k =>
       y ← getr l (fun y => ret y) ;;
-      run_until_next_call_aux (k y) fn (rcons trace (pickle y))
+      run_until_next_call_aux (k y) fn (rcons trace (get_entry (pickle y)))
   | putr l v k =>
-      putr l v (run_until_next_call_aux k fn trace)
+      putr l v (run_until_next_call_aux k fn (rcons trace put_entry))
   | sampler op k =>
       y <$ op ;;
-      run_until_next_call_aux (k y) fn (rcons trace (pickle y))
+      run_until_next_call_aux (k y) fn (rcons trace (sample_entry (pickle y)))
   end.
 
 Definition run_until_next_call {T : choice_type} (prog : raw_code T) (fn : ident)
@@ -111,7 +205,7 @@ Definition invalid_trace_code {A : choice_type} : raw_code A :=
 
 Definition continue_after_call {A Y : choice_type}
     (prog : raw_code A) (local_trace : trace_t) (y : Y) : raw_code A :=
-  match continue_from_trace prog (rcons local_trace (pickle y)) with
+  match continue_from_trace prog (rcons local_trace (call_entry (pickle y))) with
   | Some prog' => prog'
   | None => invalid_trace_code
   end.
@@ -132,22 +226,24 @@ Fixpoint factor_calls_aux (q : nat) {X Y A : choice_type}
       match s with
       | inr v => ret (inr v)
       | inl xt =>
-          let '(x, local_trace) := xt in
-          ret (inl (x, trace_prefix ++ local_trace))
+          let '(x, packed_local_trace) := xt in
+          let local_trace := unpack_trace packed_local_trace in
+          ret (inl (x, pack_trace (trace_prefix ++ local_trace)))
       end
   | S q' =>
       s ← run_until_next_call prog fn ;;
       match s with
       | inr v => ret (inr v)
       | inl xt =>
-          let '(x, local_trace) := xt in
+          let '(x, packed_local_trace) := xt in
+          let local_trace := unpack_trace packed_local_trace in
           let trace_to_call := trace_prefix ++ local_trace in
           match call_from_package (X := X) (Y := Y) p fn x with
           | Some body =>
               y ← body ;;
               @factor_calls_aux q' X Y A p fn
                 (continue_after_call prog local_trace y)
-                (rcons trace_to_call (pickle y))
+                (rcons trace_to_call (call_entry (pickle y)))
           | None => invalid_trace_code
           end
       end
@@ -163,11 +259,24 @@ Definition resume_suspended_program {A : choice_type}
   match s with
   | inr v => ret v
   | inl xt =>
-      let '(_, trace) := xt in
+      let '(_, packed_trace) := xt in
+      let trace := unpack_trace packed_trace in
       match continue_from_trace prog trace with
       | Some prog' => prog'
       | None => invalid_trace_code
       end
+  end.
+
+Definition resume_with_trace_prefix {A : choice_type}
+    (root : raw_code A) (trace_prefix : trace_t)
+    (s : suspended_program) : raw_code A :=
+  match s with
+  | inr v => ret v
+  | inl xt =>
+      let '(x, packed_local_trace) := xt in
+      let local_trace := unpack_trace packed_local_trace in
+      resume_suspended_program root
+        (inl (x, pack_trace (trace_prefix ++ local_trace)))
   end.
 
 Definition compile_calls (q : nat) {X Y A : choice_type}
@@ -240,6 +349,29 @@ Proof.
     by rewrite pickleK.
 Qed.
 
+Lemma code_link_closed
+    (A : choice_type) (L : Locations) (p : raw_package)
+    (prog : raw_code A) :
+  ValidCode L [interface] prog ->
+  code_link prog p = prog.
+Proof.
+  move=> Hvalid.
+  induction Hvalid.
+  - reflexivity.
+  - exfalso.
+    exact: (fhas_empty _ H).
+  - simpl.
+    f_equal.
+    apply functional_extensionality => v.
+    auto.
+  - simpl.
+    by rewrite IHHvalid.
+  - simpl.
+    f_equal.
+    apply functional_extensionality => v.
+    auto.
+Qed.
+
 Lemma run_until_next_call_correct_code_link
     (A : choice_type) (p : raw_package) (fn : ident)
     (root prog : raw_code A) (trace_prefix : trace_t) :
@@ -249,14 +381,67 @@ Lemma run_until_next_call_correct_code_link
      match s with
      | inr v => resume_suspended_program root (inr v)
      | inl xt =>
-         let '(x, local_trace) := xt in
+         let '(x, packed_local_trace) := xt in
+         let local_trace := unpack_trace packed_local_trace in
          resume_suspended_program root
-           (inl (x, trace_prefix ++ local_trace))
+           (inl (x, pack_trace (trace_prefix ++ local_trace)))
      end)
     p =
   code_link prog p.
 Proof.
-Admitted.
+  rewrite /run_until_next_call.
+  move=> Htrace.
+  have Haux :
+    code_link
+      (s ← run_until_next_call_aux prog fn nil ;;
+       resume_with_trace_prefix root trace_prefix s) p =
+    code_link prog p.
+  - rewrite -[trace_prefix]cats0 in Htrace.
+    elim: prog nil Htrace => [v|o x k IH|l k IH|l v k IH|op k IH] trace Htrace /=.
+    + reflexivity.
+    + move: x k IH Htrace.
+      case: o => f [S T] x k IH Htrace /=.
+      destruct ((f == fn)%bool) eqn:Hfn; simpl.
+      * rewrite /resume_with_trace_prefix /resume_suspended_program /=.
+        by rewrite !unpack_pack_trace Htrace.
+      * f_equal.
+        apply functional_extensionality => y.
+        apply: IH.
+        rewrite -cats1 catA.
+        rewrite (@continue_from_trace_cat A root
+          (opr (f, (S, T)) x k)
+          (trace_prefix ++ trace) [:: call_entry (pickle y)] Htrace)
+          /= /decode_call_entry.
+        by rewrite pickleK continue_from_trace_nil.
+    + f_equal.
+      apply functional_extensionality => y.
+      apply: IH.
+      rewrite -cats1 catA.
+      rewrite (@continue_from_trace_cat A root (getr l k)
+        (trace_prefix ++ trace) [:: get_entry (pickle y)] Htrace)
+        /= /decode_get_entry.
+      by rewrite pickleK continue_from_trace_nil.
+    + f_equal.
+      apply: IH.
+      rewrite -cats1 catA.
+      by rewrite (@continue_from_trace_cat A root (putr l v k)
+        (trace_prefix ++ trace) [:: put_entry] Htrace) /=
+        continue_from_trace_nil.
+    + f_equal.
+      apply functional_extensionality => y.
+      apply: IH.
+      rewrite -cats1 catA.
+      rewrite (@continue_from_trace_cat A root (sampler op k)
+        (trace_prefix ++ trace) [:: sample_entry (pickle y)] Htrace)
+        /= /decode_sample_entry.
+      by rewrite pickleK continue_from_trace_nil.
+  change
+    (code_link
+      (s ← run_until_next_call_aux prog fn nil ;;
+       resume_with_trace_prefix root trace_prefix s) p =
+     code_link prog p).
+  exact: Haux.
+Qed.
 
 Lemma factor_calls_aux_correct_code_link
     (q : nat) (X Y A : choice_type)
