@@ -210,6 +210,51 @@ Definition continue_after_call {A Y : choice_type}
   | None => invalid_trace_code
   end.
 
+Lemma continue_after_call_here
+    (X Y A : choice_type) (fn : ident) (x : X)
+    (k : Y -> raw_code A) (y : Y) :
+  continue_after_call (opr (mkopsig fn X Y) x k) nil y = k y.
+Proof.
+  rewrite /continue_after_call /= /decode_call_entry.
+  by rewrite pickleK continue_from_trace_nil.
+Qed.
+
+Lemma continue_after_call_at_trace
+    (X Y A : choice_type) (fn : ident) (prog : raw_code A)
+    (local_trace : trace_t) (x : X) (k : Y -> raw_code A) (y : Y) :
+  continue_from_trace prog local_trace =
+    Some (opr (mkopsig fn X Y) x k) ->
+  continue_after_call prog local_trace y = k y.
+Proof.
+  move=> Hlocal.
+  rewrite /continue_after_call.
+  rewrite (@continue_from_trace_rcons A prog
+    (opr (mkopsig fn X Y) x k) local_trace
+    (call_entry (pickle y)) Hlocal) /= /decode_call_entry.
+  by rewrite pickleK continue_from_trace_nil.
+Qed.
+
+Lemma continue_from_trace_after_call_at_trace
+    (X Y A : choice_type) (fn : ident)
+    (root prog : raw_code A) (trace_prefix local_trace : trace_t)
+    (x : X) (k : Y -> raw_code A) (y : Y) :
+  continue_from_trace root trace_prefix = Some prog ->
+  continue_from_trace prog local_trace =
+    Some (opr (mkopsig fn X Y) x k) ->
+  continue_from_trace root
+    (rcons (trace_prefix ++ local_trace) (call_entry (pickle y))) =
+  Some (k y).
+Proof.
+  move=> Hroot Hlocal.
+  rewrite rcons_cat.
+  rewrite (@continue_from_trace_cat A root prog trace_prefix
+    (rcons local_trace (call_entry (pickle y))) Hroot).
+  rewrite (@continue_from_trace_rcons A prog
+    (opr (mkopsig fn X Y) x k) local_trace
+    (call_entry (pickle y)) Hlocal) /= /decode_call_entry.
+  by rewrite pickleK continue_from_trace_nil.
+Qed.
+
 (** [factor_calls q p fn prog] manually dispatches [q] calls to [fn] through
   [p], then suspends at the next call to [fn].
 
@@ -231,22 +276,34 @@ Fixpoint factor_calls_aux (q : nat) {X Y A : choice_type}
           ret (inl (x, pack_trace (trace_prefix ++ local_trace)))
       end
   | S q' =>
-      s ← run_until_next_call prog fn ;;
-      match s with
-      | inr v => ret (inr v)
-      | inl xt =>
-          let '(x, packed_local_trace) := xt in
-          let local_trace := unpack_trace packed_local_trace in
-          let trace_to_call := trace_prefix ++ local_trace in
-          match call_from_package (X := X) (Y := Y) p fn x with
-          | Some body =>
-              y ← body ;;
-              @factor_calls_aux q' X Y A p fn
-                (continue_after_call prog local_trace y)
-                (rcons trace_to_call (call_entry (pickle y)))
-          | None => invalid_trace_code
-          end
-      end
+      let fix factor_next (prog : raw_code A) (trace_prefix : trace_t)
+          {struct prog} : raw_code suspended_program :=
+        match prog with
+        | ret v => ret (inr v)
+        | opr o x k =>
+            let '(f, _) := o in
+            if f == fn then
+              match call_from_package (X := X) (Y := Y) p fn (pickle x) with
+              | Some body =>
+                  y ← body ;;
+                  @factor_calls_aux q' X Y A p fn
+                    (continue_after_call prog nil y)
+                    (rcons trace_prefix (call_entry (pickle y)))
+              | None => invalid_trace_code
+              end
+            else
+              y ← op o ⋅ x ;;
+              factor_next (k y) (rcons trace_prefix (call_entry (pickle y)))
+        | getr l k =>
+            y ← getr l (fun y => ret y) ;;
+            factor_next (k y) (rcons trace_prefix (get_entry (pickle y)))
+        | putr l v k =>
+            putr l v (factor_next k (rcons trace_prefix put_entry))
+        | sampler op k =>
+            y <$ op ;;
+            factor_next (k y) (rcons trace_prefix (sample_entry (pickle y)))
+        end in
+      factor_next prog trace_prefix
   end.
 
 Definition factor_calls (q : nat) {X Y A : choice_type}
@@ -333,6 +390,13 @@ Proof.
   by rewrite Hfn in Ho; inversion Ho.
 Qed.
 
+Lemma ident_eqb_eq (f fn : ident) :
+  (f == fn)%bool = true -> f = fn.
+Proof.
+  elim: f fn => [|f IH] [|fn] //= H.
+  by f_equal; exact: IH.
+Qed.
+
 Lemma call_from_package_resolve
     (X Y : choice_type) (L : Locations) (M : Interface)
     (p : raw_package) (fn : ident) (x : X) :
@@ -370,6 +434,46 @@ Proof.
     f_equal.
     apply functional_extensionality => v.
     auto.
+Qed.
+
+Lemma code_link_resolve_closed
+    (X Y : choice_type) (L : Locations) (M : Interface)
+    (p : raw_package) (fn : ident) (x : X) :
+  ValidPackage L [interface] M p ->
+  fhas M (mkopsig fn X Y) ->
+  code_link (resolve p (mkopsig fn X Y) x) p =
+  resolve p (mkopsig fn X Y) x.
+Proof.
+  move=> Hp Hfn.
+  have [body Hbody] : exists body, p fn = Some (X; Y; body).
+  - have [body Hbody] : exists body, fhas p (fn, (X; Y; body)).
+    + move: (valid_exports Hp (mkopsig fn X Y)) => [HM _].
+      exact: HM.
+    + by exists body.
+  apply: code_link_closed.
+  rewrite /resolve Hbody coerce_kleisliE.
+  exact: (valid_imports Hp fn (X; Y; body) x Hbody).
+Qed.
+
+Lemma bind_ext {A B : choice_type}
+    (prog : raw_code A) (k1 k2 : A -> raw_code B) :
+  (forall x, k1 x = k2 x) ->
+  bind prog k1 = bind prog k2.
+Proof.
+  move=> Hext.
+  elim: prog k1 k2 Hext => [x|o x k IH|l k IH|l v k IH|op k IH] k1 k2 Hext /=.
+  - exact: Hext.
+  - f_equal.
+    apply functional_extensionality => y.
+    exact: (IH y k1 k2 Hext).
+  - f_equal.
+    apply functional_extensionality => y.
+    exact: (IH y k1 k2 Hext).
+  - f_equal.
+    exact: (IH k1 k2 Hext).
+  - f_equal.
+    apply functional_extensionality => y.
+    exact: (IH y k1 k2 Hext).
 Qed.
 
 Lemma run_until_next_call_correct_code_link
@@ -443,10 +547,57 @@ Proof.
   exact: Haux.
 Qed.
 
+Lemma factor_calls_aux0_correct_code_link
+    (X Y A : choice_type) (p : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix : trace_t) :
+  continue_from_trace root trace_prefix = Some prog ->
+  code_link
+    (s ← factor_calls_aux 0 (X := X) (Y := Y) p fn
+            prog trace_prefix ;;
+     resume_suspended_program root s)
+    p =
+  code_link prog p.
+Proof.
+  move=> Htrace.
+  simpl.
+  rewrite bind_assoc /=.
+  rewrite (_ :
+    (x ← run_until_next_call prog fn ;;
+     s ← match x with
+         | inl (x0, packed_local_trace) =>
+             ret
+               (inl
+                 (x0,
+                  pack_trace
+                    (trace_prefix ++ unpack_trace packed_local_trace)))
+         | inr v => ret (inr v)
+         end ;;
+     resume_suspended_program root s) =
+      (s ← run_until_next_call prog fn ;;
+       match s with
+       | inr v => resume_suspended_program root (inr v)
+       | inl xt =>
+           let '(x, packed_local_trace) := xt in
+           let local_trace := unpack_trace packed_local_trace in
+           resume_suspended_program root
+             (inl (x, pack_trace (trace_prefix ++ local_trace)))
+       end)).
+  2:{
+    f_equal.
+    apply functional_extensionality => s.
+    by case: s => [[x packed_local_trace]|v].
+  }
+  exact: (@run_until_next_call_correct_code_link A p fn root prog trace_prefix Htrace).
+Qed.
+
 Lemma factor_calls_aux_correct_code_link
     (q : nat) (X Y A : choice_type)
+    (L Lp : Locations) (M : Interface)
     (p : raw_package) (fn : ident)
     (root prog : raw_code A) (trace_prefix : trace_t) :
+  ValidPackage Lp [interface] M p ->
+  fhas M (mkopsig fn X Y) ->
+  ValidCode L M prog ->
   continue_from_trace root trace_prefix = Some prog ->
   code_link
     (s ← factor_calls_aux q (X := X) (Y := Y) p fn
@@ -455,18 +606,129 @@ Lemma factor_calls_aux_correct_code_link
     p =
   code_link prog p.
 Proof.
-Admitted.
+  elim: q X Y A L Lp M p fn root prog trace_prefix
+    => [|q IHq] X Y A L Lp M p fn root prog trace_prefix Hp Hfn Hvalid Htrace.
+  - exact: factor_calls_aux0_correct_code_link Htrace.
+  - elim: Hvalid root trace_prefix Htrace
+      => [v|o x k Ho Hk IHk|l k Hl Hk IHk|l v k Hl Hk IHk|op k Hk IHk]
+      root trace_prefix Htrace /=.
+    + reflexivity.
+    + case: o Ho x k Hk IHk Htrace => f [S T] Ho x k Hk IHk Htrace /=.
+      destruct ((f == fn)%bool) eqn:Hid; simpl.
+      * have Hid_eq : f = fn := ident_eqb_eq f fn Hid.
+        have Hop :
+          (f, (S, T)) = mkopsig fn X Y.
+        - apply: (fhas_same_ident_opsig M fn X Y).
+          + exact: Hfn.
+          + exact: Ho.
+          + exact: Hid_eq.
+        subst f.
+        move: Hop x k Hk IHk Htrace.
+        rewrite /mkopsig /=.
+        move=> [= -> ->] x k Hk IHk Htrace.
+        rewrite /call_from_package.
+        have [body Hbody] : exists body, p fn = Some (X; Y; body).
+        - have [body Hbody] : exists body, fhas p (fn, (X; Y; body)).
+          + move: (valid_exports Hp (mkopsig fn X Y)) => [HM _].
+            exact: HM.
+          + by exists body.
+        rewrite Hbody pickleK.
+        rewrite !code_link_bind.
+        rewrite (@code_link_resolve_closed X Y Lp M p fn x Hp Hfn).
+        rewrite bind_assoc.
+        apply: bind_ext => y.
+        rewrite continue_after_call_here.
+        rewrite -code_link_bind.
+        have Hnext :
+          continue_from_trace root
+            (rcons trace_prefix (call_entry (pickle y))) =
+          Some (k y).
+        {
+          rewrite -cats1.
+          rewrite (@continue_from_trace_cat A root
+            (opr (mkopsig fn X Y) x k)
+            trace_prefix [:: call_entry (pickle y)] Htrace)
+            /= /decode_call_entry.
+          by rewrite pickleK continue_from_trace_nil.
+        }
+        exact: (@IHq X Y A L Lp M p fn root (k y)
+          (rcons trace_prefix (call_entry (pickle y)))
+          Hp Hfn (Hk y) Hnext).
+      * apply: bind_ext => y.
+        have Hnext :
+          continue_from_trace root
+            (rcons trace_prefix (call_entry (pickle y))) =
+          Some (k y).
+        {
+          rewrite -cats1.
+          rewrite (@continue_from_trace_cat A root
+            (opr (f, (S, T)) x k)
+            trace_prefix [:: call_entry (pickle y)] Htrace)
+            /= /decode_call_entry.
+          by rewrite pickleK continue_from_trace_nil.
+        }
+        exact: (IHk y root
+          (rcons trace_prefix (call_entry (pickle y))) Hnext).
+    + f_equal.
+      apply functional_extensionality => y.
+      have Hnext :
+        continue_from_trace root
+          (rcons trace_prefix (get_entry (pickle y))) =
+        Some (k y).
+      {
+        rewrite -cats1.
+        rewrite (@continue_from_trace_cat A root (getr l k)
+          trace_prefix [:: get_entry (pickle y)] Htrace)
+          /= /decode_get_entry.
+        by rewrite pickleK continue_from_trace_nil.
+      }
+      exact: (IHk y root
+        (rcons trace_prefix (get_entry (pickle y))) Hnext).
+    + have Hnext :
+        continue_from_trace root (rcons trace_prefix put_entry) =
+        Some k.
+      {
+        rewrite -cats1.
+        by rewrite (@continue_from_trace_cat A root (putr l v k)
+          trace_prefix [:: put_entry] Htrace) /= continue_from_trace_nil.
+      }
+      f_equal.
+      exact: (IHk root (rcons trace_prefix put_entry) Hnext).
+    + f_equal.
+      apply functional_extensionality => y.
+      have Hnext :
+        continue_from_trace root
+          (rcons trace_prefix (sample_entry (pickle y))) =
+        Some (k y).
+      {
+        rewrite -cats1.
+        rewrite (@continue_from_trace_cat A root (sampler op k)
+          trace_prefix [:: sample_entry (pickle y)] Htrace)
+          /= /decode_sample_entry.
+        by rewrite pickleK continue_from_trace_nil.
+      }
+      exact: (IHk y root
+        (rcons trace_prefix (sample_entry (pickle y))) Hnext).
+Qed.
 
 Lemma compile_calls_correct_code_link
     (q : nat) (X Y A : choice_type)
+    (L Lp : Locations) (M : Interface)
     (p : raw_package) (fn : ident) (prog : raw_code A) :
+  ValidPackage Lp [interface] M p ->
+  fhas M (mkopsig fn X Y) ->
+  ValidCode L M prog ->
   code_link
     (compile_calls q (X := X) (Y := Y) p fn prog)
     p =
   code_link prog p.
 Proof.
+  move=> Hp Hfn Hvalid.
   rewrite /compile_calls /factor_calls.
-  eapply (@factor_calls_aux_correct_code_link q X Y A p fn prog prog nil).
+  eapply (@factor_calls_aux_correct_code_link q X Y A L Lp M p fn prog prog nil).
+  - exact: Hp.
+  - exact: Hfn.
+  - exact: Hvalid.
   exact: continue_from_trace_nil.
 Qed.
 
@@ -478,6 +740,7 @@ Theorem compile_calls_correct_against_link
   ValidPackage L M E P ->
   ValidPackage L' [interface] M P' ->
   fcompat L L' ->
+  fhas E o ->
   fhas M (mkopsig fn X Y) ->
   Pr_code
     (code_link
@@ -486,8 +749,19 @@ Theorem compile_calls_correct_against_link
     h =
   Pr_op (P ∘ P') o x h.
 Proof.
-  move=> _ _ _ _.
+  move=> HP HP' _ Ho Hfn.
   rewrite /Pr_op.
-  rewrite compile_calls_correct_code_link.
+  have Hcompile :
+    code_link
+      (compile_calls q (X := X) (Y := Y) P' fn (resolve P o x))
+      P' =
+    code_link (resolve P o x) P'.
+  {
+    apply: compile_calls_correct_code_link.
+    - exact: HP'.
+    - exact: Hfn.
+    - exact: (@valid_resolve L M E P o x HP Ho).
+  }
+  rewrite Hcompile.
   by rewrite resolve_link.
 Qed.
