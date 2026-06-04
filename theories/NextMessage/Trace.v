@@ -1,16 +1,8 @@
 From Stdlib Require Import Unicode.Utf8.
-From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals distr ssrZ realseq realsum.
-From mathcomp Require Import lra.
+From mathcomp Require Import ssreflect eqtype ssrnat seq choice.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
-From SSProve.Relational Require Import OrderEnrichedCategory.
-From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
-From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
-From SSProve.Crypt Require Import choice_type SubDistr.
-From SSProve.Crypt.nominal Require Import Pr.
-From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
+From SSProve Require Import NominalPrelude.
 
 Import PackageNotation.
 Local Open Scope package_scope.
@@ -65,4 +57,42 @@ Fixpoint continue_from_trace {A : choice_type}
           end
       end
   end.
+
+Definition packed_input := 'nat.
+
+(* left = suspended; right = done *)
+Definition suspended_program {A : choice_type} : choice_type :=
+  (packed_input * trace_t) + A.
+
+Fixpoint run_until_next_call_aux {T : choice_type} (prog : raw_code T) (fn : ident) (trace : trace_t) :
+  raw_code suspended_program :=
+  match prog with
+  | ret v => ret (inr v)
+  | opr o x k =>
+    let '(f, _) := o in
+    if f == fn then
+      ret (inl (pickle x, trace))
+    else (
+      y ← op o ⋅ x ;;
+      run_until_next_call_aux (k y) fn (rcons trace (pickle y))
+    )
+  | getr l k =>
+      y ← getr l (fun y => ret y) ;;
+      run_until_next_call_aux (k y) fn (rcons trace (pickle y))
+  | putr l v k =>
+      putr l v (run_until_next_call_aux k fn trace)
+  | sampler op k =>
+      y <$ op ;;
+      run_until_next_call_aux (k y) fn (rcons trace (pickle y))
+  end.
+
+Definition run_until_next_call {T : choice_type} (prog : raw_code T) (fn : ident)
+  : raw_code suspended_program :=
+  run_until_next_call_aux prog fn nil.
+
+Print resolve.
+
+Definition call_from_package {X Y : choice_type} (p : raw_package) (fn : 'nat) (x : packed_input)
+  : option (raw_code Y).
+Admitted.
 
