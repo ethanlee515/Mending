@@ -2,6 +2,7 @@ From Stdlib Require Import Unicode.Utf8.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import ssreflect eqtype ssrnat seq choice.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
+From extructures Require Import ord fset fmap.
 From SSProve Require Import NominalPrelude.
 
 Import PackageNotation.
@@ -90,9 +91,86 @@ Definition run_until_next_call {T : choice_type} (prog : raw_code T) (fn : ident
   : raw_code suspended_program :=
   run_until_next_call_aux prog fn nil.
 
-Print resolve.
+Definition call_from_package {X Y : choice_type} (p : raw_package) (fn : ident) (x : packed_input)
+  : option (raw_code Y) :=
+  match p fn with
+  | Some _ =>
+      match unpickle x : option X with
+      | Some x' => Some (resolve p (mkopsig fn X Y) x')
+      | None => None
+      end
+  | None => None
+  end.
 
-Definition call_from_package {X Y : choice_type} (p : raw_package) (fn : 'nat) (x : packed_input)
-  : option (raw_code Y).
-Admitted.
+Definition invalid_trace_code {A : choice_type} : raw_code A :=
+  sampler (A; distr.dnull) (@ret _).
 
+Definition continue_after_call {A Y : choice_type}
+    (prog : raw_code A) (local_trace : trace_t) (y : Y) : raw_code A :=
+  match continue_from_trace prog (rcons local_trace (pickle y)) with
+  | Some prog' => prog'
+  | None => invalid_trace_code
+  end.
+
+(** [factor_calls q p fn prog] manually dispatches [q] calls to [fn] through
+  [p], then suspends at the next call to [fn].
+
+  The suspended trace is relative to the original [prog]. This assumes the
+  selected package body does not itself call [fn]; only the resumed caller is
+  factored with the remaining fuel.
+*)
+Fixpoint factor_calls_aux (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A)
+    (trace_prefix : trace_t) : raw_code suspended_program :=
+  match q with
+  | 0 =>
+      s ← run_until_next_call prog fn ;;
+      match s with
+      | inr v => ret (inr v)
+      | inl xt =>
+          let '(x, local_trace) := xt in
+          ret (inl (x, trace_prefix ++ local_trace))
+      end
+  | S q' =>
+      s ← run_until_next_call prog fn ;;
+      match s with
+      | inr v => ret (inr v)
+      | inl xt =>
+          let '(x, local_trace) := xt in
+          let trace_to_call := trace_prefix ++ local_trace in
+          match call_from_package (X := X) (Y := Y) p fn x with
+          | Some body =>
+              y ← body ;;
+              @factor_calls_aux q' X Y A p fn
+                (continue_after_call prog local_trace y)
+                (rcons trace_to_call (pickle y))
+          | None => invalid_trace_code
+          end
+      end
+  end.
+
+Definition factor_calls (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A)
+    : raw_code suspended_program :=
+  factor_calls_aux q (X := X) (Y := Y) p fn prog nil.
+
+Definition resume_suspended_program {A : choice_type}
+    (prog : raw_code A) (s : suspended_program) : raw_code A :=
+  match s with
+  | inr v => ret v
+  | inl xt =>
+      let '(_, trace) := xt in
+      match continue_from_trace prog trace with
+      | Some prog' => prog'
+      | None => invalid_trace_code
+      end
+  end.
+
+Definition compile_calls (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
+  s ← factor_calls q (X := X) (Y := Y) p fn prog ;;
+  resume_suspended_program prog s.
+
+Definition compile_next_call {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
+  compile_calls 1 (X := X) (Y := Y) p fn prog.
