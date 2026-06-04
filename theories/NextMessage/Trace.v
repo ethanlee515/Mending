@@ -174,3 +174,52 @@ Definition compile_calls (q : nat) {X Y A : choice_type}
 Definition compile_next_call {X Y A : choice_type}
     (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
   compile_calls 1 (X := X) (Y := Y) p fn prog.
+
+(** Correctness target for the trace-based compiler.
+
+  The compiler rewrites the first [q] calls to [fn] by manually dispatching
+  them through [P'].  The result still has to be linked against [P'], because
+  the resumed suffix may contain more calls to [fn], and the original program
+  may also call other procedures implemented by [P'].
+
+  The side conditions use SSProve's standard package well-formedness story:
+  [P] imports the middle interface [M] and exports [E], while [P'] implements
+  [M] and imports nothing.  The [fcompat L L'] assumption is the location
+  compatibility required by SSProve's [valid_link] lemma for [P ∘ P'].
+
+  There is no separate "self-contained" assumption below.  Since [P'] is a
+  valid package with empty import interface [[interface]], every body inserted
+  from [P'] is already call-free as far as package operations are concerned.
+  Thus the explicit [code_link] on the left can link the resumed caller without
+  introducing an extra semantic condition on calls inside [P'].
+
+  Proof intuition:
+
+  - Show that [factor_calls] preserves the trace of the original caller up to
+    the selected calls, replacing each selected [fn] call by [resolve P'].
+  - Show that [resume_suspended_program] resumes the original caller at exactly
+    the traced continuation point.
+  - After the explicit [code_link] on the left, all uncompiled calls in the
+    resumed suffix, including calls after the first [q] occurrences and calls
+    to operations other than [fn], are resolved just as in [P ∘ P'].
+  - Use the self-contained/no-callback condition for [P'] to justify that
+    linking the manually inserted [P'] bodies does not change their behavior.
+  The hypothesis [fhas M (mkopsig fn X Y)] records that the distinguished
+  operation [fn] has the signature [X ~> Y] in the interface implemented by
+  [P'].
+*)
+Conjecture compile_calls_correct_against_link :
+  forall (q : nat) (X Y : choice_type)
+      (L L' : Locations) (M E : Interface)
+      (P P' : raw_package) (fn : ident),
+    ValidPackage L M E P ->
+    ValidPackage L' [interface] M P' ->
+    fcompat L L' ->
+    fhas M (mkopsig fn X Y) ->
+    forall (o : opsig) (x : src o) h,
+      Pr_code
+        (code_link
+          (compile_calls q (X := X) (Y := Y) P' fn (resolve P o x))
+          P')
+        h =
+      Pr_op (P ∘ P') o x h.
