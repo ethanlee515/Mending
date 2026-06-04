@@ -21,6 +21,7 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition pk_addr : Location := mkloc 100 (None : 'option pk_t).
   Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
   Definition sk_addr : Location := mkloc 102 (None : 'option sk_t).
+  Definition bit_addr : Location := mkloc 103 false.
   Definition table_addr : Location := mkloc 104 (nil : challenger_table).
   (* Function labels *)
   Definition oracle_encrypt : nat := 200.
@@ -57,12 +58,14 @@ Module IndCpad(Import S: ApproxFheScheme).
       [oracle_eval2] : { binary_gate × 'nat× 'nat ~> ciphertext } ;
       [oracle_decrypt] :{ 'nat ~> 'option message }
     ].
-  Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; sk_addr; table_addr].
+  Definition oracle_mem_spec : Locations :=
+    [fmap pk_addr; evk_addr; sk_addr; bit_addr; table_addr].
 
-  Definition IndCpadOracle (b: bool) (max_queries : nat) : IndCpaOracle_t :=
+  Definition IndCpadOracle (max_queries : nat) : IndCpaOracle_t :=
     [package oracle_mem_spec ;
       #def #[oracle_encrypt] ('(m0, m1) : 'message × 'message ) : 'ciphertext
       {
+        b ← get bit_addr ;;
         let m := if b then m1 else m0 in
         o ← get pk_addr ;;
         #assert isSome o as opk ;;
@@ -144,29 +147,35 @@ Module IndCpad(Import S: ApproxFheScheme).
     [package oracle_mem_spec ;
       #def #[main] (_ : 'unit) : 'bool
       {
+        b <$ ('bool; dflip (1 / 2)) ;;
         keys <$ (pk_t × evk_t × sk_t; keygen) ;;
         let '(pk, evk, sk) := keys in
+        #put bit_addr := b ;;
         #put pk_addr := Some pk ;;
         #put evk_addr := Some evk ;;
         #put sk_addr := Some sk ;;
         b' ← call [ guess ] : { pk_t × evk_t ~> 'bool} (pk, evk) ;;
-        ret b'
+        ret (eq_op b' b)
       }
     ].
 
   Definition IndCpadGame
-    (b : bool) (max_queries : nat) (Adv : nom_package) : nom_package :=
-    ((IndCpadChallenger ∘ Adv)%sep ∘ IndCpadOracle b max_queries)%share.
+    (max_queries : nat) (Adv : nom_package) : nom_package :=
+    ((IndCpadChallenger ∘ Adv)%sep ∘ IndCpadOracle max_queries)%share.
 
   Definition game_out
-    (b : bool) (max_queries : nat) (Adv : nom_package) : distr R bool :=
-    dfst (Pr_op (IndCpadGame b max_queries Adv) (main, ('unit, 'bool)) tt empty_heap).
+    (max_queries : nat) (Adv : nom_package) : distr R bool :=
+    dfst (Pr_op (IndCpadGame max_queries Adv)
+      (main, ('unit, 'bool)) tt empty_heap).
 
   Local Open Scope ring_scope.
 
+  Definition success_probability
+    (max_queries : nat) (Adv : nom_package) :=
+    game_out max_queries Adv true.
+
   Definition winning_probability (max_queries : nat) (Adv : nom_package) :=
-    `|(game_out false max_queries Adv) true -
-      (game_out true max_queries Adv) true|.
+    `|success_probability max_queries Adv - 1 / 2|.
 
   Definition FactoredAdversary_t := package
     [interface

@@ -16,6 +16,7 @@ Module IndCpa(Import S: ApproxFheScheme).
   (* -- Variables and their addresses -- *)
   Definition pk_addr : Location := mkloc 100 (None : 'option pk_t).
   Definition evk_addr : Location := mkloc 101 (None : 'option evk_t).
+  Definition bit_addr : Location := mkloc 102 false.
   (* Function labels *)
   Definition oracle_encrypt : nat := 200.
   Definition adv_set_keys : nat := 300.
@@ -28,7 +29,7 @@ Module IndCpa(Import S: ApproxFheScheme).
   Notation " 'message_pair " := (message × message) (in custom pack_type at level 2).
   Notation " 'ciphertext " := ciphertext (in custom pack_type at level 2).
 
-  Definition IndCpa_locs : Locations := [fmap pk_addr; evk_addr].
+  Definition IndCpa_locs : Locations := [fmap pk_addr; evk_addr; bit_addr].
 
   Definition IndCpaAdv_import :=
     [interface
@@ -49,11 +50,12 @@ Module IndCpa(Import S: ApproxFheScheme).
       #val #[oracle_encrypt] : 'message_pair → 'ciphertext
     ].
 
-  Definition IndCpaOracle (b: bool) : IndCpaOracle_t :=
+  Definition IndCpaOracle : IndCpaOracle_t :=
     [package IndCpa_locs ;
       #def #[oracle_encrypt] (messages : 'message_pair) : 'ciphertext
       {
         let (m0, m1) := messages in
+        b ← get bit_addr ;;
         let m := if b then m1 else m0 in
         o ← get pk_addr ;;
         #assert isSome o as opk ;;
@@ -77,23 +79,28 @@ Module IndCpa(Import S: ApproxFheScheme).
     [package IndCpa_locs ;
       #def #[main] (_ : 'unit) : 'bool
       {
+        b <$ ('bool; dflip (1 / 2)) ;;
         keys <$ (pk_t × evk_t × sk_t; keygen) ;;
         let '(pk, evk, sk) := keys in
+        #put bit_addr := b ;;
         #put pk_addr := Some pk ;;
         #put evk_addr := Some evk ;;
         b' ← call [ adv_guess ] : { pk_t × evk_t ~> 'bool} (pk, evk) ;;
-        ret b'
+        ret (eq_op b' b)
       }
     ].
 
-  Definition IndCpaGame (b : bool) (Adv: nom_package) : nom_package :=
-    ((IndCpaChallenger ∘ Adv)%sep ∘ IndCpaOracle b)%share.
+  Definition IndCpaGame (Adv : nom_package) : nom_package :=
+    ((IndCpaChallenger ∘ Adv)%sep ∘ IndCpaOracle)%share.
   
-  Definition game_out (b : bool) (Adv: nom_package) : distr R bool :=
-    dfst (Pr_op (IndCpaGame b Adv) (main, ('unit, 'bool)) tt empty_heap).
+  Definition game_out (Adv : nom_package) : distr R bool :=
+    dfst (Pr_op (IndCpaGame Adv) (main, ('unit, 'bool)) tt empty_heap).
 
-  Definition winning_probability (Adv: nom_package) :=
-    `|(game_out false Adv) true - (game_out true Adv) true|.
+  Definition success_probability (Adv : nom_package) :=
+    game_out Adv true.
+
+  Definition winning_probability (Adv : nom_package) :=
+    `|success_probability Adv - 1 / 2|.
 End IndCpa.
 
 Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
