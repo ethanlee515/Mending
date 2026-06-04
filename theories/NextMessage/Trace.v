@@ -59,6 +59,10 @@ Fixpoint continue_from_trace {A : choice_type}
       end
   end.
 
+Lemma continue_from_trace_nil {A : choice_type} (p : raw_code A) :
+  continue_from_trace p nil = Some p.
+Proof. by case: p. Qed.
+
 Definition packed_input := 'nat.
 
 (* left = suspended; right = done *)
@@ -208,18 +212,97 @@ Definition compile_next_call {X Y A : choice_type}
   operation [fn] has the signature [X ~> Y] in the interface implemented by
   [P'].
 *)
-Conjecture compile_calls_correct_against_link :
-  forall (q : nat) (X Y : choice_type)
-      (L L' : Locations) (M E : Interface)
-      (P P' : raw_package) (fn : ident),
-    ValidPackage L M E P ->
-    ValidPackage L' [interface] M P' ->
-    fcompat L L' ->
-    fhas M (mkopsig fn X Y) ->
-    forall (o : opsig) (x : src o) h,
-      Pr_code
-        (code_link
-          (compile_calls q (X := X) (Y := Y) P' fn (resolve P o x))
-          P')
-        h =
-      Pr_op (P ∘ P') o x h.
+Lemma fhas_same_ident_opsig
+    (M : Interface) (fn : ident) (X Y : choice_type) (o : opsig) :
+  fhas M (mkopsig fn X Y) ->
+  fhas M o ->
+  fst o = fn ->
+  o = mkopsig fn X Y.
+Proof.
+  case: o => id [S T] Hfn Ho /= Hid; subst id.
+  rewrite /fhas /mkopsig /= in Hfn Ho.
+  by rewrite Hfn in Ho; inversion Ho.
+Qed.
+
+Lemma call_from_package_resolve
+    (X Y : choice_type) (L : Locations) (M : Interface)
+    (p : raw_package) (fn : ident) (x : X) :
+  ValidPackage L [interface] M p ->
+  fhas M (mkopsig fn X Y) ->
+  call_from_package (X := X) (Y := Y) p fn (pickle x) =
+    Some (resolve p (mkopsig fn X Y) x).
+Proof.
+  move=> Hp Hfn.
+  have [f Hpf] : exists f, fhas p (fn, (X; Y; f)).
+  - move: (valid_exports Hp (mkopsig fn X Y)) => [HM _].
+    exact: HM.
+  - rewrite /call_from_package Hpf.
+    by rewrite pickleK.
+Qed.
+
+Lemma run_until_next_call_correct_code_link
+    (A : choice_type) (p : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix : trace_t) :
+  continue_from_trace root trace_prefix = Some prog ->
+  code_link
+    (s ← run_until_next_call prog fn ;;
+     match s with
+     | inr v => resume_suspended_program root (inr v)
+     | inl xt =>
+         let '(x, local_trace) := xt in
+         resume_suspended_program root
+           (inl (x, trace_prefix ++ local_trace))
+     end)
+    p =
+  code_link prog p.
+Proof.
+Admitted.
+
+Lemma factor_calls_aux_correct_code_link
+    (q : nat) (X Y A : choice_type)
+    (p : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix : trace_t) :
+  continue_from_trace root trace_prefix = Some prog ->
+  code_link
+    (s ← factor_calls_aux q (X := X) (Y := Y) p fn
+            prog trace_prefix ;;
+     resume_suspended_program root s)
+    p =
+  code_link prog p.
+Proof.
+Admitted.
+
+Lemma compile_calls_correct_code_link
+    (q : nat) (X Y A : choice_type)
+    (p : raw_package) (fn : ident) (prog : raw_code A) :
+  code_link
+    (compile_calls q (X := X) (Y := Y) p fn prog)
+    p =
+  code_link prog p.
+Proof.
+  rewrite /compile_calls /factor_calls.
+  eapply (@factor_calls_aux_correct_code_link q X Y A p fn prog prog nil).
+  exact: continue_from_trace_nil.
+Qed.
+
+Theorem compile_calls_correct_against_link
+    (q : nat) (X Y : choice_type)
+    (L L' : Locations) (M E : Interface)
+    (P P' : raw_package) (fn : ident)
+    (o : opsig) (x : src o) h :
+  ValidPackage L M E P ->
+  ValidPackage L' [interface] M P' ->
+  fcompat L L' ->
+  fhas M (mkopsig fn X Y) ->
+  Pr_code
+    (code_link
+      (compile_calls q (X := X) (Y := Y) P' fn (resolve P o x))
+      P')
+    h =
+  Pr_op (P ∘ P') o x h.
+Proof.
+  move=> _ _ _ _.
+  rewrite /Pr_op.
+  rewrite compile_calls_correct_code_link.
+  by rewrite resolve_link.
+Qed.
