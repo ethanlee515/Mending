@@ -9,7 +9,7 @@ From SSProve Require Import NominalPrelude.
 From Mending.Schemes Require Import ApproxFHE Indcpa Indcpad.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.LibExtras.MathcompExtras Require Import DTuple.
-From Mending.Probability Require Import DiscreteGaussian.
+From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
 From extructures Require Import ord fset fmap.
 Import PackageNotation.
 Local Open Scope package_scope.

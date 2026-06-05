@@ -17,7 +17,7 @@ From SSProve Require Import NominalPrelude.
 From Mending.Schemes Require Import Indcpa Indcpad ApproxFHE.
 From mathcomp Require Import seq.
 From extructures Require Import ord fset fmap.
-From Mending.Probability Require Import DiscreteGaussian.
+From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.LibExtras.SSProveExtras Require Import ChoiceVector DiscreteGaussian.
 From Mending.LibExtras.MathcompExtras Require Import ListExtras.

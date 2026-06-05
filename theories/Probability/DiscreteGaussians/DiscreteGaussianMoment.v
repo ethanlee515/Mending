@@ -10,7 +10,7 @@ From mathcomp Require Import lra.
 From mathcomp.algebra_tactics Require Import ring.
 Import GRing.Theory Num.Theory Order.Theory.
 
-From Mending.Probability Require Import DiscreteGaussian.
+From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 

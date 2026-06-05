@@ -13,10 +13,10 @@ From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve.Crypt.nominal Require Import Pr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
-From Mending.Probability Require Import KL.
+From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
 From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
-From Mending.Probability Require Import Pyth.
+From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
 Local Open Scope AeNotations.
 Local Open Scope HoareNotations.
@@ -154,7 +154,10 @@ apply: (klSampRule (fun _ : chUnit => ssp_dg centerL stdev)
                    pre post ε).
 - have Hkl := kl_ssp_dg centerL centerR stdev Hstdev.
   have Hnonneg : 0 <= δ_KL (ssp_dg centerL stdev) (ssp_dg centerR stdev) :=
-    kl_nonnegative _ _.
+    kl_nonnegative _ _ (ssp_dg_absolute_continuous centerL centerR stdev Hstdev)
+      (ssp_dg_mass1 centerL stdev Hstdev).
+  have Hupper : δ_KL (ssp_dg centerL stdev) (ssp_dg centerR stdev) <= ε.
+    lra.
   lra.
 - move=> memL memR [] [].
   exact: Hsame.

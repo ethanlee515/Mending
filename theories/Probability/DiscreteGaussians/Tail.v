@@ -9,7 +9,7 @@ Set Warnings "notation-incompatible-prefix".
 From mathcomp Require Import lra.
 Import GRing.Theory Num.Theory Order.Theory.
 
-From Mending.Probability Require Import DiscreteGaussian DiscreteGaussianKL.
+From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian DiscreteGaussianKL.
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras DistrExtras.
 
 Local Open Scope ring_scope.

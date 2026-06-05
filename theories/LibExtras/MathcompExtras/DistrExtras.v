@@ -1,6 +1,6 @@
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype bigop order all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 From mathcomp Require Import lra.
@@ -68,6 +68,51 @@ rewrite (eq_psum (F2 := fun x => \P_[P, p] (pred1 x))).
   exact: prc_sum.
 by move=> x; rewrite dcondE.
 Qed.
+
+Lemma pr_dcond {T : choiceType} (mu : {distr T / R})
+    (p : pred T) (A : pred T) :
+  \P_[dcond mu p] A = \P_[mu, p] A.
+Admitted.
+
+Definition conditional_second {T U : choiceType}
+    (P : {distr (T * U) / R}) (x : T) : {distr U / R} :=
+  dmargin (fun xy : T * U => xy.2)
+    (dcond P (fun xy : T * U => xy.1 == x)).
+
+Definition tuple_prefix_eq {n : nat} {Ω : choiceType}
+    {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i)
+    (i : 'I_n) (a : forall j : 'I_n, X j) (omega : Ω) : bool :=
+  [forall j : 'I_n, (j < i)%N ==> (coord j omega == a j)].
+
+Definition conditional_coordinate {n : nat} {Ω : choiceType}
+    {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i)
+    (P : {distr Ω / R}) (i : 'I_n) (a : forall j : 'I_n, X j)
+    : {distr (X i) / R} :=
+  dmargin (coord i)
+    (dcond P (fun omega : Ω => tuple_prefix_eq coord i a omega)).
+
+Definition coordinates_separate {n : nat} {Ω : choiceType}
+    {X : 'I_n -> choiceType}
+    (coord : forall i : 'I_n, Ω -> X i) : Prop :=
+  forall omega1 omega2 : Ω,
+    (forall i : 'I_n, coord i omega1 = coord i omega2) ->
+    omega1 = omega2.
+
+Lemma conditional_secondE {T U : choiceType}
+    (P : {distr (T * U) / R}) (x : T) (y : U) :
+  conditional_second P x y =
+    if dmargin (fun xy : T * U => xy.1) P x == 0 then 0
+    else P (x, y) / dmargin (fun xy : T * U => xy.1) P x.
+Admitted.
+
+Lemma conditional_second_factorization {T U : choiceType}
+    (P : {distr (T * U) / R}) (x : T) (y : U) :
+  P (x, y) =
+    dmargin (fun xy : T * U => xy.1) P x *
+    conditional_second P x y.
+Admitted.
 
 Lemma expectation_ext {T : choiceType} (P : {distr T / R}) (f g : T -> R) :
   f =1 g ->
@@ -228,5 +273,17 @@ rewrite dmargin_psumE.
 by apply/eq_psum=> x; rewrite mulrC.
 Qed.
 
-End DistrExtras.
+Lemma conditional_second_mass1_on_support {T U : choiceType}
+    (P : {distr (T * U) / R}) (x : T) :
+  dweight P = 1 ->
+  0 < dmargin (fun xy : T * U => xy.1) P x ->
+  dweight (conditional_second P x) = 1.
+Proof.
+move=> _ Hx.
+rewrite /conditional_second dmargin_dweight.
+apply: dcond_mass1.
+rewrite -(pr_dmargin (pred1 x) (fun xy : T * U => xy.1) P).
+by rewrite -pr_pred1.
+Qed.
 
+End DistrExtras.
