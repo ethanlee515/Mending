@@ -37,6 +37,7 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Module NF := NoiseFlooding(S)(Metric)(Params).
   Module IndCpaGame := IndCpa S.
   Module IndCpadGame := IndCpad NF.
+  Import IndCpadGame.
   (* Copied from oracle *)
   Definition simulator_table_row := message × message × ciphertext.
   Definition simulator_table := chList simulator_table_row.
@@ -44,10 +45,6 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Definition evk_addr : Location := mkloc 1101 (None : 'option evk_t).
   Definition ready_addr : Location := mkloc 1103 (false : 'bool).
   Definition table_addr : Location := mkloc 1104 (nil : simulator_table).
-  Definition oracle_encrypt : nat := 200.
-  Definition oracle_eval1 : nat := 202.
-  Definition oracle_eval2 : nat := 203.
-  Definition oracle_decrypt : nat := 204.
   Definition message_pair := message × message.
   Definition adv_keys := pk_t × evk_t.
   Notation " 'adv_keys " := (adv_keys) (in custom pack_type at level 2).
@@ -57,21 +54,12 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Notation " 'adv_ev2 " := (binary_gate × 'nat × 'nat) (in custom pack_type at level 2).
   Notation " 'option_message " := (chOption message) (in custom pack_type at level 2).
   Definition IndCpadAdv_import :=
-    [interface
-      #val #[oracle_encrypt] : 'message_pair → 'ciphertext ;
-      #val #[oracle_eval1] : 'adv_ev1 → 'ciphertext ;
-      #val #[oracle_eval2] : 'adv_ev2 → 'ciphertext ;
-      #val #[oracle_decrypt] : 'nat → 'option_message
-    ].
-
-  Definition adv_guess := 301%N.
+    IndCpadGame.IndCpadAdv_import.
 
   Definition IndCpadAdv_export :=
-    [interface
-      #val #[adv_guess] : 'adv_keys → 'bool
-    ].
+    IndCpadGame.IndCpadAdv_export.
 
-  Definition IndCpadAdv_t := package IndCpadAdv_import IndCpadAdv_export.
+  Definition IndCpadAdv_t := IndCpadGame.IndCpadAdv_t.
 
   (* Simulator interface *)
   Definition IndCpaSim_t := package
@@ -162,23 +150,19 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
 
 
   Definition IndCpaSimTop_t := package
-    [interface
-      #val #[adv_guess] : 'adv_keys → 'bool
-    ]
-    [interface
-      #val #[adv_guess] : 'adv_keys → 'bool
-    ].
+    IndCpadAdv_export
+    IndCpadAdv_export.
 
   Definition IndCpaSimTop : IndCpaSimTop_t :=
     [package oracle_mem_spec ;
-      #def #[adv_guess] ('(pk, evk) : 'adv_keys) : 'bool
+      #def #[guess] ('(pk, evk) : 'adv_keys) : 'bool
       {
         ready ← get ready_addr ;;
         #assert (~~ ready) ;;
         #put ready_addr := true ;;
         #put pk_addr := Some pk ;;
         #put evk_addr := Some evk ;;
-        b ← call [ adv_guess ] : { pk_t × evk_t ~> 'bool } (pk, evk) ;;
+        b ← call [ guess ] : { pk_t × evk_t ~> 'bool } (pk, evk) ;;
         ret b
       }
     ].
@@ -213,4 +197,3 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
 (* TODO maybe adversary map from A to R in the end...
  * Should hopefully just be composition? *)
 End IndCpadSimulator.
-

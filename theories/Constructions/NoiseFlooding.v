@@ -33,7 +33,7 @@ Module NoiseFlooding
   (Import Scheme : ApproxFheScheme)
   (Import Metric : ApproxFheMetric(Scheme))
   (Import Params : NoiseFloodingParams)
-  : ApproxFheScheme.
+  <: ApproxFheScheme.
 Definition pk_t := Scheme.pk_t.
 Definition evk_t := Scheme.evk_t.
 Definition sk_t := Scheme.sk_t.

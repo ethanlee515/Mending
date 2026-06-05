@@ -30,13 +30,7 @@ Module Type NoiseFloodingIsIndCpad
   (Metric : ApproxFheMetric(Scheme))
   (Params : NoiseFloodingParams).
   Module NF := NoiseFlooding(Scheme)(Metric)(Params).
-  Module IndCpadGame := IndCpad NF.
-  Module IndCpaDSim := IndCpadSimulator(Scheme)(Metric)(Params).
-
-  Parameter security_bound : nat -> R.
-  Axiom is_secure : forall (A : nom_package) max_queries,
-    Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    IndCpadGame.winning_probability max_queries A <= security_bound max_queries.
+  Include IsIndCpad(NF).
 End NoiseFloodingIsIndCpad.
 
 (* Main theorem *)

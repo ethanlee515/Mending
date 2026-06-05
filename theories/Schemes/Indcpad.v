@@ -177,43 +177,6 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition winning_probability (max_queries : nat) (Adv : nom_package) :=
     `|success_probability max_queries Adv - 1 / 2|.
 
-  Definition FactoredAdversary_t := package
-    [interface
-      [oracle_encrypt] : { message × message ~> ciphertext } ;
-      [oracle_eval1] : { unary_gate × nat ~> ciphertext } ;
-      [oracle_eval2] : { binary_gate × nat × nat ~> ciphertext }
-    ]
-    [interface
-      [send_next_input] : { 'unit ~> 'nat } ;
-      [receive_output] : { 'option message ~> 'unit } ;
-      [guess] : { pk_t × evk_t ~> 'bool}
-    ].
-  
-  Definition AdvTop_t := package
-    [interface
-      [send_next_input] : { 'unit ~> 'nat } ;
-      [receive_output] : { 'option message ~> 'unit } ;
-      [oracle_decrypt] : { 'nat ~> 'option message } ;
-      [guess] : { pk_t × evk_t ~> 'bool }
-    ]
-    [interface
-      [guess] : { pk_t × evk_t ~> 'bool }
-    ].
-
-  Definition AdvTop (num_dec_queries : nat) : AdvTop_t :=
-    [package emptym ;
-      #def #[guess] (a : 'adv_keys ) : 'bool
-      {
-        for_loop (fun _ =>
-          i ← call [ send_next_input ] : { 'unit ~> 'nat } tt ;;
-          o ← call [ oracle_decrypt ] : { 'nat ~> 'option message } i ;;
-          _ ← call [ receive_output ] : { 'option message ~> 'unit } o ;;
-          ret tt
-        ) num_dec_queries ;;
-        b ← call [ guess ] : { pk_t × evk_t ~> 'bool} a ;;
-        ret b
-      }
-    ].
 End IndCpad.
 
 Local Open Scope ring_scope.
