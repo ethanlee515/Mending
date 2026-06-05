@@ -84,6 +84,18 @@ Definition lift_loss_post
     | _ => false
     end.
 
+Lemma coupling_with_loss_total_variation_dmargin_match
+  {outL_t outR_t A : choiceType}
+  (fL : outL_t -> A) (fR : outR_t -> A)
+  (d : {distr (outL_t * outR_t) / R})
+  (outL : {distr outL_t / R})
+  (outR : {distr outR_t / R})
+  (ε : R) :
+  coupling_with_loss d outL outR ->
+  \P_[ d ] (fun xy => fL xy.1 == fR xy.2) >= 1 - ε ->
+  total_variation (dmargin fL outL) (dmargin fR outR) <= ε.
+Admitted.
+
 Lemma coupling_with_loss_bind
   {midL_t midR_t outL_t outR_t : choiceType}
   (ML : {distr midL_t / R})

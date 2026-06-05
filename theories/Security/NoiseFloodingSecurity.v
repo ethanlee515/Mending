@@ -153,7 +153,7 @@ Module NoiseFloodingSecure
     have Hpre : game_initial_pre ((tt, empty_heap), (tt, empty_heap)).
       by rewrite /game_initial_pre.
     have Htv :=
-      additiveErrorTvBound _ _ _ _ Hae empty_heap empty_heap tt tt Hpre.
+      additiveErrorTvBound _ _ _ _ empty_heap empty_heap tt tt Hae Hpre.
     have Hpoint :
       `|IndCpadGame.success_probability max_queries A -
         IndCpaSecurity.IndCpaGame.success_probability

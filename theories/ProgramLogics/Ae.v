@@ -203,10 +203,16 @@ Lemma additiveErrorTvBound
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (ε : R) :
+  (ε : R) memL memR xL xR :
   ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ fun outs => outs.1.1 == outs.2.1 ⦄ ->
-  forall memL memR xL xR,
-    pre ((xL, memL), (xR, memR)) ->
-    total_variation (dmargin fst (Pr_code (progL xL) memL))
-                    (dmargin fst (Pr_code (progR xR) memR)) <= ε.
-Admitted.
+  pre ((xL, memL), (xR, memR)) ->
+  total_variation (dmargin fst (Pr_code (progL xL) memL))
+                  (dmargin fst (Pr_code (progR xR) memR)) <= ε.
+Proof.
+move=> [_ Hae] Hpre.
+have [d [Hd Hmatch]] := Hae memL memR xL xR Hpre.
+exact: (@coupling_with_loss_total_variation_dmargin_match
+  R (out_t * heap)%type (out_t * heap)%type out_t
+  (@fst out_t heap) (@fst out_t heap) d
+  (Pr_code (progL xL) memL) (Pr_code (progR xR) memR) ε Hd Hmatch).
+Qed.
