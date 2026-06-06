@@ -17,7 +17,7 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
-From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
+From Mending.LibExtras.SSProveExtras Require Import ChoiceVector DiscreteGaussian.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
 Local Open Scope AeNotations.
@@ -28,13 +28,46 @@ Import pkg_heap.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
+Definition pythOmega
+  {ℓ : nat} {out_t : ord_choiceType}
+  (X : 'I_ℓ -> choiceType) : choiceType :=
+  chHVec (rcons_choice X (out_t * heap)%type).
+
+Definition pythCoord
+  {ℓ : nat} {out_t : ord_choiceType}
+  (X : 'I_ℓ -> choiceType)
+  (i : 'I_ℓ) : pythOmega (out_t := out_t) X -> X i.
+Proof.
+move=> omega.
+rewrite /pythOmega in omega.
+have v := hget (rcons_choice X (out_t * heap)%type) omega (lift ord_max i).
+rewrite /rcons_choice in v.
+case E: (unlift ord_max (lift ord_max i)) v => [j|] v.
+- have Hj : j = i.
+    have Hsome : Some j = Some i by rewrite -E liftK.
+    by inversion Hsome.
+  by subst j.
+- by rewrite liftK in E.
+Defined.
+
+Definition pythFinal
+  {ℓ : nat} {out_t : ord_choiceType}
+  (X : 'I_ℓ -> choiceType) :
+  pythOmega (out_t := out_t) X -> (out_t * heap)%type.
+Proof.
+move=> omega.
+rewrite /pythOmega in omega.
+have v := hget (rcons_choice X (out_t * heap)%type) omega ord_max.
+rewrite /rcons_choice in v.
+case E: (unlift ord_max ord_max) v => [j|] v.
+- by rewrite unlift_none in E.
+- exact: v.
+Defined.
+
 Definition pythJudgment
   {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
-  (Ω : choiceType)
   (X : 'I_ℓ -> choiceType)
-  (coord : forall i : 'I_ℓ, Ω -> X i)
-  (final : Ω -> out_t * heap)
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
@@ -42,23 +75,23 @@ Definition pythJudgment
   (s : (ℓ.+1).-tuple R) :=
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
   exists
-  (P Q : {distr Ω / R}),
+  (P Q : {distr (pythOmega (out_t := out_t) X) / R}),
   let outL := Pr_code (progL xL) memL in
   let outR := Pr_code (progR xR) memR in
-  pythDistWithFinal coord final P Q s /\
-  dmargin final P =1 outL /\
-  dmargin final Q =1 outR /\
+  pythDistWithFinal (pythCoord X) (pythFinal X) P Q s /\
+  dmargin (pythFinal X) P =1 outL /\
+  dmargin (pythFinal X) Q =1 outR /\
   (forall x, x \in dinsupp outL -> post x) /\
   (forall x, x \in dinsupp outR -> post x).
 
 Declare Scope PythNotations.
 Local Open Scope PythNotations.
 
-Notation "⊨Pyth( Ω , X , coord , final ) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
-  (pythJudgment Ω X coord final progL progR pre post s) : PythNotations.
+Notation "⊨Pyth( X ) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
+  (pythJudgment X progL progR pre post s) : PythNotations.
 
-Notation "⊨Pyth1( Ω , X , coord , final ) ⦃ pre ⦄ progL ≈( eps ) progR ⦃ post ⦄" :=
-  (pythJudgment Ω X coord final progL progR pre post [tuple eps] ) : PythNotations.
+Notation "⊨Pyth1( X ) ⦃ pre ⦄ progL ≈( eps ) progR ⦃ post ⦄" :=
+  (pythJudgment X progL progR pre post [tuple eps] ) : PythNotations.
 
 Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code out_t :=
   x <$ (existT _ out_t D) ;;
@@ -193,16 +226,13 @@ Qed.
 Lemma MicciancioWalterRule
   {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
-  (Ω : choiceType)
   (X : 'I_ℓ -> choiceType)
-  (coord : forall i : 'I_ℓ, Ω -> X i)
-  (final : Ω -> out_t * heap)
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred (out_t * heap))
   (s : (ℓ.+1).-tuple R) :
-  ⊨Pyth(Ω, X, coord, final) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
+  ⊨Pyth(X) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   let delta := pythagorean_tv_bound s in
   ⊨AE ⦃ pre ⦄ progL ≈( delta ) progR ⦃
     fun outs =>
@@ -218,10 +248,11 @@ apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)
     Hpyth memL memR xL xR Hpre.
   pose outL := Pr_code (progL xL) memL.
   pose outR := Pr_code (progR xR) memR.
-  have Htv := pythDistWithFinal_total_variation coord final P Q s Hdist.
+  have Htv := pythDistWithFinal_total_variation
+    (pythCoord X) (pythFinal X) P Q s Hdist.
   have Htv_eq :
       total_variation outL outR =
-      total_variation (dmargin final P) (dmargin final Q).
+      total_variation (dmargin (pythFinal X) P) (dmargin (pythFinal X) Q).
     rewrite /total_variation.
     congr (_ * _).
     apply/eq_sum=> y.
@@ -237,10 +268,7 @@ Qed.
 Lemma pythConseqRule
   {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
-  (Ω : choiceType)
   (X : 'I_ℓ -> choiceType)
-  (coord : forall i : 'I_ℓ, Ω -> X i)
-  (final : Ω -> out_t * heap)
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre pre' : pred ((inL_t * heap) * (inR_t * heap)))
@@ -249,8 +277,8 @@ Lemma pythConseqRule
   (forall inps, pre' inps -> pre inps) ->
   (forall outs, post outs -> post' outs) ->
   (forall i : 'I_(ℓ.+1), tnth s i <= tnth s' i) ->
-  ⊨Pyth(Ω, X, coord, final) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
-  ⊨Pyth(Ω, X, coord, final) ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
+  ⊨Pyth(X) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
+  ⊨Pyth(X) ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
 Proof.
 move=> Hpre Hpost Hs Hpyth memL memR xL xR Hpre'.
 have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=

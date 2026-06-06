@@ -1,6 +1,6 @@
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order tuple.
+From mathcomp Require Import all_boot all_order choice tuple.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 Import PackageNotation.
@@ -54,16 +54,32 @@ elim: n v.
 Admitted.
 
 (* Non-uniform tuples *)
-(*
-Fixpoint nonuniform_vec {n : nat}
-  : n.-tuple choice_type -> choice_type :=
-match n with
-| 0 => fun _ => chUnit
-| S m => fun types => chProd (thead types) (nonuniform_vec (behead types))
-end.
+Fixpoint chHVec {n : nat} : ('I_n -> choiceType) -> choiceType :=
+  match n with
+  | 0 => fun _ => (unit : choiceType)
+  | S n' =>
+      fun X =>
+        ((X ord0 * chHVec (fun i : 'I_n' => X (lift ord0 i)))%type
+          : choiceType)
+  end.
 
-Program Definition nth_nonuniform_vec {dim : nat} {types : dim.-tuple choice_type}
-  (vec : nonuniform_vec types) (n : 'I_dim) (gt0_n : dim > 0) : (tnth types n).
-Admitted.
-*)
-
+Fixpoint hget {n : nat} :
+    forall (X : 'I_n -> choiceType), chHVec X -> forall i : 'I_n, X i :=
+  match n return
+      forall (X : 'I_n -> choiceType), chHVec X -> forall i : 'I_n, X i
+  with
+  | 0 =>
+      fun _ _ i =>
+        let '(Ordinal m p) := i in
+        False_rect _ (elimF idP (ltn0 m) p)
+  | S n' =>
+      fun X v i =>
+        match unliftP ord0 i with
+        | UnliftSome j Hi =>
+            eq_rect (lift ord0 j) X
+              (hget (fun k : 'I_n' => X (lift ord0 k)) v.2 j) i
+              (esym Hi)
+        | UnliftNone Hi =>
+            eq_rect ord0 X v.1 i (esym Hi)
+        end
+  end.
