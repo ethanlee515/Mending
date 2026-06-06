@@ -57,6 +57,9 @@ Local Open Scope PythNotations.
 Notation "⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
   (pythJudgment progL progR pre post s) : PythNotations.
 
+Notation "⊨Pyth1 ⦃ pre ⦄ progL ≈( eps ) progR ⦃ post ⦄" :=
+  (pythJudgment progL progR pre post [tuple eps] ) : PythNotations.
+
 Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code out_t :=
   x <$ (existT _ out_t D) ;;
   ret x.
@@ -218,43 +221,6 @@ apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)
   exact: HpostL.
 Qed.
 
-Lemma pythCompileCallsRule
-  (q : nat) (X Y A : choice_type)
-  (L' L'' : Locations) (M : Interface)
-  (P' P'' : raw_package) (fn : ident)
-  (prog : raw_code A)
-  (eps : R)
-  (call_invariant : pred heap) :
-  ValidPackage L' [interface] M P' ->
-  ValidPackage L'' [interface] M P'' ->
-  fhas M (mkopsig fn X Y) ->
-  ⊨Pyth ⦃ fun inps =>
-          let '((xL, memL), (xR, memR)) := inps in
-          (xL == xR) && (memL == memR) &&
-          call_invariant memL ⦄
-    (fun x => resolve P' (mkopsig fn X Y) x)
-    ≈( [tuple eps] )
-    (fun x => resolve P'' (mkopsig fn X Y) x)
-  ⦃ fun out =>
-    let '(y, mem) := out in
-    call_invariant mem ⦄ ->
-  ⊨Pyth ⦃ fun inps =>
-          let '((_, memL), (_, memR)) := inps in
-          (memL == memR) &&
-          call_invariant memL ⦄
-    (fun _ : chUnit => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P' fn prog)
-      P')
-    ≈( nseq (q.+1) eps )
-    (fun _ : chUnit => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P'' fn prog)
-      P')
-  ⦃ fun out =>
-    let '(y, mem) := out in
-    call_invariant mem ⦄.
-Proof.
-Admitted.
-
 Lemma pythConseqRule
   {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
@@ -390,7 +356,7 @@ split.
   exact: Hay.
 Qed.
 
-Lemma pythSeqRule
+Lemma pythSeqRule'
   {ℓ ℓ' : nat}
   {inL_t inR_t mid_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code mid_t)
@@ -541,3 +507,66 @@ split.
   apply: (Hhoare x mem (HmidR (x, mem) Hx) y).
   by rewrite in_dinsupp.
 Qed.
+
+Lemma pythSeqRule
+  {ℓ ℓ' : nat}
+  {inL_t inR_t mid_t out_t : ord_choiceType}
+  (progL : inL_t -> raw_code mid_t)
+  (progR : inR_t -> raw_code mid_t)
+  (contL : mid_t -> raw_code out_t)
+  (contR : mid_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (eps : R)
+  (s : (ℓ'.+1).-tuple R) :
+  ⊨Pyth1 ⦃ pre ⦄ progL ≈( eps ) progR ⦃ mid ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( eps :: s )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
+Proof.
+Admitted.
+
+Lemma pythCompileCallsRule
+  (q : nat) (X Y A : choice_type)
+  (L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (prog : raw_code A)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( [tuple eps] )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((_, memL), (_, memR)) := inps in
+          (memL == memR) &&
+          call_invariant memL ⦄
+    (fun _ : chUnit => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P' fn prog)
+      P')
+    ≈( nseq (q.+1) eps )
+    (fun _ : chUnit => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P'' fn prog)
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+Admitted.
