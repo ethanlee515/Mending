@@ -201,6 +201,7 @@ rewrite !Pr_code_bind.
 exact: Hd.
 Qed.
 
+(* TODO get rid of P.o and replace with just `prog : raw_code`? *)
 Lemma additiveErrorCompileCallsRule
   (q : nat) (X Y : choice_type)
   (L L' : Locations) (M E : Interface)

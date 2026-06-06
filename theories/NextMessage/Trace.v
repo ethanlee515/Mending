@@ -290,13 +290,77 @@ Definition factor_calls (q : nat) {X Y A : choice_type}
     : raw_code packed_trace_t :=
   factor_calls_aux q (X := X) (Y := Y) p fn prog nil.
 
-Definition compile_calls (q : nat) {X Y A : choice_type}
-    (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
-  packed_trace ← factor_calls q (X := X) (Y := Y) p fn prog ;;
-  match continue_from_trace prog (unpack_trace packed_trace) with
+Definition compile_calls_from_trace (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident)
+    (root : raw_code A) (trace_prefix : trace_t) : raw_code A :=
+  packed_trace ← factor_calls_aux q (X := X) (Y := Y) p fn
+      root trace_prefix ;;
+  match continue_from_trace root (unpack_trace packed_trace) with
   | Some prog' => prog'
   | None => invalid_trace_code
   end.
+
+Definition compile_calls (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
+  compile_calls_from_trace q (X := X) (Y := Y) p fn prog nil.
+
+Lemma compile_calls_from_trace_nil (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A) :
+  @compile_calls_from_trace q X Y A p fn prog nil =
+  @compile_calls q X Y A p fn prog.
+Proof. by []. Qed.
+
+Lemma compile_calls_from_traceS_at_call
+    (q : nat) (X Y A : choice_type)
+    (p : raw_package) (fn : ident)
+    (root : raw_code A) (trace_prefix : trace_t)
+    (x : X) (k : Y -> raw_code A) :
+  continue_from_trace root trace_prefix =
+    Some (opr (mkopsig fn X Y) x k) ->
+  (@compile_calls_from_trace (S q) X Y A p fn root trace_prefix) =
+    (
+    y ← resolve p (mkopsig fn X Y) x ;;
+    @compile_calls_from_trace q X Y A p fn root
+      (rcons trace_prefix (call_entry (pickle y)))).
+Proof.
+  move=> Htrace.
+  rewrite /compile_calls_from_trace /= Htrace /run_until_next_call /=.
+  rewrite eqxx /call_from_package.
+  cbn.
+  rewrite pickleK cats0 bind_assoc.
+  by [].
+Qed.
+
+Lemma compile_calls_from_traceS_decompose
+    (q : nat) (X Y A : choice_type)
+    (p : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix : trace_t) :
+  continue_from_trace root trace_prefix = Some prog ->
+  (@compile_calls_from_trace (S q) X Y A p fn root trace_prefix) =
+    (
+    packed_trace ←
+       (s ← run_until_next_call prog fn ;;
+        match s with
+        | (inl x, packed_local_trace) =>
+            match call_from_package (X := X) (Y := Y) p fn x with
+            | Some body =>
+                y ← body ;;
+                factor_calls_aux q (X := X) (Y := Y) p fn root
+                  (rcons (trace_prefix ++ unpack_trace packed_local_trace)
+                    (call_entry (pickle y)))
+            | None => invalid_trace_code
+            end
+        | (inr _, packed_local_trace) =>
+            ret (pack_trace (trace_prefix ++ unpack_trace packed_local_trace))
+        end) ;;
+     match continue_from_trace root (unpack_trace packed_trace) with
+     | Some prog' => prog'
+     | None => invalid_trace_code
+     end).
+Proof.
+  move=> Htrace.
+  by rewrite /compile_calls_from_trace /= Htrace.
+Qed.
 
 Definition compile_next_call {X Y A : choice_type}
     (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
@@ -554,7 +618,7 @@ Lemma compile_calls_correct_code_link
   code_link prog p.
 Proof.
   move=> Hp Hfn Hvalid.
-  rewrite /compile_calls /factor_calls.
+  rewrite /compile_calls /compile_calls_from_trace.
   eapply (@factor_calls_aux_correct_code_link q X Y A L Lp M p fn prog prog nil).
   - exact: Hp.
   - exact: Hfn.

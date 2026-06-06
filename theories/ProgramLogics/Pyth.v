@@ -219,18 +219,14 @@ apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)
 Qed.
 
 Lemma pythCompileCallsRule
-  (q : nat) (X Y : choice_type)
-  (L L' L'' : Locations) (M E : Interface)
-  (P P' P'' : raw_package) (fn : ident)
-  (o : opsig)
+  (q : nat) (X Y A : choice_type)
+  (L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (prog : raw_code A)
   (eps : R)
   (call_invariant : pred heap) :
-  ValidPackage L M E P ->
   ValidPackage L' [interface] M P' ->
   ValidPackage L'' [interface] M P'' ->
-  fcompat L L' ->
-  fcompat L L'' ->
-  fhas E o ->
   fhas M (mkopsig fn X Y) ->
   ⊨Pyth ⦃ fun inps =>
           let '((xL, memL), (xR, memR)) := inps in
@@ -243,14 +239,16 @@ Lemma pythCompileCallsRule
     let '(y, mem) := out in
     call_invariant mem ⦄ ->
   ⊨Pyth ⦃ fun inps =>
-          let '((xL, memL), (xR, memR)) := inps in
-          (xL == xR) && (memL == memR) &&
+          let '((_, memL), (_, memR)) := inps in
+          (memL == memR) &&
           call_invariant memL ⦄
-    (fun x => resolve (link P P') o x)
+    (fun _ : chUnit => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P' fn prog)
+      P')
     ≈( nseq (q.+1) eps )
-    (fun x => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (resolve P o x))
-      P'')
+    (fun _ : chUnit => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P'' fn prog)
+      P')
   ⦃ fun out =>
     let '(y, mem) := out in
     call_invariant mem ⦄.
