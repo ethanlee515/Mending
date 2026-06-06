@@ -6,12 +6,15 @@ From mathcomp Require Import reals distr.
 From mathcomp Require Import realseq realsum exp lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
+From Mending.NextMessage Require Import Trace.
 From Mending.Probability Require Import Ae.
 From SSProve.Relational Require Import OrderEnrichedCategory.
-From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
+From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph
+  choice_type fmap_extra.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve.Crypt.nominal Require Import Pr.
-From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
+From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
+  pkg_notation.
 
 Import GRing.Theory Num.Theory Order.Theory Order.POrderTheory.
 
@@ -196,6 +199,45 @@ have [d [Hd Hpost]] :=
 exists d; split; last exact: Hpost.
 rewrite !Pr_code_bind.
 exact: Hd.
+Qed.
+
+Lemma additiveErrorCompileCallsRule
+  (q : nat) (X Y : choice_type)
+  (L L' : Locations) (M E : Interface)
+  (P P' : raw_package) (fn : ident)
+  (o : opsig) :
+  ValidPackage L M E P ->
+  ValidPackage L' [interface] M P' ->
+  fcompat L L' ->
+  fhas E o ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨AE ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) ⦄
+    (fun x => code_link
+      (compile_calls q (X := X) (Y := Y) P' fn (resolve P o x))
+      P')
+    ≈( 0 )
+    (fun x => resolve (link P P') o x)
+  ⦃ fun outs =>
+      let '((yL, memL), (yR, memR)) := outs in
+      (yL == yR) && (memL == memR) ⦄.
+Proof.
+move=> HP HP' Hcompat Ho Hfn.
+apply: additiveErrorTvdEqRule.
+- exact: lexx.
+- move=> memL memR xL xR Hpre.
+  move/andP: Hpre => [/eqP -> /eqP ->].
+  rewrite (@compile_calls_correct q X Y L L' M E P P' fn o xR memR
+    HP HP' Hcompat Ho Hfn).
+  rewrite /Pr_op /total_variation.
+  rewrite (_ : sum (fun y =>
+      `|Pr_code (resolve (link P P') o xR) memR y -
+        Pr_code (resolve (link P P') o xR) memR y|) = 0).
+    by rewrite mulr0 lexx.
+  rewrite -(@sum0 R (tgt o * heap)%type).
+  apply/eq_sum => y.
+  by rewrite subrr normr0.
 Qed.
 
 Lemma additiveErrorTvBound
