@@ -159,18 +159,18 @@ Qed.
 
 Definition packed_input := 'nat.
 
-(* left = suspended; right = done *)
+(* left = suspended at the next call; right = done *)
 Definition suspended_program {A : choice_type} : choice_type :=
-  (packed_input * packed_trace_t) + A.
+  (packed_input + A) * packed_trace_t.
 
 Fixpoint run_until_next_call_aux {T : choice_type} (prog : raw_code T) (fn : ident) (trace : trace_t) :
   raw_code suspended_program :=
   match prog with
-  | ret v => ret (inr v)
+  | ret v => ret (inr v, pack_trace trace)
   | opr o x k =>
     let '(f, _) := o in
     if f == fn then
-      ret (inl (pickle x, pack_trace trace))
+      ret (inl (pickle x), pack_trace trace)
     else (
       y ← op o ⋅ x ;;
       run_until_next_call_aux (k y) fn (rcons trace (call_entry (pickle y)))
@@ -191,12 +191,8 @@ Definition run_until_next_call {T : choice_type} (prog : raw_code T) (fn : ident
 
 Definition call_from_package {X Y : choice_type} (p : raw_package) (fn : ident) (x : packed_input)
   : option (raw_code Y) :=
-  match p fn with
-  | Some _ =>
-      match unpickle x : option X with
-      | Some x' => Some (resolve p (mkopsig fn X Y) x')
-      | None => None
-      end
+  match unpickle x : option X with
+  | Some x' => Some (resolve p (mkopsig fn X Y) x')
   | None => None
   end.
 
@@ -254,6 +250,81 @@ Proof.
     (call_entry (pickle y)) Hlocal) /= /decode_call_entry.
   by rewrite pickleK continue_from_trace_nil.
 Qed.
+
+(** [factor_calls_aux q p fn root trace_prefix] starts from [trace_prefix] in
+  [root] and factors the next [q] calls to [fn] through [p].
+
+  The prefix is the cursor into [root].  Each factored call extends it by the
+  trace to the call and the call result returned by [p].
+*)
+Fixpoint factor_calls_aux (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident)
+    (root : raw_code A) (trace_prefix : trace_t) : raw_code packed_trace_t :=
+  match q with
+  | 0 => ret (pack_trace trace_prefix)
+  | S q' =>
+      match continue_from_trace root trace_prefix with
+      | Some prog =>
+          s ← run_until_next_call prog fn ;;
+          let '(status, packed_local_trace) := s in
+          let local_trace := unpack_trace packed_local_trace in
+          match status with
+          | inr _ =>
+              ret (pack_trace (trace_prefix ++ local_trace))
+          | inl x =>
+              match call_from_package (X := X) (Y := Y) p fn x with
+              | Some body =>
+                  y ← body ;;
+                  factor_calls_aux q' (X := X) (Y := Y) p fn root
+                    (rcons (trace_prefix ++ local_trace)
+                      (call_entry (pickle y)))
+              | None => invalid_trace_code
+              end
+          end
+      | None => invalid_trace_code
+      end
+  end.
+
+Definition factor_calls (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A)
+    : raw_code packed_trace_t :=
+  factor_calls_aux q (X := X) (Y := Y) p fn prog nil.
+
+Definition compile_calls (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
+  packed_trace ← factor_calls q (X := X) (Y := Y) p fn prog ;;
+  match continue_from_trace prog (unpack_trace packed_trace) with
+  | Some prog' => prog'
+  | None => invalid_trace_code
+  end.
+
+Definition compile_next_call {X Y A : choice_type}
+    (p : raw_package) (fn : ident) (prog : raw_code A) : raw_code A :=
+  compile_calls 1 (X := X) (Y := Y) p fn prog.
+
+Theorem compile_calls_correct
+  (q : nat) (X Y : choice_type)
+  (L L' : Locations) (M E : Interface)
+  (P P' : raw_package) (fn : ident)
+  (o : opsig) (x : src o) h :
+ValidPackage L M E P ->
+ValidPackage L' [interface] M P' ->
+fcompat L L' ->
+fhas E o ->
+fhas M (mkopsig fn X Y) ->
+Pr_code
+  (code_link
+    (compile_calls q (X := X) (Y := Y) P' fn (resolve P o x))
+    P')
+  h =
+Pr_op (P ∘ P') o x h.
+Proof.
+Admitted.
+
+(*
+  The rest of this file is temporarily parked while the trace/resume API is
+  refactored around [continue_from_trace] and
+  [factor_calls_aux].
 
 (** [factor_calls q p fn prog] manually dispatches [q] calls to [fn] through
   [p], then suspends at the next call to [fn].
@@ -765,3 +836,4 @@ Proof.
   rewrite Hcompile.
   by rewrite resolve_link.
 Qed.
+*)

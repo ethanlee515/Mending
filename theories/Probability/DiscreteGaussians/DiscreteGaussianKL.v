@@ -225,6 +225,4 @@ have -> : (nu - mu)%:~R = - (mu - nu)%:~R :> R.
 lra.
 Qed.
 
-Print Assumptions kl_discrete_gaussian.
-
 End IntegerCenteredKL.
