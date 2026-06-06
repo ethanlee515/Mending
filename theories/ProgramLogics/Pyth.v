@@ -31,6 +31,10 @@ Local Open Scope ring_scope.
 Definition pythJudgment
   {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
+  (Ω : choiceType)
+  (X : 'I_ℓ -> choiceType)
+  (coord : forall i : 'I_ℓ, Ω -> X i)
+  (final : Ω -> out_t * heap)
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
@@ -38,10 +42,6 @@ Definition pythJudgment
   (s : (ℓ.+1).-tuple R) :=
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
   exists
-  (Ω : choiceType)
-  (X : 'I_ℓ -> choiceType)
-  (coord : forall i : 'I_ℓ, Ω -> X i)
-  (final : Ω -> out_t * heap)
   (P Q : {distr Ω / R}),
   let outL := Pr_code (progL xL) memL in
   let outR := Pr_code (progR xR) memR in
@@ -54,11 +54,11 @@ Definition pythJudgment
 Declare Scope PythNotations.
 Local Open Scope PythNotations.
 
-Notation "⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
-  (pythJudgment progL progR pre post s) : PythNotations.
+Notation "⊨Pyth( Ω , X , coord , final ) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
+  (pythJudgment Ω X coord final progL progR pre post s) : PythNotations.
 
-Notation "⊨Pyth1 ⦃ pre ⦄ progL ≈( eps ) progR ⦃ post ⦄" :=
-  (pythJudgment progL progR pre post [tuple eps] ) : PythNotations.
+Notation "⊨Pyth1( Ω , X , coord , final ) ⦃ pre ⦄ progL ≈( eps ) progR ⦃ post ⦄" :=
+  (pythJudgment Ω X coord final progL progR pre post [tuple eps] ) : PythNotations.
 
 Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code out_t :=
   x <$ (existT _ out_t D) ;;
@@ -73,6 +73,14 @@ apply: eq_in_dlet; last by [].
 move=> x _ z.
 by rewrite Pr_code_ret.
 Qed.
+
+(*
+TODO: Restate the sampling rules for the explicit-witness judgment.
+
+These rules construct their witness space/final map. With [Ω], [X], [coord],
+and [final] moved out of the existential in [pythJudgment], the conclusion must
+name a fixed witness such as a lifted output/heap space rather than relying on
+the old existential package.
 
 Lemma klSampRule
   {inL_t inR_t : ord_choiceType} {out_t : choice_type}
@@ -180,16 +188,21 @@ apply: (klSampRule (fun _ : chUnit => ssp_dg centerL stdev)
 - move=> memL memR [] [] y Hpre Hy.
   exact: (HpostR memL memR Hpre y Hy).
 Qed.
+*)
 
 Lemma MicciancioWalterRule
   {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
+  (Ω : choiceType)
+  (X : 'I_ℓ -> choiceType)
+  (coord : forall i : 'I_ℓ, Ω -> X i)
+  (final : Ω -> out_t * heap)
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred (out_t * heap))
   (s : (ℓ.+1).-tuple R) :
-  ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
+  ⊨Pyth(Ω, X, coord, final) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   let delta := pythagorean_tv_bound s in
   ⊨AE ⦃ pre ⦄ progL ≈( delta ) progR ⦃
     fun outs =>
@@ -201,7 +214,7 @@ apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)
 - rewrite /pythagorean_tv_bound.
   exact: Num.Theory.sqrtr_ge0.
 - move=> memL memR xL xR Hpre.
-  have [Ω [X [coord [final [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+  have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
     Hpyth memL memR xL xR Hpre.
   pose outL := Pr_code (progL xL) memL.
   pose outR := Pr_code (progR xR) memR.
@@ -216,7 +229,7 @@ apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)
   rewrite Htv_eq.
   exact: Htv.
 - move=> memL memR xL xR y Hpre Hy.
-  have [Ω [X [coord [final [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+  have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
     Hpyth memL memR xL xR Hpre.
   exact: HpostL.
 Qed.
@@ -224,6 +237,10 @@ Qed.
 Lemma pythConseqRule
   {ℓ : nat}
   {inL_t inR_t out_t : ord_choiceType}
+  (Ω : choiceType)
+  (X : 'I_ℓ -> choiceType)
+  (coord : forall i : 'I_ℓ, Ω -> X i)
+  (final : Ω -> out_t * heap)
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre pre' : pred ((inL_t * heap) * (inR_t * heap)))
@@ -232,14 +249,13 @@ Lemma pythConseqRule
   (forall inps, pre' inps -> pre inps) ->
   (forall outs, post outs -> post' outs) ->
   (forall i : 'I_(ℓ.+1), tnth s i <= tnth s' i) ->
-  ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
-  ⊨Pyth ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
+  ⊨Pyth(Ω, X, coord, final) ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
+  ⊨Pyth(Ω, X, coord, final) ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
 Proof.
 move=> Hpre Hpost Hs Hpyth memL memR xL xR Hpre'.
-have [Ω [X [coord [final [P [Q
-    [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]]]]]] :=
+have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
   Hpyth memL memR xL xR (Hpre _ Hpre').
-exists Ω, X, coord, final, P, Q.
+exists P, Q.
 split.
 - move: Hdist=> [Hsep [Heps [Hac [HP [HQ Hcond]]]]].
   split; first exact: Hsep.
@@ -263,6 +279,17 @@ split.
 - move=> y Hy.
   exact: Hpost (HpostR y Hy).
 Qed.
+
+(*
+TODO: Restate the sequencing and compile-calls rules for explicit uniform
+witnesses.
+
+The old statements below construct new witness spaces using existential
+distribution lemmas such as [pythDistWithFinal_bind],
+[pythDistWithFinal_postprocess], and [pythDistWithFinal_bind_coupling]. With
+the witness space now fixed by the judgment, each rule needs an explicit output
+witness in its conclusion, or a distribution-level lemma whose conclusion uses
+the same fixed witness.
 
 Lemma aePythSeqRule
   {ℓ : nat}
@@ -570,3 +597,4 @@ Lemma pythCompileCallsRule
     call_invariant mem ⦄.
 Proof.
 Admitted.
+*)

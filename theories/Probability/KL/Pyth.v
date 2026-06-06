@@ -302,6 +302,19 @@ Lemma pythDistWithFinal_bind
     dmargin finalc Qc =1 \dlet_(a <- dmargin final Q) KR a.
 Admitted.
 
+(*
+TODO: Restate the diagonal bind lemma with uniform continuation witnesses.
+
+The tempting pointwise-existential shape
+
+  forall a, exists Ω' X' coord' final' P' Q', ...
+
+is not useful for constructing the composed choiceType Ωc: the continuation
+choice space is hidden behind a Prop-level existential and may vary with [a].
+The replacement should expose a fixed Ω'/X'/coord'/final' and kernels
+P' Q' : A -> {distr Ω' / R}.
+*)
+
 Lemma pythDistWithFinal_bind_coupling
     {n : nat} {A B C : choiceType}
     (ML : {distr A / R}) (MR : {distr B / R})
