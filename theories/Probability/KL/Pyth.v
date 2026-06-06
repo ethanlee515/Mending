@@ -9,6 +9,7 @@ Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From Mending.Probability Require Import Ae.
 From Mending.Probability.KL Require Import Core Conditional Pinsker.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
+From Mending.LibExtras.SSProveExtras Require Import ChoiceVector.
 
 Import GRing.Theory Num.Theory Order.Theory.
 
@@ -100,11 +101,6 @@ exact: (pythagorean_probability_preservation coord P Q eps
 Qed.
 
 
-Definition rcons_choice {n : nat}
-    (X : 'I_n -> choiceType) (A : choiceType)
-    (i : 'I_n.+1) : choiceType :=
-  if unlift ord_max i is Some j then X j else A.
-
 Definition rcons_coord {n : nat} {Ω : choiceType}
     {X : 'I_n -> choiceType} {A : choiceType}
     (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
@@ -120,6 +116,20 @@ Definition pythDistWithFinal
     (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
     (P Q : {distr Ω / R}) (eps : n.+1.-tuple R) : Prop :=
   pythDist (rcons_coord coord final) P Q eps.
+
+Definition canonical_pythOmega
+    {n : nat} (X : 'I_n -> choiceType) (A : choiceType) : choiceType :=
+  chHVec (rcons_choice X A).
+
+Definition canonical_pythCoord
+    {n : nat} (X : 'I_n -> choiceType) (A : choiceType)
+    (i : 'I_n) : canonical_pythOmega X A -> X i :=
+  fun omega => hget_rcons_coord X A omega i.
+
+Definition canonical_pythFinal
+    {n : nat} (X : 'I_n -> choiceType) (A : choiceType) :
+    canonical_pythOmega X A -> A :=
+  hget_rcons_final X A.
 
 Definition singleton_pyth_choice (A : choiceType) (_ : 'I_1) : choiceType := A.
 
@@ -257,66 +267,22 @@ Lemma pythDistWithFinal_total_variation
 Admitted.
 
 Lemma pythDistWithFinal_postprocess
-    {n : nat} {Ω A B : choiceType} {X : 'I_n -> choiceType}
-    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
-    (P Q : {distr Ω / R}) (eps : n.+1.-tuple R)
+    {n : nat} {A B : choiceType} (X : 'I_n -> choiceType)
+    (P Q : {distr (canonical_pythOmega X A) / R}) (eps : n.+1.-tuple R)
     (K : A -> {distr B / R}) :
-  pythDistWithFinal coord final P Q eps ->
+  pythDistWithFinal (canonical_pythCoord X A) (canonical_pythFinal X A) P Q eps ->
   exists
-  (Ω' : choiceType)
-  (X' : 'I_n -> choiceType)
-  (coord' : forall i : 'I_n, Ω' -> X' i)
-  (final' : Ω' -> B)
-  (P' Q' : {distr Ω' / R}),
-    pythDistWithFinal coord' final' P' Q' eps /\
-    dmargin final' P' =1 \dlet_(x <- dmargin final P) K x /\
-    dmargin final' Q' =1 \dlet_(x <- dmargin final Q) K x.
+  (P' Q' : {distr (canonical_pythOmega X B) / R}),
+    pythDistWithFinal (canonical_pythCoord X B) (canonical_pythFinal X B)
+      P' Q' eps /\
+    dmargin (canonical_pythFinal X B) P' =1
+      \dlet_(x <- dmargin (canonical_pythFinal X A) P) K x /\
+    dmargin (canonical_pythFinal X B) Q' =1
+      \dlet_(x <- dmargin (canonical_pythFinal X A) Q) K x.
 Admitted.
-
-Lemma pythDistWithFinal_bind
-    {n m : nat} {Ω A B : choiceType} {X : 'I_n -> choiceType}
-    (coord : forall i : 'I_n, Ω -> X i) (final : Ω -> A)
-    (P Q : {distr Ω / R}) (eps : n.+1.-tuple R) (eps' : m.+1.-tuple R)
-    (KL KR : A -> {distr B / R}) :
-  pythDistWithFinal coord final P Q eps ->
-  (forall aL aR,
-    aL \in dinsupp (dmargin final P) ->
-    aR \in dinsupp (dmargin final Q) ->
-    exists
-    (Ω' : choiceType)
-    (X' : 'I_m -> choiceType)
-    (coord' : forall i : 'I_m, Ω' -> X' i)
-    (final' : Ω' -> B)
-    (P' Q' : {distr Ω' / R}),
-      pythDistWithFinal coord' final' P' Q' eps' /\
-      dmargin final' P' =1 KL aL /\
-      dmargin final' Q' =1 KR aR) ->
-  exists
-  (Ωc : choiceType)
-  (Xc : 'I_(n + m.+1) -> choiceType)
-  (coordc : forall i : 'I_(n + m.+1), Ωc -> Xc i)
-  (finalc : Ωc -> B)
-  (Pc Qc : {distr Ωc / R}),
-    pythDistWithFinal coordc finalc Pc Qc (cat_tuple eps eps') /\
-    dmargin finalc Pc =1 \dlet_(a <- dmargin final P) KL a /\
-    dmargin finalc Qc =1 \dlet_(a <- dmargin final Q) KR a.
-Admitted.
-
-(*
-TODO: Restate the diagonal bind lemma with uniform continuation witnesses.
-
-The tempting pointwise-existential shape
-
-  forall a, exists Ω' X' coord' final' P' Q', ...
-
-is not useful for constructing the composed choiceType Ωc: the continuation
-choice space is hidden behind a Prop-level existential and may vary with [a].
-The replacement should expose a fixed Ω'/X'/coord'/final' and kernels
-P' Q' : A -> {distr Ω' / R}.
-*)
 
 Lemma pythDistWithFinal_bind_coupling
-    {n : nat} {A B C : choiceType}
+    {n : nat} {A B C : choiceType} (X : 'I_n -> choiceType)
     (ML : {distr A / R}) (MR : {distr B / R})
     (KL : A -> {distr C / R}) (KR : B -> {distr C / R})
     (mid : pred (A * B)) (d0 : {distr (A * B) / R})
@@ -326,23 +292,17 @@ Lemma pythDistWithFinal_bind_coupling
   (forall a b,
     mid (a, b) ->
     exists
-    (Ω : choiceType)
-    (X : 'I_n -> choiceType)
-    (coord : forall i : 'I_n, Ω -> X i)
-    (final : Ω -> C)
-    (P Q : {distr Ω / R}),
-      pythDistWithFinal coord final P Q eps /\
-      dmargin final P =1 KL a /\
-      dmargin final Q =1 KR b) ->
+    (P Q : {distr (canonical_pythOmega X C) / R}),
+      pythDistWithFinal (canonical_pythCoord X C) (canonical_pythFinal X C)
+        P Q eps /\
+      dmargin (canonical_pythFinal X C) P =1 KL a /\
+      dmargin (canonical_pythFinal X C) Q =1 KR b) ->
   exists
-  (Ωc : choiceType)
-  (Xc : 'I_n -> choiceType)
-  (coordc : forall i : 'I_n, Ωc -> Xc i)
-  (finalc : Ωc -> C)
-  (Pc Qc : {distr Ωc / R}),
-    pythDistWithFinal coordc finalc Pc Qc eps /\
-    dmargin finalc Pc =1 \dlet_(a <- ML) KL a /\
-    dmargin finalc Qc =1 \dlet_(b <- MR) KR b.
+  (Pc Qc : {distr (canonical_pythOmega X C) / R}),
+    pythDistWithFinal (canonical_pythCoord X C) (canonical_pythFinal X C)
+      Pc Qc eps /\
+    dmargin (canonical_pythFinal X C) Pc =1 \dlet_(a <- ML) KL a /\
+    dmargin (canonical_pythFinal X C) Qc =1 \dlet_(b <- MR) KR b.
 Admitted.
 
 Lemma coupling_with_loss_prob1_left_support
