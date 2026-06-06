@@ -10,9 +10,11 @@ Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
-From SSProve.Crypt Require Import choice_type SubDistr.
+From SSProve.Crypt Require Import choice_type fmap_extra SubDistr.
 From SSProve.Crypt.nominal Require Import Pr.
-From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
+From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
+  pkg_notation.
+From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
 From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
@@ -215,6 +217,45 @@ apply: (additiveErrorTvdEqPostRule progL progR pre post (pythagorean_tv_bound s)
     Hpyth memL memR xL xR Hpre.
   exact: HpostL.
 Qed.
+
+Lemma pythCompileCallsRule
+  (q : nat) (X Y : choice_type)
+  (L L' L'' : Locations) (M E : Interface)
+  (P P' P'' : raw_package) (fn : ident)
+  (o : opsig)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidPackage L M E P ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fcompat L L' ->
+  fcompat L L'' ->
+  fhas E o ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( [tuple eps] )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve (link P P') o x)
+    ≈( nseq (q.+1) eps )
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (resolve P o x))
+      P'')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+Admitted.
 
 Lemma pythConseqRule
   {ℓ : nat}
