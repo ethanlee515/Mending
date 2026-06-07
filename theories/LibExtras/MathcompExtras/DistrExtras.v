@@ -1,6 +1,6 @@
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice fintype bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice tuple fintype bigop order all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 From mathcomp Require Import lra.
@@ -79,26 +79,15 @@ Definition conditional_second {T U : choiceType}
   dmargin (fun xy : T * U => xy.2)
     (dcond P (fun xy : T * U => xy.1 == x)).
 
-Definition tuple_prefix_eq {n : nat} {Ω : choiceType}
-    {X : 'I_n -> choiceType}
-    (coord : forall i : 'I_n, Ω -> X i)
-    (i : 'I_n) (a : forall j : 'I_n, X j) (omega : Ω) : bool :=
-  [forall j : 'I_n, (j < i)%N ==> (coord j omega == a j)].
+Definition tuple_prefix_eq {n : nat} {A : choiceType}
+    (i : 'I_n) (a : forall j : 'I_n, A) (omega : n.-tuple A) : bool :=
+  [forall j : 'I_n, (j < i)%N ==> (tnth omega j == a j)].
 
-Definition conditional_coordinate {n : nat} {Ω : choiceType}
-    {X : 'I_n -> choiceType}
-    (coord : forall i : 'I_n, Ω -> X i)
-    (P : {distr Ω / R}) (i : 'I_n) (a : forall j : 'I_n, X j)
-    : {distr (X i) / R} :=
-  dmargin (coord i)
-    (dcond P (fun omega : Ω => tuple_prefix_eq coord i a omega)).
-
-Definition coordinates_separate {n : nat} {Ω : choiceType}
-    {X : 'I_n -> choiceType}
-    (coord : forall i : 'I_n, Ω -> X i) : Prop :=
-  forall omega1 omega2 : Ω,
-    (forall i : 'I_n, coord i omega1 = coord i omega2) ->
-    omega1 = omega2.
+Definition conditional_coordinate {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R}) (i : 'I_n)
+    (a : forall j : 'I_n, A) : {distr A / R} :=
+  dmargin (fun omega : n.-tuple A => tnth omega i)
+    (dcond P (fun omega : n.-tuple A => tuple_prefix_eq i a omega)).
 
 Lemma conditional_secondE {T U : choiceType}
     (P : {distr (T * U) / R}) (x : T) (y : U) :

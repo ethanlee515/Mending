@@ -205,7 +205,7 @@ Lemma pythAeSeqRule
   ⦃ post ⦄.
 Admitted.
 
-Lemma pythSeqRule
+Lemma pythSeq1Rule
   {ℓ : nat}
   {inL_t inR_t mid_t out_t : choice_type}
   (progL : inL_t -> raw_code mid_t)
@@ -226,6 +226,31 @@ Lemma pythSeqRule
   ⊨Pyth ⦃ pre ⦄
     (fun xL => yL ← progL xL ;; contL yL)
     ≈( eps :: s )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
+Admitted.
+
+Lemma pythSeqRule
+  {ℓ1 ℓ2 : nat}
+  {inL_t inR_t mid_t out_t : choice_type}
+  (progL : inL_t -> raw_code mid_t)
+  (progR : inR_t -> raw_code mid_t)
+  (contL : mid_t -> raw_code out_t)
+  (contR : mid_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R) :
+  ⊨Pyth ⦃ pre ⦄ progL ≈( s1 ) progR ⦃ mid ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s2 ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( cat_tuple s1 s2 )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
 Proof.
