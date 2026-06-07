@@ -104,46 +104,6 @@ Lemma pythDist_final_total_variation
     pythagorean_tv_bound eps.
 Admitted.
 
-(* Composition principles for program-logic sequencing.  Proving these should
-   amount to mixture/data-processing lemmas for [pythDist]: the AE-zero case
-   stitches together per-coupled continuations, while the same-kernel case
-   postprocesses the final coordinate without adding KL cost. *)
-Lemma pythDist_bind_ae0
-  {n : nat}
-  {A midL_t midR_t out_t : choiceType}
-  (h : out_t -> A)
-  (ML : {distr midL_t / R})
-  (MR : {distr midR_t / R})
-  (KL : midL_t -> {distr out_t / R})
-  (KR : midR_t -> {distr out_t / R})
-  (mid : pred (midL_t * midR_t))
-  (post : pred out_t)
-  (eps : n.+1.-tuple R)
-  (d0 : {distr (midL_t * midR_t) / R}) :
-  coupling_with_loss d0 ML MR ->
-  \P_[ d0 ] mid >= 1 - 0 ->
-  (forall yL yR,
-    yL \in dinsupp ML ->
-    yR \in dinsupp MR ->
-    mid (yL, yR) ->
-    exists (P Q : {distr (n.+1.-tuple A) / R}),
-      pythDist P Q eps /\
-      dmargin (fun omega => tnth omega ord_max) P
-        =1 dmargin h (KL yL) /\
-      dmargin (fun omega => tnth omega ord_max) Q
-        =1 dmargin h (KR yR) /\
-      (forall x, x \in dinsupp (KL yL) -> post x) /\
-      (forall x, x \in dinsupp (KR yR) -> post x)) ->
-  exists (P Q : {distr (n.+1.-tuple A) / R}),
-    pythDist P Q eps /\
-    dmargin (fun omega => tnth omega ord_max) P
-      =1 dmargin h (\dlet_(yL <- ML) KL yL) /\
-    dmargin (fun omega => tnth omega ord_max) Q
-      =1 dmargin h (\dlet_(yR <- MR) KR yR) /\
-    (forall x, x \in dinsupp (\dlet_(yL <- ML) KL yL) -> post x) /\
-    (forall x, x \in dinsupp (\dlet_(yR <- MR) KR yR) -> post x).
-Admitted.
-
 Lemma pythDist_bind_same_kernel
   {n : nat}
   {A mid_t out_t : choiceType}

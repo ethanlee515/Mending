@@ -166,56 +166,17 @@ split.
   exact: Hpost (HpostR y Hy).
 Qed.
 
-Lemma aePythSeqRule
-  {ℓ : nat}
-  {inL_t inR_t midL_t midR_t out_t : choice_type}
-  (progL : inL_t -> raw_code midL_t)
-  (progR : inR_t -> raw_code midR_t)
-  (contL : midL_t -> raw_code out_t)
-  (contR : midR_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (mid : pred ((midL_t * heap) * (midR_t * heap)))
-  (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R) :
-  ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃ mid ⦄ ->
-  ⊨Pyth ⦃ mid ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
-  ⊨Pyth ⦃ pre ⦄
-    (fun xL => yL ← progL xL ;; contL yL)
-    ≈( s )
-    (fun xR => yR ← progR xR ;; contR yR)
-  ⦃ post ⦄.
-Proof.
-move=> [_ Hae] Hpyth memL memR xL xR Hpre.
-set ML := Pr_code (progL xL) memL.
-set MR := Pr_code (progR xR) memR.
-set KL := fun y : midL_t * heap => Pr_code (contL y.1) y.2.
-set KR := fun y : midR_t * heap => Pr_code (contR y.1) y.2.
-have [d0 [Hd0 Hmidprob]] := Hae memL memR xL xR Hpre.
-have Hcont :
-    forall yL yR,
-      yL \in dinsupp ML ->
-      yR \in dinsupp MR ->
-      mid (yL, yR) ->
-      exists (P Q : {distr ((ℓ.+1).-tuple (nat * heap)) / R}),
-        pythDist P Q s /\
-        dmargin (fun omega => tnth omega ord_max) P
-          =1 dmargin pack_output_heap (KL yL) /\
-        dmargin (fun omega => tnth omega ord_max) Q
-          =1 dmargin pack_output_heap (KR yR) /\
-        (forall x, x \in dinsupp (KL yL) -> post x) /\
-        (forall x, x \in dinsupp (KR yR) -> post x).
-  move=> [yLv yLm] [yRv yRm] _ _ Hmid.
-  exact: (Hpyth yLm yRm yLv yRv Hmid).
-have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
-  pythDist_bind_ae0 (@pack_output_heap out_t) ML MR KL KR mid post s d0
-    Hd0 Hmidprob Hcont.
-exists P, Q.
-rewrite !Pr_code_bind.
-split; first exact: Hdist.
-split; first exact: HmarginL.
-split; first exact: HmarginR.
-by split.
-Qed.
+Lemma aeEqPyth1Rule
+  {in_t mid_t : choice_type}
+  (progL progR : in_t -> raw_code mid_t)
+  (pre : pred ((in_t * heap) * (in_t * heap)))
+  (mid : pred (mid_t * heap)) :
+  ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃
+    fun outs =>
+      let '((yL, memL'), (yR, memR')) := outs in
+      (yL == yR) && (memL' == memR') && mid (yL, memL') ⦄ ->
+  ⊨Pyth1 ⦃ pre ⦄ progL ≈( 0 ) progR ⦃ mid ⦄.
+Admitted.
 
 Lemma pythAeSeqRule
   {ℓ : nat}
@@ -280,6 +241,36 @@ Lemma pythSeq1Rule
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
 Admitted.
+
+Lemma aePythSeqRule
+  {ℓ : nat}
+  {in_t mid_t out_t : choice_type}
+  (progL progR : in_t -> raw_code mid_t)
+  (contL contR : mid_t -> raw_code out_t)
+  (pre : pred ((in_t * heap) * (in_t * heap)))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃
+    fun outs =>
+      let '((yL, memL'), (yR, memR')) := outs in
+      (yL == yR) && (memL' == memR') && mid (yL, memL') ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( 0 :: s )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
+Proof.
+move=> Hae Hpyth.
+apply: (pythSeq1Rule progL progR contL contR pre mid post 0 s).
+- exact: aeEqPyth1Rule Hae.
+- exact: Hpyth.
+Qed.
 
 Lemma pythSeqRule
   {ℓ1 ℓ2 : nat}
