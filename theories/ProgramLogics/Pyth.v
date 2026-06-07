@@ -184,7 +184,38 @@ Lemma aePythSeqRule
     ≈( s )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
-Admitted.
+Proof.
+move=> [_ Hae] Hpyth memL memR xL xR Hpre.
+set ML := Pr_code (progL xL) memL.
+set MR := Pr_code (progR xR) memR.
+set KL := fun y : midL_t * heap => Pr_code (contL y.1) y.2.
+set KR := fun y : midR_t * heap => Pr_code (contR y.1) y.2.
+have [d0 [Hd0 Hmidprob]] := Hae memL memR xL xR Hpre.
+have Hcont :
+    forall yL yR,
+      yL \in dinsupp ML ->
+      yR \in dinsupp MR ->
+      mid (yL, yR) ->
+      exists (P Q : {distr ((ℓ.+1).-tuple (nat * heap)) / R}),
+        pythDist P Q s /\
+        dmargin (fun omega => tnth omega ord_max) P
+          =1 dmargin pack_output_heap (KL yL) /\
+        dmargin (fun omega => tnth omega ord_max) Q
+          =1 dmargin pack_output_heap (KR yR) /\
+        (forall x, x \in dinsupp (KL yL) -> post x) /\
+        (forall x, x \in dinsupp (KR yR) -> post x).
+  move=> [yLv yLm] [yRv yRm] _ _ Hmid.
+  exact: (Hpyth yLm yRm yLv yRv Hmid).
+have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+  pythDist_bind_ae0 (@pack_output_heap out_t) ML MR KL KR mid post s d0
+    Hd0 Hmidprob Hcont.
+exists P, Q.
+rewrite !Pr_code_bind.
+split; first exact: Hdist.
+split; first exact: HmarginL.
+split; first exact: HmarginR.
+by split.
+Qed.
 
 Lemma pythAeSeqRule
   {ℓ : nat}
@@ -203,7 +234,27 @@ Lemma pythAeSeqRule
     ≈( s )
     (fun xR => yR ← progR xR ;; cont yR)
   ⦃ post ⦄.
-Admitted.
+Proof.
+move=> Hpyth Hhoare memL memR xL xR Hpre.
+have [P0 [Q0 [Hdist0 [HmarginL0 [HmarginR0 [HmidL HmidR]]]]]] :=
+  Hpyth memL memR xL xR Hpre.
+set ML := Pr_code (progL xL) memL.
+set MR := Pr_code (progR xR) memR.
+set K := fun y : mid_t * heap => Pr_code (cont y.1) y.2.
+have HK :
+    forall y, mid y -> forall x, x \in dinsupp (K y) -> post x.
+  by move=> [y mem] Hy x Hx; exact: Hhoare y mem Hy x Hx.
+have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+  pythDist_bind_same_kernel (@pack_output_heap mid_t) (@pack_output_heap out_t)
+    ML MR K mid post s P0 Q0
+    Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
+exists P, Q.
+rewrite !Pr_code_bind.
+split; first exact: Hdist.
+split; first exact: HmarginL.
+split; first exact: HmarginR.
+by split.
+Qed.
 
 Lemma pythSeq1Rule
   {ℓ : nat}
@@ -256,10 +307,6 @@ Lemma pythSeqRule
 Proof.
 Admitted.
 
-(*
-TODO: Restore this once [pythSeqRule] is proved and an induction-friendly
-statement over [compile_calls_from_trace] is available.
-
 Lemma pythCompileCallsRule
   (q : nat) (X Y A : choice_type)
   (L' L'' : Locations) (M : Interface)
@@ -296,4 +343,3 @@ Lemma pythCompileCallsRule
     call_invariant mem ⦄.
 Proof.
 Admitted.
-*)
