@@ -201,42 +201,39 @@ rewrite !Pr_code_bind.
 exact: Hd.
 Qed.
 
-(* TODO get rid of P.o and replace with just `prog : raw_code`? *)
 Lemma additiveErrorCompileCallsRule
-  (q : nat) (X Y : choice_type)
-  (L L' : Locations) (M E : Interface)
-  (P P' : raw_package) (fn : ident)
-  (o : opsig) :
-  ValidPackage L M E P ->
+  (q : nat) (X Y I O : choice_type)
+  (L L' : Locations) (M : Interface)
+  (P' : raw_package) (fn : ident)
+  (prog : I -> raw_code O) :
   ValidPackage L' [interface] M P' ->
-  fcompat L L' ->
-  fhas E o ->
   fhas M (mkopsig fn X Y) ->
+  (forall x, ValidCode L M (prog x)) ->
   ⊨AE ⦃ fun inps =>
           let '((xL, memL), (xR, memR)) := inps in
           (xL == xR) && (memL == memR) ⦄
     (fun x => code_link
-      (compile_calls q (X := X) (Y := Y) P' fn (resolve P o x))
+      (compile_calls q (X := X) (Y := Y) P' fn (prog x))
       P')
     ≈( 0 )
-    (fun x => resolve (link P P') o x)
+    (fun x => code_link (prog x) P')
   ⦃ fun outs =>
       let '((yL, memL), (yR, memR)) := outs in
       (yL == yR) && (memL == memR) ⦄.
 Proof.
-move=> HP HP' Hcompat Ho Hfn.
+move=> HP' Hfn Hprog.
 apply: additiveErrorTvdEqRule.
 - exact: lexx.
 - move=> memL memR xL xR Hpre.
   move/andP: Hpre => [/eqP -> /eqP ->].
-  rewrite (@compile_calls_correct q X Y L L' M E P P' fn o xR memR
-    HP HP' Hcompat Ho Hfn).
-  rewrite /Pr_op /total_variation.
+  rewrite (@compile_calls_correct_code_link q X Y O L L' M P' fn (prog xR)
+    HP' Hfn (Hprog xR)).
+  rewrite /total_variation.
   rewrite (_ : sum (fun y =>
-      `|Pr_code (resolve (link P P') o xR) memR y -
-        Pr_code (resolve (link P P') o xR) memR y|) = 0).
+      `|Pr_code (code_link (prog xR) P') memR y -
+        Pr_code (code_link (prog xR) P') memR y|) = 0).
     by rewrite mulr0 lexx.
-  rewrite -(@sum0 R (tgt o * heap)%type).
+  rewrite -(@sum0 R (O * heap)%type).
   apply/eq_sum => y.
   by rewrite subrr normr0.
 Qed.

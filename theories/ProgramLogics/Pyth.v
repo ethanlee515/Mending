@@ -299,10 +299,10 @@ Proof.
 Admitted.
 
 Lemma pythCompileCallsRule
-  (q : nat) (X Y A : choice_type)
+  (q : nat) (X Y A B : choice_type)
   (L' L'' : Locations) (M : Interface)
   (P' P'' : raw_package) (fn : ident)
-  (prog : raw_code A)
+  (prog : A -> raw_code B)
   (eps : R)
   (call_invariant : pred heap) :
   ValidPackage L' [interface] M P' ->
@@ -319,15 +319,15 @@ Lemma pythCompileCallsRule
     let '(y, mem) := out in
     call_invariant mem ⦄ ->
   ⊨Pyth ⦃ fun inps =>
-          let '((_, memL), (_, memR)) := inps in
-          (memL == memR) &&
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
           call_invariant memL ⦄
-    (fun _ : chUnit => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P' fn prog)
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
       P')
     ≈( nseq (q.+1) eps )
-    (fun _ : chUnit => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P'' fn prog)
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
       P')
   ⦃ fun out =>
     let '(y, mem) := out in
