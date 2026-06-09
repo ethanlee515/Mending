@@ -242,6 +242,1126 @@ Lemma pythSeq1Rule
   ⦃ post ⦄.
 Admitted.
 
+Definition pythKernelPair {ℓ : nat} : Type :=
+  ({distr ((ℓ.+1).-tuple (nat * heap)) / R} *
+   {distr ((ℓ.+1).-tuple (nat * heap)) / R})%type.
+
+Definition pythKernelSpec
+  {ℓ : nat}
+  {out_t : choice_type}
+  (KL KR : {distr (out_t * heap) / R})
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (W : pythKernelPair (ℓ := ℓ)) : Prop :=
+  let '(P, Q) := W in
+  pythDist P Q s /\
+  dmargin (fun omega => tnth omega ord_max) P
+    =1 dmargin (@pack_output_heap out_t) KL /\
+  dmargin (fun omega => tnth omega ord_max) Q
+    =1 dmargin (@pack_output_heap out_t) KR /\
+  (forall x, x \in dinsupp KL -> post x) /\
+  (forall x, x \in dinsupp KR -> post x).
+
+Lemma pythKernelSpec_dist
+  {ℓ : nat}
+  {out_t : choice_type}
+  (KL KR : {distr (out_t * heap) / R})
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (W : pythKernelPair (ℓ := ℓ)) :
+  pythKernelSpec KL KR post s W ->
+  pythDist W.1 W.2 s.
+Proof. by case: W=> P Q /= [Hdist _]. Qed.
+
+Lemma pythKernelSpec_marginL
+  {ℓ : nat}
+  {out_t : choice_type}
+  (KL KR : {distr (out_t * heap) / R})
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (W : pythKernelPair (ℓ := ℓ)) :
+  pythKernelSpec KL KR post s W ->
+  dmargin (fun omega => tnth omega ord_max) W.1
+    =1 dmargin (@pack_output_heap out_t) KL.
+Proof. by case: W=> P Q /= [_ [Hmargin _]]. Qed.
+
+Lemma pythKernelSpec_marginR
+  {ℓ : nat}
+  {out_t : choice_type}
+  (KL KR : {distr (out_t * heap) / R})
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (W : pythKernelPair (ℓ := ℓ)) :
+  pythKernelSpec KL KR post s W ->
+  dmargin (fun omega => tnth omega ord_max) W.2
+    =1 dmargin (@pack_output_heap out_t) KR.
+Proof. by case: W=> P Q /= [_ [_ [Hmargin _]]]. Qed.
+
+Lemma pythKernelSpec_postL
+  {ℓ : nat}
+  {out_t : choice_type}
+  (KL KR : {distr (out_t * heap) / R})
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (W : pythKernelPair (ℓ := ℓ)) :
+  pythKernelSpec KL KR post s W ->
+  forall x, x \in dinsupp KL -> post x.
+Proof. by case: W=> P Q /= [_ [_ [_ [Hpost _]]]]. Qed.
+
+Lemma pythKernelSpec_postR
+  {ℓ : nat}
+  {out_t : choice_type}
+  (KL KR : {distr (out_t * heap) / R})
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (W : pythKernelPair (ℓ := ℓ)) :
+  pythKernelSpec KL KR post s W ->
+  forall x, x \in dinsupp KR -> post x.
+Proof. by case: W=> P Q /= [_ [_ [_ [_ Hpost]]]]. Qed.
+
+Definition default_pyth_trace {n : nat} : n.-tuple (nat * heap) :=
+  nseq_tuple n (0%N, empty_heap).
+
+Definition decode_output_heap {out_t : choice_type}
+    (x : nat * heap) : option (out_t * heap) :=
+  match unpickle x.1 with
+  | Some y => Some (y, x.2)
+  | None => None
+  end.
+
+Lemma decode_output_heap_pack {out_t : choice_type} (x : out_t * heap) :
+  decode_output_heap (pack_output_heap x) = Some x.
+Proof. by case: x=> y mem; rewrite /decode_output_heap /pack_output_heap pickleK. Qed.
+
+Lemma pythKernel_choice
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  (forall y, mid y ->
+    exists (P Q : {distr ((ℓ.+1).-tuple (nat * heap)) / R}),
+      pythKernelSpec (KL y) (KR y) post s (P, Q)) ->
+  exists (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ)),
+    forall y,
+      pythKernelSpec
+        (KL (proj1_sig y)) (KR (proj1_sig y)) post s (K y).
+Proof.
+move=> Hcont.
+have Hchoice :
+    forall y : { y : mid_t * heap | mid y },
+      exists W : pythKernelPair (ℓ := ℓ),
+        pythKernelSpec
+          (KL (proj1_sig y)) (KR (proj1_sig y)) post s W.
+  move=> [y Hy] /=.
+  have [P [Q HW]] := Hcont y Hy.
+  by exists (P, Q).
+have [K HK] := schoice _ _ _ Hchoice.
+by exists K.
+Qed.
+
+Definition pythTraceKernelL
+  {ℓ1 ℓ2 : nat}
+  {mid_t : choice_type}
+  (mid : pred (mid_t * heap))
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (omega : (ℓ1.+1).-tuple (nat * heap))
+    : {distr ((ℓ2.+1).-tuple (nat * heap)) / R} :=
+  match decode_output_heap (tnth omega ord_max) with
+  | Some y =>
+      match @idP (mid y) with
+      | ReflectT Hy => (K (exist _ y Hy)).1
+      | ReflectF _ => dunit (default_pyth_trace (n := ℓ2.+1))
+      end
+  | None => dunit (default_pyth_trace (n := ℓ2.+1))
+  end.
+
+Definition pythTraceKernelR
+  {ℓ1 ℓ2 : nat}
+  {mid_t : choice_type}
+  (mid : pred (mid_t * heap))
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (omega : (ℓ1.+1).-tuple (nat * heap))
+    : {distr ((ℓ2.+1).-tuple (nat * heap)) / R} :=
+  match decode_output_heap (tnth omega ord_max) with
+  | Some y =>
+      match @idP (mid y) with
+      | ReflectT Hy => (K (exist _ y Hy)).2
+      | ReflectF _ => dunit (default_pyth_trace (n := ℓ2.+1))
+      end
+  | None => dunit (default_pyth_trace (n := ℓ2.+1))
+  end.
+
+Definition pythTraceBindL
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML : {distr (mid_t * heap) / R})
+  (KL : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+    : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R} :=
+  \dlet_(omega1 <- P0)
+  \dlet_(omega2 <- pythTraceKernelL mid K omega1)
+    dunit (cat_tuple omega1 omega2).
+
+Definition pythTraceBindR
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (MR : {distr (mid_t * heap) / R})
+  (KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+    : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R} :=
+  \dlet_(omega1 <- Q0)
+  \dlet_(omega2 <- pythTraceKernelR mid K omega1)
+    dunit (cat_tuple omega1 omega2).
+
+Definition pythTraceBindPair
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) : Prop :=
+  P =1 pythTraceBindL ML KL mid P0 K /\
+  Q =1 pythTraceBindR MR KR mid Q0 K.
+
+Lemma pythTraceBindPair_exists
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  exists (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}),
+    pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q.
+Proof.
+exists (pythTraceBindL ML KL mid P0 K),
+       (pythTraceBindR MR KR mid Q0 K).
+by split=> omega.
+Qed.
+
+Lemma cat_tuple_nonneg
+  {ℓ1 ℓ2 : nat}
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R) :
+  (forall i : 'I_(ℓ1.+1), 0 <= tnth s1 i) ->
+  (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
+  forall i : 'I_(ℓ1.+1 + ℓ2.+1), 0 <= tnth (cat_tuple s1 s2) i.
+Admitted.
+
+Lemma pythTraceBindPair_s2_nonneg
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML : {distr (mid_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i.
+Admitted.
+
+Lemma pythTraceBindPair_absolute_continuous
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  absolute_continuous P Q.
+Admitted.
+
+Lemma pythTraceBindPair_dweightL
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  dweight P = 1.
+Admitted.
+
+Lemma pythTraceBindPair_dweightR
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  dweight Q = 1.
+Admitted.
+
+Lemma cat_tuple_tnth_prefix_choice
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (t1 : (ℓ1.+1).-tuple A)
+  (t2 : (ℓ2.+1).-tuple A)
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (i < ℓ1.+1)%N) :
+  tnth (cat_tuple t1 t2) i = tnth t1 (Ordinal Hi).
+Proof.
+rewrite (tnth_nth (tnth t1 (Ordinal Hi))).
+rewrite (tnth_nth (tnth t1 (Ordinal Hi)) t1).
+rewrite nth_cat size_tuple Hi.
+by apply: set_nth_default; rewrite size_tuple.
+Qed.
+
+Lemma cat_tuple_tnth_prefix
+  {ℓ1 ℓ2 : nat}
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (i < ℓ1.+1)%N) :
+  tnth (cat_tuple s1 s2) i = tnth s1 (Ordinal Hi).
+Proof. exact: cat_tuple_tnth_prefix_choice. Qed.
+
+Lemma cat_tuple_suffix_bound
+  {ℓ1 ℓ2 : nat}
+  (i : 'I_(ℓ1.+1 + ℓ2.+1)) :
+  (ℓ1.+1 <= i)%N ->
+  (i - ℓ1.+1 < ℓ2.+1)%N.
+Proof.
+move=> Hi.
+have Hord := ltn_ord i.
+by rewrite ltn_subLR // addnC.
+Qed.
+
+Lemma cat_tuple_tnth_suffix_choice
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (t1 : (ℓ1.+1).-tuple A)
+  (t2 : (ℓ2.+1).-tuple A)
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N) :
+  tnth (cat_tuple t1 t2) i =
+  tnth t2 (Ordinal (cat_tuple_suffix_bound i Hi)).
+Proof.
+rewrite (tnth_nth (tnth t2 (Ordinal (cat_tuple_suffix_bound i Hi)))).
+rewrite nth_cat size_tuple.
+rewrite ltnNge Hi.
+rewrite /=.
+by rewrite [RHS](tnth_nth (tnth t2 (Ordinal (cat_tuple_suffix_bound i Hi)))).
+Qed.
+
+Lemma cat_tuple_tnth_suffix
+  {ℓ1 ℓ2 : nat}
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N) :
+  tnth (cat_tuple s1 s2) i =
+  tnth s2 (Ordinal (cat_tuple_suffix_bound i Hi)).
+Proof. exact: cat_tuple_tnth_suffix_choice. Qed.
+
+Lemma kl_ext
+  {T : choiceType}
+  (P P' Q Q' : {distr T / R}) :
+  P =1 P' ->
+  Q =1 Q' ->
+  δ_KL P Q = δ_KL P' Q'.
+Proof.
+move=> HP HQ.
+rewrite /δ_KL.
+rewrite (expectation_distr_ext P P' _ HP).
+apply: expectation_ext=> x.
+by rewrite -HP -HQ.
+Qed.
+
+Lemma pr_ext {T : choiceType} (P Q : {distr T / R}) (p : pred T) :
+  P =1 Q ->
+  \P_[P] p = \P_[Q] p.
+Proof.
+move=> HP.
+rewrite /pr.
+apply/eq_psum=> x.
+by rewrite HP.
+Qed.
+
+Lemma prc_ext {T : choiceType}
+    (P Q : {distr T / R}) (A p : pred T) :
+  P =1 Q ->
+  \P_[P, p] A = \P_[Q, p] A.
+Proof.
+move=> HP.
+rewrite /prc.
+by rewrite (pr_ext P Q [predI A & p] HP) (pr_ext P Q p HP).
+Qed.
+
+Lemma dcond_ext {T : choiceType}
+    (P Q : {distr T / R}) (p : pred T) :
+  P =1 Q ->
+  dcond P p =1 dcond Q p.
+Proof.
+move=> HP x.
+rewrite !dcondE.
+exact: (prc_ext P Q (pred1 x) p HP).
+Qed.
+
+Lemma dmargin_ext {T U : choiceType} (f : T -> U) (P Q : {distr T / R}) :
+  P =1 Q ->
+  dmargin f P =1 dmargin f Q.
+Proof.
+move=> HPQ y.
+rewrite !dmargin_psumE.
+apply/eq_psum=> x.
+by rewrite HPQ.
+Qed.
+
+Lemma dunit_dweight {T : choiceType} (x : T) :
+  dweight (dunit x : {distr T / R}) = 1.
+Admitted.
+
+Lemma conditional_coordinate_dist_ext
+  {n : nat}
+  {A : choiceType}
+  (P Q : {distr (n.-tuple A) / R})
+  (i : 'I_n)
+  (a : forall j : 'I_n, A) :
+  P =1 Q ->
+  conditional_coordinate P i a =1 conditional_coordinate Q i a.
+Proof.
+move=> HP.
+apply: dmargin_ext.
+exact: dcond_ext.
+Qed.
+
+Lemma tuple_prefix_eq_cat_prefix
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (i < ℓ1.+1)%N)
+  (omega1 : (ℓ1.+1).-tuple A)
+  (omega2 : (ℓ2.+1).-tuple A) :
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), A :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  tuple_prefix_eq i a (cat_tuple omega1 omega2) =
+  tuple_prefix_eq i0 a0 omega1.
+Admitted.
+
+Lemma pr_dlet_cat_prefix_lift_eq
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  (forall omega1, dweight (K0 omega1) = 1) ->
+  forall
+    (p : pred ((ℓ1.+1 + ℓ2.+1).-tuple A))
+    (p0 : pred ((ℓ1.+1).-tuple A)),
+    (forall omega1 omega2, p (cat_tuple omega1 omega2) = p0 omega1) ->
+    \P_[
+      \dlet_(omega1 <- P0)
+      \dlet_(omega2 <- K0 omega1)
+        dunit (cat_tuple omega1 omega2)
+    ] p =
+    \P_[P0] p0.
+Admitted.
+
+Lemma prc_dlet_cat_prefix_coordinate_eq
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  (forall omega1, dweight (K0 omega1) = 1) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+         (Hi : (i < ℓ1.+1)%N)
+         (x : A),
+    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+    let a0 : forall j : 'I_(ℓ1.+1), A :=
+      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+    \P_[
+      \dlet_(omega1 <- P0)
+      \dlet_(omega2 <- K0 omega1)
+        dunit (cat_tuple omega1 omega2),
+      fun omega => tuple_prefix_eq i a omega
+    ] [pred omega | tnth omega i \in pred1 x] =
+    \P_[P0, fun omega1 => tuple_prefix_eq i0 a0 omega1]
+      [pred omega1 | tnth omega1 i0 \in pred1 x].
+Proof.
+move=> Hmass i a Hi x /=.
+rewrite /prc.
+rewrite (pr_dlet_cat_prefix_lift_eq P0 K0 Hmass
+  (fun omega =>
+    (tnth omega i \in pred1 x) && tuple_prefix_eq i a omega)
+  (fun omega1 =>
+    (tnth omega1 (Ordinal Hi) \in pred1 x) &&
+    tuple_prefix_eq (Ordinal Hi)
+      (fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))))
+      omega1)).
+  rewrite (pr_dlet_cat_prefix_lift_eq P0 K0 Hmass
+    (fun omega => tuple_prefix_eq i a omega)
+    (fun omega1 => tuple_prefix_eq (Ordinal Hi)
+      (fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))))
+      omega1)) //.
+  move=> omega1 omega2.
+	  exact: tuple_prefix_eq_cat_prefix.
+move=> omega1 omega2.
+rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 i Hi).
+by rewrite (tuple_prefix_eq_cat_prefix i a Hi omega1 omega2).
+Qed.
+
+
+Lemma conditional_coordinate_dlet_cat_prefix_eq
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  (forall omega1, dweight (K0 omega1) = 1) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+         (Hi : (i < ℓ1.+1)%N),
+    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+    let a0 : forall j : 'I_(ℓ1.+1), A :=
+      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+    conditional_coordinate
+      (\dlet_(omega1 <- P0)
+       \dlet_(omega2 <- K0 omega1)
+         dunit (cat_tuple omega1 omega2))
+      i a
+      =1 conditional_coordinate P0 i0 a0.
+Proof.
+move=> Hmass i a Hi /= x.
+rewrite !pr_pred1.
+rewrite !pr_dmargin.
+rewrite !pr_dcond.
+exact: (prc_dlet_cat_prefix_coordinate_eq P0 K0 Hmass i a Hi x).
+Qed.
+
+Lemma pythTraceKernelL_dweight1
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall omega : (ℓ1.+1).-tuple (nat * heap),
+    dweight (pythTraceKernelL mid K omega) = 1.
+Admitted.
+
+Lemma pythTraceKernelR_dweight1
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall omega : (ℓ1.+1).-tuple (nat * heap),
+    dweight (pythTraceKernelR mid K omega) = 1.
+Admitted.
+
+Lemma pythTraceBindL_conditional_coordinate_prefix_eq
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML : {distr (mid_t * heap) / R})
+  (KL : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+         (Hi : (i < ℓ1.+1)%N),
+    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+    conditional_coordinate (pythTraceBindL ML KL mid P0 K) i a
+      =1 conditional_coordinate P0 i0 a0.
+Proof.
+move=> HK i a Hi.
+exact: (conditional_coordinate_dlet_cat_prefix_eq
+  P0 (pythTraceKernelL mid K)
+  (pythTraceKernelL_dweight1 mid s2 K HK) i a Hi).
+Qed.
+
+Lemma pythTraceBindR_conditional_coordinate_prefix_eq
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (MR : {distr (mid_t * heap) / R})
+  (KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+         (Hi : (i < ℓ1.+1)%N),
+    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+    conditional_coordinate (pythTraceBindR MR KR mid Q0 K) i a
+      =1 conditional_coordinate Q0 i0 a0.
+Proof.
+move=> HK i a Hi.
+exact: (conditional_coordinate_dlet_cat_prefix_eq
+  Q0 (pythTraceKernelR mid K)
+  (pythTraceKernelR_dweight1 mid s2 K HK) i a Hi).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_prefix_eqL
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+         (Hi : (i < ℓ1.+1)%N),
+    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+    conditional_coordinate P i a
+      =1 conditional_coordinate P0 i0 a0.
+Proof.
+move=> [HP _] HK i a Hi /= x.
+rewrite (conditional_coordinate_dist_ext P
+  (pythTraceBindL ML KL mid P0 K) i a HP x).
+exact: (pythTraceBindL_conditional_coordinate_prefix_eq
+  ML KL mid s2 P0 K HK i a Hi x).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_prefix_eqR
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+         (Hi : (i < ℓ1.+1)%N),
+    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+    conditional_coordinate Q i a
+      =1 conditional_coordinate Q0 i0 a0.
+Proof.
+move=> [_ HQ] HK i a Hi /= x.
+rewrite (conditional_coordinate_dist_ext Q
+  (pythTraceBindR MR KR mid Q0 K) i a HQ x).
+exact: (pythTraceBindR_conditional_coordinate_prefix_eq
+  MR KR mid s2 Q0 K HK i a Hi x).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_prefix_eq
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+         (Hi : (i < ℓ1.+1)%N),
+    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) =
+    δ_KL (conditional_coordinate P0 i0 a0)
+         (conditional_coordinate Q0 i0 a0).
+Proof.
+move=> Hbind HK i a Hi.
+apply: kl_ext.
+- exact: (pythTraceBindPair_conditional_coordinate_prefix_eqL
+    ML MR KL KR mid s2 P0 Q0 K P Q Hbind HK i a Hi).
+- exact: (pythTraceBindPair_conditional_coordinate_prefix_eqR
+    ML MR KL KR mid s2 P0 Q0 K P Q Hbind HK i a Hi).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_bound_prefix_from_P0
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
+    (i < ℓ1.+1)%N ->
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) <=
+      tnth (cat_tuple s1 s2) i.
+Proof.
+move=> Hbind [_ [_ [_ [_ Hcond0]]]] HK i a Hi.
+pose i0 : 'I_(ℓ1.+1) := Ordinal Hi.
+pose a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+  fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))).
+rewrite (pythTraceBindPair_conditional_coordinate_prefix_eq
+  ML MR KL KR mid s2 P0 Q0 K P Q Hbind HK i a Hi).
+rewrite (cat_tuple_tnth_prefix s1 s2 i Hi).
+exact: (Hcond0 i0 a0).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_bound_prefix
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
+    (i < ℓ1.+1)%N ->
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) <=
+      tnth (cat_tuple s1 s2) i.
+Proof.
+move=> Hbind Hdist0 _ _ _ _ HK i a Hi.
+exact: (pythTraceBindPair_conditional_coordinate_bound_prefix_from_P0
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q Hbind Hdist0
+  HK i a Hi).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+         (Hi : (ℓ1.+1 <= i)%N),
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) <=
+      tnth s2 (Ordinal (cat_tuple_suffix_bound i Hi)).
+Admitted.
+
+Lemma pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
+    (ℓ1.+1 <= i)%N ->
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) <=
+      tnth (cat_tuple s1 s2) i.
+Proof.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi.
+rewrite (cat_tuple_tnth_suffix s1 s2 i Hi).
+exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_bound_suffix
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
+    (ℓ1.+1 <= i)%N ->
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) <=
+      tnth (cat_tuple s1 s2) i.
+Proof.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi.
+exact: (pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+Qed.
+
+Lemma pythTraceBindPair_conditional_coordinate_bound
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
+         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) <=
+      tnth (cat_tuple s1 s2) i.
+Proof.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a.
+case: (ltnP i ℓ1.+1)=> Hi.
+- exact: (pythTraceBindPair_conditional_coordinate_bound_prefix
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+- exact: (pythTraceBindPair_conditional_coordinate_bound_suffix
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+Qed.
+
+Lemma pythTraceBindPair_pythDist
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  pythDist P Q (cat_tuple s1 s2).
+Proof.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
+move: Hdist0=> [Hs1 [Hac0 [HP0 [HQ0 Hcond0]]]].
+have Hdist0 : pythDist P0 Q0 s1.
+  by split; first exact: Hs1; split; first exact: Hac0;
+     split; first exact: HP0; split; first exact: HQ0.
+have Hs2 : forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i :=
+  pythTraceBindPair_s2_nonneg ML mid s1 s2 P0 Q0 K
+    Hdist0 HmarginL0 HmidL HK.
+split.
+- apply: cat_tuple_nonneg.
+  + exact: Hs1.
+  + exact: Hs2.
+split.
+- exact: (pythTraceBindPair_absolute_continuous
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
+split.
+- exact: (pythTraceBindPair_dweightL
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q
+    Hbind Hdist0 HmarginL0 HmidL HK).
+split.
+- exact: (pythTraceBindPair_dweightR
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q
+    Hbind Hdist0 HmarginR0 HmidR HK).
+- exact: (pythTraceBindPair_conditional_coordinate_bound
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
+Qed.
+
+Lemma pythTraceBindL_final_margin
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML : {distr (mid_t * heap) / R})
+  (KL : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y,
+    dmargin (fun omega => tnth omega ord_max) (K y).1
+      =1 dmargin (@pack_output_heap out_t) (KL (proj1_sig y))) ->
+  dmargin (fun omega => tnth omega ord_max)
+    (pythTraceBindL ML KL mid P0 K)
+    =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y).
+Admitted.
+
+Lemma pythTraceBindR_final_margin
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (MR : {distr (mid_t * heap) / R})
+  (KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y,
+    dmargin (fun omega => tnth omega ord_max) (K y).2
+      =1 dmargin (@pack_output_heap out_t) (KR (proj1_sig y))) ->
+  dmargin (fun omega => tnth omega ord_max)
+    (pythTraceBindR MR KR mid Q0 K)
+    =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y).
+Admitted.
+
+Lemma pythTraceBindPair_final_margins
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y,
+    dmargin (fun omega => tnth omega ord_max) (K y).1
+      =1 dmargin (@pack_output_heap out_t) (KL (proj1_sig y))) ->
+  (forall y,
+    dmargin (fun omega => tnth omega ord_max) (K y).2
+      =1 dmargin (@pack_output_heap out_t) (KR (proj1_sig y))) ->
+  dmargin (fun omega => tnth omega ord_max) P
+    =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y) /\
+  dmargin (fun omega => tnth omega ord_max) Q
+    =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y).
+Proof.
+move=> [HP HQ] HmarginL0 HmarginR0 HmidL HmidR HKL HKR.
+split.
+- move=> z.
+  rewrite (dmargin_ext (fun omega => tnth omega ord_max)
+    P (pythTraceBindL ML KL mid P0 K) HP z).
+  exact: (pythTraceBindL_final_margin ML KL mid P0 K
+    HmarginL0 HmidL HKL z).
+- move=> z.
+  rewrite (dmargin_ext (fun omega => tnth omega ord_max)
+    Q (pythTraceBindR MR KR mid Q0 K) HQ z).
+  exact: (pythTraceBindR_final_margin MR KR mid Q0 K
+    HmarginR0 HmidR HKR z).
+Qed.
+
+Lemma pythTraceBindPair_post
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y : { y : mid_t * heap | mid y },
+    forall x, x \in dinsupp (KL (proj1_sig y)) -> post x) ->
+  (forall y : { y : mid_t * heap | mid y },
+    forall x, x \in dinsupp (KR (proj1_sig y)) -> post x) ->
+  (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
+  (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
+Proof.
+move=> _ HmidL HmidR HpostL HpostR.
+split.
+- move=> x Hx.
+  have [y Hy Hinner] := @dinsupp_dlet R _ _ KL ML x Hx.
+  have Hy_mid := HmidL y Hy.
+  have Hx_inner : x \in dinsupp (KL y).
+    by rewrite in_dinsupp.
+  exact: (HpostL (exist _ y Hy_mid) x Hx_inner).
+- move=> x Hx.
+  have [y Hy Hinner] := @dinsupp_dlet R _ _ KR MR x Hx.
+  have Hy_mid := HmidR y Hy.
+  have Hx_inner : x \in dinsupp (KR y).
+    by rewrite in_dinsupp.
+  exact: (HpostR (exist _ y Hy_mid) x Hx_inner).
+Qed.
+
+Lemma pythDist_bind_pyth_kernel_witness
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y,
+    pythKernelSpec
+      (KL (proj1_sig y)) (KR (proj1_sig y)) post s2 (K y)) ->
+  exists (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}),
+    pythDist P Q (cat_tuple s1 s2) /\
+    dmargin (fun omega => tnth omega ord_max) P
+      =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y) /\
+    dmargin (fun omega => tnth omega ord_max) Q
+      =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y) /\
+    (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
+    (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
+Proof.
+move=> Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
+have [P [Q Hbind]] :=
+  pythTraceBindPair_exists ML MR KL KR mid P0 Q0 K.
+exists P, Q.
+have Hdist :
+    pythDist P Q (cat_tuple s1 s2).
+  apply: (pythTraceBindPair_pythDist
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q Hbind
+    Hdist0 HmarginL0 HmarginR0 HmidL HmidR).
+  move=> y.
+  exact: (pythKernelSpec_dist _ _ _ _ _ (HK y)).
+have [HmarginL HmarginR] :
+    dmargin (fun omega => tnth omega ord_max) P
+      =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y) /\
+    dmargin (fun omega => tnth omega ord_max) Q
+      =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y).
+  apply: (pythTraceBindPair_final_margins
+    ML MR KL KR mid P0 Q0 K P Q Hbind
+    HmarginL0 HmarginR0 HmidL HmidR).
+  - move=> y.
+    exact: (pythKernelSpec_marginL _ _ _ _ _ (HK y)).
+  - move=> y.
+    exact: (pythKernelSpec_marginR _ _ _ _ _ (HK y)).
+have [HpostL HpostR] :
+    (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
+    (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
+  apply: (pythTraceBindPair_post
+    ML MR KL KR mid post P0 Q0 K P Q Hbind HmidL HmidR).
+  - move=> y.
+    exact: (pythKernelSpec_postL _ _ _ _ _ (HK y)).
+  - move=> y.
+    exact: (pythKernelSpec_postR _ _ _ _ _ (HK y)).
+split; first exact: Hdist.
+split; first exact: HmarginL.
+split; first exact: HmarginR.
+by split.
+Qed.
+
 Lemma pythDist_bind_pyth_kernel
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -276,7 +1396,22 @@ Lemma pythDist_bind_pyth_kernel
       =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y) /\
     (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
     (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
-Admitted.
+Proof.
+move=> Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hcont.
+have Hcont' :
+    forall y, mid y ->
+      exists (P Q : {distr ((ℓ2.+1).-tuple (nat * heap)) / R}),
+        pythKernelSpec (KL y) (KR y) post s2 (P, Q).
+  move=> y Hy.
+  have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+    Hcont y Hy.
+  by exists P, Q.
+have [K HK] :=
+  pythKernel_choice KL KR mid post s2 Hcont'.
+exact:
+  (pythDist_bind_pyth_kernel_witness ML MR KL KR mid post s1 s2 P0 Q0 K
+    Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
+Qed.
 
 Lemma aePythSeqRule
   {ℓ : nat}
