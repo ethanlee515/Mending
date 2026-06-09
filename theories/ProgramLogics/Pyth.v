@@ -242,6 +242,42 @@ Lemma pythSeq1Rule
   ⦃ post ⦄.
 Admitted.
 
+Lemma pythDist_bind_pyth_kernel
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R}) :
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, mid y ->
+    exists (P Q : {distr ((ℓ2.+1).-tuple (nat * heap)) / R}),
+      pythDist P Q s2 /\
+      dmargin (fun omega => tnth omega ord_max) P
+        =1 dmargin (@pack_output_heap out_t) (KL y) /\
+      dmargin (fun omega => tnth omega ord_max) Q
+        =1 dmargin (@pack_output_heap out_t) (KR y) /\
+      (forall x, x \in dinsupp (KL y) -> post x) /\
+      (forall x, x \in dinsupp (KR y) -> post x)) ->
+  exists (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}),
+    pythDist P Q (cat_tuple s1 s2) /\
+    dmargin (fun omega => tnth omega ord_max) P
+      =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y) /\
+    dmargin (fun omega => tnth omega ord_max) Q
+      =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y) /\
+    (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
+    (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
+Admitted.
+
 Lemma aePythSeqRule
   {ℓ : nat}
   {in_t mid_t out_t : choice_type}
@@ -296,7 +332,42 @@ Lemma pythSeqRule
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
 Proof.
-Admitted.
+move=> Hpyth1 Hpyth2 memL memR xL xR Hpre.
+have [P0 [Q0 [Hdist0 [HmarginL0 [HmarginR0 [HmidL HmidR]]]]]] :=
+  Hpyth1 memL memR xL xR Hpre.
+set ML := Pr_code (progL xL) memL.
+set MR := Pr_code (progR xR) memR.
+set KL := fun y : mid_t * heap => Pr_code (contL y.1) y.2.
+set KR := fun y : mid_t * heap => Pr_code (contR y.1) y.2.
+have Hcont :
+    forall y, mid y ->
+      exists (P Q : {distr ((ℓ2.+1).-tuple (nat * heap)) / R}),
+        pythDist P Q s2 /\
+        dmargin (fun omega => tnth omega ord_max) P
+          =1 dmargin (@pack_output_heap out_t) (KL y) /\
+        dmargin (fun omega => tnth omega ord_max) Q
+          =1 dmargin (@pack_output_heap out_t) (KR y) /\
+        (forall x, x \in dinsupp (KL y) -> post x) /\
+        (forall x, x \in dinsupp (KR y) -> post x).
+  move=> [y mem] Hy.
+  have Hpre_cont :
+      (let '((xL0, memL0), (xR0, memR0)) :=
+          ((y, mem), (y, mem)) in
+        (xL0 == xR0) && (memL0 == memR0) && mid (xL0, memL0)).
+    by rewrite !eqxx Hy.
+  have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+    Hpyth2 mem mem y y Hpre_cont.
+  by exists P, Q.
+have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+  pythDist_bind_pyth_kernel ML MR KL KR mid post s1 s2 P0 Q0
+    Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hcont.
+exists P, Q.
+rewrite !Pr_code_bind.
+split; first exact: Hdist.
+split; first exact: HmarginL.
+split; first exact: HmarginR.
+by split.
+Qed.
 
 Lemma pythCompileCallsRule
   (q : nat) (X Y A B : choice_type)
