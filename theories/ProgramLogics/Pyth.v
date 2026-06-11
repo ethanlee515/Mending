@@ -448,6 +448,158 @@ exists (pythTraceBindL ML KL mid P0 K),
 by split=> omega.
 Qed.
 
+Lemma dweight1_dinsupp
+  {T : choiceType}
+  (mu : {distr T / R}) :
+  dweight mu = 1 ->
+  exists x, x \in dinsupp mu.
+Proof.
+rewrite pr_predT=> Hmass.
+have Hnz : psum mu <> 0.
+  move=> Hzero.
+  move: Hmass.
+  rewrite Hzero=> H01.
+  by move/eqP: H01; rewrite eq_sym oner_eq0.
+have [x Hx] := @neq0_psum R T mu Hnz.
+exists x.
+exact/dinsuppP.
+Qed.
+
+Lemma dmargin_dinsupp_image
+  {T U : choiceType}
+  (mu : {distr T / R})
+  (f : T -> U)
+  (x : T) :
+  x \in dinsupp mu ->
+  f x \in dinsupp (dmargin f mu).
+Proof.
+move=> Hx.
+rewrite dmarginE.
+apply: (@dlet_dinsupp R T U (fun x => dunit (f x)) mu x (f x) Hx).
+by rewrite dunit1E eqxx oner_neq0.
+Qed.
+
+Lemma dmargin_dinsupp_preimage
+  {T U : choiceType}
+  (mu : {distr T / R})
+  (f : T -> U)
+  (y : U) :
+  y \in dinsupp (dmargin f mu) ->
+  exists2 x, x \in dinsupp mu & f x = y.
+Proof.
+rewrite dmarginE=> /dinsupp_dlet [x Hx Hunit].
+exists x=> //.
+move: Hunit.
+by rewrite dunit1E pnatr_eq0 eqb0 negbK=> /eqP.
+Qed.
+
+Lemma pr_ext {T : choiceType} (P Q : {distr T / R}) (p : pred T) :
+  P =1 Q ->
+  \P_[P] p = \P_[Q] p.
+Proof.
+move=> HP.
+rewrite /pr.
+apply/eq_psum=> x.
+by rewrite HP.
+Qed.
+
+Lemma dlet_dunit_cat_dinsupp_preimage
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (omega : (ℓ1.+1 + ℓ2.+1).-tuple A) :
+  omega \in dinsupp
+    (\dlet_(omega1 <- P0)
+     \dlet_(omega2 <- K0 omega1)
+       dunit (cat_tuple omega1 omega2)) ->
+  exists omega1, exists omega2,
+    omega = cat_tuple omega1 omega2 /\
+    omega1 \in dinsupp P0 /\
+    omega2 \in dinsupp (K0 omega1).
+Proof.
+move=> Homega.
+have [omega1 Homega1 Hinner] := @dinsupp_dlet R _ _ _ _ _ Homega.
+have [omega2 Homega2 Hunit] := @dinsupp_dlet R _ _ _ _ _ Hinner.
+exists omega1; exists omega2.
+split.
+  move: Hunit.
+  by rewrite dunit1E pnatr_eq0 eqb0 negbK=> /eqP.
+by split.
+Qed.
+
+Lemma dlet_dunit_cat_dinsupp_image
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (omega1 : (ℓ1.+1).-tuple A)
+  (omega2 : (ℓ2.+1).-tuple A) :
+  omega1 \in dinsupp P0 ->
+  omega2 \in dinsupp (K0 omega1) ->
+  cat_tuple omega1 omega2 \in dinsupp
+    (\dlet_(omega1 <- P0)
+     \dlet_(omega2 <- K0 omega1)
+       dunit (cat_tuple omega1 omega2)).
+Proof.
+move=> Homega1 Homega2.
+apply: (@dlet_dinsupp R _ _
+  (fun omega1 =>
+    \dlet_(omega2 <- K0 omega1) dunit (cat_tuple omega1 omega2))
+  P0 omega1 (cat_tuple omega1 omega2) Homega1).
+apply: (@dlet_dinsupp R _ _
+  (fun omega2 => dunit (cat_tuple omega1 omega2))
+  (K0 omega1) omega2 (cat_tuple omega1 omega2) Homega2).
+by rewrite dunit1E eqxx oner_neq0.
+Qed.
+
+Lemma dlet_dunit_cat_absolute_continuous
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (KL KR : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  absolute_continuous P0 Q0 ->
+  (forall omega1,
+    omega1 \in dinsupp P0 -> absolute_continuous (KL omega1) (KR omega1)) ->
+  absolute_continuous
+    (\dlet_(omega1 <- P0)
+     \dlet_(omega2 <- KL omega1)
+       dunit (cat_tuple omega1 omega2))
+    (\dlet_(omega1 <- Q0)
+     \dlet_(omega2 <- KR omega1)
+       dunit (cat_tuple omega1 omega2)).
+Proof.
+move=> Hac0 HacK omega HQomega0.
+apply/eqP; apply/negP=> HPomega_nz.
+  have HPomega_supp :
+    omega \in dinsupp
+      (\dlet_(omega1 <- P0)
+       \dlet_(omega2 <- KL omega1)
+         dunit (cat_tuple omega1 omega2)).
+  rewrite in_dinsupp.
+  by apply/negP.
+have [omega1 [omega2 [Homega [Homega1 Homega2]]]] :=
+  dlet_dunit_cat_dinsupp_preimage P0 KL omega HPomega_supp.
+have Hqomega1 : omega1 \in dinsupp Q0.
+  rewrite in_dinsupp.
+  apply/negP=> /eqP HQ0omega1.
+  move: Homega1.
+  by rewrite in_dinsupp (Hac0 omega1 HQ0omega1) eqxx.
+have Hqomega2 : omega2 \in dinsupp (KR omega1).
+  rewrite in_dinsupp.
+  apply/negP=> /eqP HKRomega2.
+  move: Homega2.
+  by rewrite in_dinsupp (HacK omega1 Homega1 omega2 HKRomega2) eqxx.
+have HQomega_supp :
+    cat_tuple omega1 omega2 \in dinsupp
+      (\dlet_(omega1 <- Q0)
+       \dlet_(omega2 <- KR omega1)
+         dunit (cat_tuple omega1 omega2)).
+  exact: dlet_dunit_cat_dinsupp_image.
+move: HQomega_supp.
+by rewrite -Homega in_dinsupp HQomega0 eqxx.
+Qed.
+
 Lemma cat_tuple_nonneg
   {ℓ1 ℓ2 : nat}
   (s1 : (ℓ1.+1).-tuple R)
@@ -472,7 +624,48 @@ Lemma pythTraceBindPair_s2_nonneg
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
   forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i.
-Admitted.
+Proof.
+move=> Hdist0 HmarginL0 HmidL HK i.
+case: Hdist0=> _ [_ [HP0mass _]].
+have [omega Homega] := dweight1_dinsupp P0 HP0mass.
+have Hfinal_supp_P0 :
+    tnth omega ord_max \in
+      dinsupp (dmargin (fun omega => tnth omega ord_max) P0).
+  exact: (dmargin_dinsupp_image P0
+    (fun omega => tnth omega ord_max) omega Homega).
+have Hfinal_supp_ML :
+    tnth omega ord_max \in
+      dinsupp (dmargin (@pack_output_heap mid_t) ML).
+  rewrite in_dinsupp -HmarginL0.
+  by move: Hfinal_supp_P0; rewrite in_dinsupp.
+have [y Hy _] :=
+  dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
+    (tnth omega ord_max) Hfinal_supp_ML.
+have Hmidy : mid y := HmidL y Hy.
+case: (HK (exist _ y Hmidy))=> Hs2 _.
+exact: Hs2.
+Qed.
+
+Lemma pythTraceKernel_absolute_continuous
+  {ℓ1 ℓ2 : nat}
+  {mid_t : choice_type}
+  (mid : pred (mid_t * heap))
+  (s2 : (ℓ2.+1).-tuple R)
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  forall omega : (ℓ1.+1).-tuple (nat * heap),
+    absolute_continuous
+      (pythTraceKernelL mid K omega)
+      (pythTraceKernelR mid K omega).
+Proof.
+move=> HK omega.
+rewrite /pythTraceKernelL /pythTraceKernelR.
+case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
+  destruct (@idP (mid y)) as [Hy|Hnot].
+    by case: (HK (exist _ y Hy))=> _ [Hac _].
+  by move=> x Hx.
+by move=> x Hx.
+Qed.
 
 Lemma pythTraceBindPair_absolute_continuous
   {ℓ1 ℓ2 : nat}
@@ -495,47 +688,21 @@ Lemma pythTraceBindPair_absolute_continuous
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
   absolute_continuous P Q.
-Admitted.
-
-Lemma pythTraceBindPair_dweightL
-  {ℓ1 ℓ2 : nat}
-  {mid_t out_t : choice_type}
-  (ML MR : {distr (mid_t * heap) / R})
-  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
-  (mid : pred (mid_t * heap))
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R)
-  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
-  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
-  pythDist P0 Q0 s1 ->
-  dmargin (fun omega => tnth omega ord_max) P0
-    =1 dmargin (@pack_output_heap mid_t) ML ->
-  (forall y, y \in dinsupp ML -> mid y) ->
-  (forall y, pythDist (K y).1 (K y).2 s2) ->
-  dweight P = 1.
-Admitted.
-
-Lemma pythTraceBindPair_dweightR
-  {ℓ1 ℓ2 : nat}
-  {mid_t out_t : choice_type}
-  (ML MR : {distr (mid_t * heap) / R})
-  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
-  (mid : pred (mid_t * heap))
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R)
-  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
-  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
-  pythDist P0 Q0 s1 ->
-  dmargin (fun omega => tnth omega ord_max) Q0
-    =1 dmargin (@pack_output_heap mid_t) MR ->
-  (forall y, y \in dinsupp MR -> mid y) ->
-  (forall y, pythDist (K y).1 (K y).2 s2) ->
-  dweight Q = 1.
-Admitted.
+Proof.
+move=> [HP HQ] Hdist0 _ _ _ _ HK.
+case: Hdist0=> _ [Hac0 _].
+have Hac_bind :
+    absolute_continuous
+      (pythTraceBindL ML KL mid P0 K)
+      (pythTraceBindR MR KR mid Q0 K).
+  rewrite /pythTraceBindL /pythTraceBindR.
+  apply: dlet_dunit_cat_absolute_continuous=> // omega1 _.
+  exact: (pythTraceKernel_absolute_continuous mid s2 K HK omega1).
+move=> omega HQomega0.
+rewrite HP.
+apply: Hac_bind.
+by rewrite -HQ.
+Qed.
 
 Lemma cat_tuple_tnth_prefix_choice
   {ℓ1 ℓ2 : nat}
@@ -645,16 +812,6 @@ apply: expectation_ext=> x.
 by rewrite -HP -HQ.
 Qed.
 
-Lemma pr_ext {T : choiceType} (P Q : {distr T / R}) (p : pred T) :
-  P =1 Q ->
-  \P_[P] p = \P_[Q] p.
-Proof.
-move=> HP.
-rewrite /pr.
-apply/eq_psum=> x.
-by rewrite HP.
-Qed.
-
 Lemma prc_ext {T : choiceType}
     (P Q : {distr T / R}) (A p : pred T) :
   P =1 Q ->
@@ -760,7 +917,22 @@ Lemma pr_dlet_cat_prefix_lift_eq
         dunit (cat_tuple omega1 omega2)
     ] p =
     \P_[P0] p0.
-Admitted.
+Proof.
+move=> Hmass p p0 Hp.
+rewrite pr_dlet.
+rewrite [RHS]pr_exp.
+apply: expectation_ext=> omega1.
+rewrite pr_dlet.
+rewrite (expectation_ext (K0 omega1)
+  (fun omega2 => \P_[dunit (cat_tuple omega1 omega2)] p)
+  (fun _ => if p0 omega1 then 1 else 0)).
+  case Hp0: (p0 omega1).
+    by rewrite expectation_const // Hmass.
+  by rewrite exp0.
+move=> omega2.
+rewrite pr_dunit Hp.
+by case: (p0 omega1).
+Qed.
 
 Lemma prc_dlet_cat_prefix_coordinate_eq
   {ℓ1 ℓ2 : nat}
@@ -842,7 +1014,15 @@ Lemma pythTraceKernelL_dweight1
   (forall y, pythDist (K y).1 (K y).2 s2) ->
   forall omega : (ℓ1.+1).-tuple (nat * heap),
     dweight (pythTraceKernelL mid K omega) = 1.
-Admitted.
+Proof.
+move=> HK omega.
+rewrite /pythTraceKernelL.
+case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
+  destruct (@idP (mid y)) as [Hy|Hnot].
+    by case: (HK (exist _ y Hy))=> _ [_ [Hmass _]].
+  exact: dunit_dweight.
+exact: dunit_dweight.
+Qed.
 
 Lemma pythTraceKernelR_dweight1
   {ℓ1 ℓ2 : nat}
@@ -853,7 +1033,75 @@ Lemma pythTraceKernelR_dweight1
   (forall y, pythDist (K y).1 (K y).2 s2) ->
   forall omega : (ℓ1.+1).-tuple (nat * heap),
     dweight (pythTraceKernelR mid K omega) = 1.
-Admitted.
+Proof.
+move=> HK omega.
+rewrite /pythTraceKernelR.
+case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
+  destruct (@idP (mid y)) as [Hy|Hnot].
+    by case: (HK (exist _ y Hy))=> _ [_ [_ [Hmass _]]].
+  exact: dunit_dweight.
+exact: dunit_dweight.
+Qed.
+
+Lemma pythTraceBindPair_dweightL
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  dweight P = 1.
+Proof.
+move=> [HP _] Hdist0 _ _ HK.
+case: Hdist0=> _ [_ [HP0mass _]].
+rewrite (pr_ext P (pythTraceBindL ML KL mid P0 K) predT HP).
+rewrite /pythTraceBindL.
+rewrite (pr_dlet_cat_prefix_lift_eq P0 (pythTraceKernelL mid K)
+  (@pythTraceKernelL_dweight1 ℓ1 ℓ2 mid_t out_t mid s2 K HK)
+  predT predT);
+  last by move=> omega1 omega2.
+exact: HP0mass.
+Qed.
+
+Lemma pythTraceBindPair_dweightR
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
+  pythDist P0 Q0 s1 ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, pythDist (K y).1 (K y).2 s2) ->
+  dweight Q = 1.
+Proof.
+move=> [_ HQ] Hdist0 _ _ HK.
+case: Hdist0=> _ [_ [_ [HQ0mass _]]].
+rewrite (pr_ext Q (pythTraceBindR MR KR mid Q0 K) predT HQ).
+rewrite /pythTraceBindR.
+rewrite (pr_dlet_cat_prefix_lift_eq Q0 (pythTraceKernelR mid K)
+  (@pythTraceKernelR_dweight1 ℓ1 ℓ2 mid_t out_t mid s2 K HK)
+  predT predT);
+  last by move=> omega1 omega2.
+exact: HQ0mass.
+Qed.
 
 Lemma pythTraceBindL_conditional_coordinate_prefix_eq
   {ℓ1 ℓ2 : nat}
@@ -1632,7 +1880,33 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_decode_none
     δ_KL (conditional_coordinate P i a)
          (conditional_coordinate Q i a) <=
       tnth s2 (pythCombinedSuffixIndex i Hi).
-Admitted.
+Proof.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi Hdecode_none.
+have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
+  case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
+    exact/eqP.
+  have Hprefix_supp :
+      pythCombinedPrefixTrace a \in dinsupp P0.
+    by rewrite in_dinsupp HP0z.
+  have Hfinal_supp_P0 :
+      tnth (pythCombinedPrefixTrace a) ord_max \in
+        dinsupp (dmargin (fun omega => tnth omega ord_max) P0).
+    exact: (dmargin_dinsupp_image P0
+      (fun omega => tnth omega ord_max) _ Hprefix_supp).
+  have Hfinal_supp_ML :
+      tnth (pythCombinedPrefixTrace a) ord_max \in
+        dinsupp (dmargin (@pack_output_heap mid_t) ML).
+    rewrite in_dinsupp -HmarginL0.
+    by move: Hfinal_supp_P0; rewrite in_dinsupp.
+  have [z Hz Hpack] :=
+    dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
+      (tnth (pythCombinedPrefixTrace a) ord_max) Hfinal_supp_ML.
+  move: Hdecode_none.
+  by rewrite -Hpack decode_output_heap_pack.
+exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi HP0z).
+Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
   {ℓ1 ℓ2 : nat}
@@ -1664,7 +1938,39 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
     δ_KL (conditional_coordinate P i a)
          (conditional_coordinate Q i a) <=
       tnth s2 (pythCombinedSuffixIndex i Hi).
-Admitted.
+Proof.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi y Hdecode Hnot_mid.
+have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
+  case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
+    exact/eqP.
+  have Hprefix_supp :
+      pythCombinedPrefixTrace a \in dinsupp P0.
+    by rewrite in_dinsupp HP0z.
+  have Hfinal_supp_P0 :
+      tnth (pythCombinedPrefixTrace a) ord_max \in
+        dinsupp (dmargin (fun omega => tnth omega ord_max) P0).
+    exact: (dmargin_dinsupp_image P0
+      (fun omega => tnth omega ord_max) _ Hprefix_supp).
+  have Hfinal_supp_ML :
+      tnth (pythCombinedPrefixTrace a) ord_max \in
+        dinsupp (dmargin (@pack_output_heap mid_t) ML).
+    rewrite in_dinsupp -HmarginL0.
+    by move: Hfinal_supp_P0; rewrite in_dinsupp.
+  have [z Hz Hpack] :=
+    dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
+      (tnth (pythCombinedPrefixTrace a) ord_max) Hfinal_supp_ML.
+  have Hdecode_z :
+      @decode_output_heap mid_t
+        (tnth (pythCombinedPrefixTrace a) ord_max) = Some z.
+    by rewrite -Hpack decode_output_heap_pack.
+  have Hyz : y = z by move: Hdecode; rewrite Hdecode_z=> -[].
+  move: Hnot_mid.
+  rewrite Hyz.
+  by rewrite (HmidL z Hz).
+exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi HP0z).
+Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
   {ℓ1 ℓ2 : nat}
@@ -1867,6 +2173,121 @@ split.
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 Qed.
 
+Lemma cat_tuple_tnth_ord_max_suffix
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (omega1 : (ℓ1.+1).-tuple A)
+  (omega2 : (ℓ2.+1).-tuple A) :
+  tnth (cat_tuple omega1 omega2) ord_max = tnth omega2 ord_max.
+Proof.
+have Hi : (ℓ1.+1 <= (ord_max : 'I_(ℓ1.+1 + ℓ2.+1)))%N.
+  rewrite /ord_max /=.
+  by rewrite -{1}(addn0 ℓ1) ltn_add2l.
+rewrite (cat_tuple_tnth_suffix_choice omega1 omega2 ord_max Hi).
+apply: congr1.
+apply: val_inj.
+rewrite /ord_max /=.
+change ((ℓ1 + ℓ2.+1 - ℓ1.+1)%N = ℓ2).
+by rewrite subnS addnC addnK.
+Qed.
+
+Lemma dmargin_dlet_cat_final
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  dmargin (fun omega => tnth omega ord_max)
+    (\dlet_(omega1 <- P0)
+     \dlet_(omega2 <- K0 omega1)
+       dunit (cat_tuple omega1 omega2))
+  =1
+  \dlet_(omega1 <- P0)
+    dmargin (fun omega2 => tnth omega2 ord_max) (K0 omega1).
+Proof.
+move=> z.
+rewrite dmargin_dlet.
+apply: eq_in_dlet=> // omega1 _ z1.
+rewrite dmargin_dlet.
+apply: eq_in_dlet=> // omega2 _ z2.
+rewrite dmargin_dunit.
+by rewrite cat_tuple_tnth_ord_max_suffix.
+Qed.
+
+Lemma pythTraceKernelL_bind_final_margin
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (ML : {distr (mid_t * heap) / R})
+  (KL : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 dmargin (@pack_output_heap mid_t) ML ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y,
+    dmargin (fun omega => tnth omega ord_max) (K y).1
+      =1 dmargin (@pack_output_heap out_t) (KL (proj1_sig y))) ->
+  \dlet_(omega <- P0)
+    dmargin (fun omega2 => tnth omega2 ord_max)
+      (pythTraceKernelL mid K omega)
+  =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y).
+Proof.
+move=> Hmargin Hmid HK z.
+pose final (omega : (ℓ1.+1).-tuple (nat * heap)) := tnth omega ord_max.
+pose H (x : nat * heap) : {distr (nat * heap) / R} :=
+  match @decode_output_heap mid_t x with
+  | Some y =>
+      match @idP (mid y) with
+      | ReflectT Hy => dmargin (fun omega2 => tnth omega2 ord_max) (K (exist _ y Hy)).1
+      | ReflectF _ => dmargin (fun omega2 => tnth omega2 ord_max)
+          (dunit (default_pyth_trace (n := ℓ2.+1)))
+      end
+  | None => dmargin (fun omega2 => tnth omega2 ord_max)
+      (dunit (default_pyth_trace (n := ℓ2.+1)))
+  end.
+rewrite -(eq_in_dlet (mu := P0)
+  (f := fun omega : (ℓ1.+1).-tuple (nat * heap) => H (final omega))
+  (g := fun omega => dmargin (fun omega2 => tnth omega2 ord_max)
+          (pythTraceKernelL mid K omega))).
+  rewrite -(dlet_dmargin P0 final H z).
+  rewrite -(eq_in_dlet (mu := dmargin (@pack_output_heap mid_t) ML)
+    (nu := dmargin final P0) (f := H) (g := H)).
+    rewrite (dlet_dmargin ML (@pack_output_heap mid_t) H z).
+    rewrite dmargin_dlet.
+    apply: eq_in_dlet=> // y Hy z'.
+    rewrite /H decode_output_heap_pack.
+    destruct (@idP (mid y)) as [Hymid|Hymid].
+      by rewrite (HK (exist _ y Hymid)).
+    by case: Hymid; exact: (Hmid y Hy).
+  - by [].
+  - by move=> x; rewrite -Hmargin.
+- move=> omega Homega z'.
+  rewrite /H /pythTraceKernelL /final.
+  case: (decode_output_heap (tnth omega ord_max))=> [y|] //.
+  by destruct (@idP (mid y)).
+- by [].
+Qed.
+
+Lemma pythTraceKernelR_bind_final_margin
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (MR : {distr (mid_t * heap) / R})
+  (KR : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 dmargin (@pack_output_heap mid_t) MR ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y,
+    dmargin (fun omega => tnth omega ord_max) (K y).2
+      =1 dmargin (@pack_output_heap out_t) (KR (proj1_sig y))) ->
+  \dlet_(omega <- Q0)
+    dmargin (fun omega2 => tnth omega2 ord_max)
+      (pythTraceKernelR mid K omega)
+  =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y).
+Admitted.
+
 Lemma pythTraceBindL_final_margin
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -1884,7 +2305,13 @@ Lemma pythTraceBindL_final_margin
   dmargin (fun omega => tnth omega ord_max)
     (pythTraceBindL ML KL mid P0 K)
     =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y).
-Admitted.
+Proof.
+move=> Hmargin Hmid HK z.
+rewrite /pythTraceBindL.
+rewrite (dmargin_dlet_cat_final P0 (pythTraceKernelL mid K) z).
+exact: (pythTraceKernelL_bind_final_margin ML KL mid P0 K
+  Hmargin Hmid HK z).
+Qed.
 
 Lemma pythTraceBindR_final_margin
   {ℓ1 ℓ2 : nat}
@@ -1903,7 +2330,13 @@ Lemma pythTraceBindR_final_margin
   dmargin (fun omega => tnth omega ord_max)
     (pythTraceBindR MR KR mid Q0 K)
     =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y).
-Admitted.
+Proof.
+move=> Hmargin Hmid HK z.
+rewrite /pythTraceBindR.
+rewrite (dmargin_dlet_cat_final Q0 (pythTraceKernelR mid K) z).
+exact: (pythTraceKernelR_bind_final_margin MR KR mid Q0 K
+  Hmargin Hmid HK z).
+Qed.
 
 Lemma pythTraceBindPair_final_margins
   {ℓ1 ℓ2 : nat}
@@ -2191,6 +2624,8 @@ split; first exact: HmarginL.
 split; first exact: HmarginR.
 by split.
 Qed.
+
+Print Assumptions pythSeqRule.
 
 Lemma pythCompileCallsRule
   (q : nat) (X Y A B : choice_type)
