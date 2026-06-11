@@ -72,7 +72,37 @@ Qed.
 Lemma pr_dcond {T : choiceType} (mu : {distr T / R})
     (p : pred T) (A : pred T) :
   \P_[dcond mu p] A = \P_[mu, p] A.
-Admitted.
+Proof.
+case Hp0: (\P_[mu] p == 0).
+  move/eqP: Hp0=> Hp0.
+  rewrite /pr /prc Hp0 invr0 mulr0.
+  apply/psum_eq0=> x.
+  rewrite dcondE /prc Hp0 invr0 mulr0 mulr0.
+  exact/eqP.
+rewrite /pr.
+rewrite (eq_psum
+  (F2 := fun x => (A x)%:R * \P_[mu, p] (pred1 x))).
+  rewrite (eq_psum
+    (F2 := fun x =>
+      ((A x)%:R * \P_[mu] [predI pred1 x & p]) / \P_[mu] p)).
+    rewrite psumZr ?invr_ge0 ?ge0_pr //.
+    rewrite /prc.
+    congr (_ / _).
+    rewrite /pr.
+    apply/eq_psum=> x.
+    rewrite /pr (psum_finseq (r := [:: x])) ?big_seq1 //=.
+      rewrite !inE eqxx -!topredE /= ger0_norm
+        ?mulr_ge0 ?ler0n ?ge0_mu //.
+      by case: (A x); case: (p x); rewrite ?mul0r ?mul1r.
+    move=> y.
+    rewrite !inE.
+    case: (y == x) => //=.
+    by rewrite mul0r eqxx.
+  move=> x.
+  by rewrite /prc mulrA.
+move=> x.
+by rewrite dcondE.
+Qed.
 
 Definition conditional_second {T U : choiceType}
     (P : {distr (T * U) / R}) (x : T) : {distr U / R} :=

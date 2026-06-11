@@ -600,15 +600,6 @@ move: HQomega_supp.
 by rewrite -Homega in_dinsupp HQomega0 eqxx.
 Qed.
 
-Lemma cat_tuple_nonneg
-  {ℓ1 ℓ2 : nat}
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R) :
-  (forall i : 'I_(ℓ1.+1), 0 <= tnth s1 i) ->
-  (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
-  forall i : 'I_(ℓ1.+1 + ℓ2.+1), 0 <= tnth (cat_tuple s1 s2) i.
-Admitted.
-
 Lemma pythTraceBindPair_s2_nonneg
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -766,6 +757,23 @@ Lemma cat_tuple_tnth_suffix
   tnth s2 (Ordinal (cat_tuple_suffix_bound i Hi)).
 Proof. exact: cat_tuple_tnth_suffix_choice. Qed.
 
+Lemma cat_tuple_nonneg
+  {ℓ1 ℓ2 : nat}
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R) :
+  (forall i : 'I_(ℓ1.+1), 0 <= tnth s1 i) ->
+  (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
+  forall i : 'I_(ℓ1.+1 + ℓ2.+1), 0 <= tnth (cat_tuple s1 s2) i.
+Proof.
+move=> Hs1 Hs2 i.
+case Hi: (i < ℓ1.+1)%N.
+  rewrite (cat_tuple_tnth_prefix s1 s2 i Hi).
+  exact: Hs1.
+have Hi' : (ℓ1.+1 <= i)%N by rewrite leqNgt Hi.
+rewrite (cat_tuple_tnth_suffix s1 s2 i Hi').
+exact: Hs2.
+Qed.
+
 Definition pythCombinedPrefixTrace
   {ℓ1 ℓ2 : nat}
   {A : Type}
@@ -844,7 +852,9 @@ Qed.
 
 Lemma dunit_dweight {T : choiceType} (x : T) :
   dweight (dunit x : {distr T / R}) = 1.
-Admitted.
+Proof.
+by rewrite pr_dunit.
+Qed.
 
 Lemma conditional_coordinate_dist_ext
   {n : nat}
@@ -873,7 +883,43 @@ Lemma tuple_prefix_eq_cat_prefix
     fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
   tuple_prefix_eq i a (cat_tuple omega1 omega2) =
   tuple_prefix_eq i0 a0 omega1.
-Admitted.
+Proof.
+rewrite /tuple_prefix_eq.
+apply/idP/idP.
+- move=> Hbool.
+  have Hfull := forallP Hbool.
+  apply/forallP=> j.
+  have Hj : (j < ℓ1.+1 + ℓ2.+1)%N :=
+    leq_trans (ltn_ord j) (leq_addr _ _).
+  move: (Hfull (Ordinal Hj)).
+  rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 (Ordinal Hj)
+    (ltn_ord j)) /=.
+  have -> : @Ordinal ℓ1.+1 (nat_of_ord j) (ltn_ord j) = j
+    by apply: val_inj.
+  have -> :
+      @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j) Hj =
+      @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
+        (leq_trans (ltn_ord j) (leq_addr _ _))
+    by apply: val_inj.
+  by [].
+- move=> HsmallBool.
+  have Hsmall := forallP HsmallBool.
+  apply/forallP=> k.
+  case Hki: (k < i)%N.
+    have Hklt : (k < ℓ1.+1)%N := leq_ltn_trans (ltnW Hki) Hi.
+    move: (Hsmall (@Ordinal ℓ1.+1 (nat_of_ord k) Hklt)).
+    rewrite /= Hki.
+    rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 k Hklt).
+    rewrite implyTb.
+    have -> :
+        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord k)
+          (leq_trans
+            (ltn_ord (@Ordinal ℓ1.+1 (nat_of_ord k) Hklt))
+            (leq_addr _ _)) = k
+      by apply: val_inj.
+    by [].
+  by [].
+Qed.
 
 Lemma pythCombinedPrefixTrace_cat
   {ℓ1 ℓ2 : nat}
@@ -882,7 +928,52 @@ Lemma pythCombinedPrefixTrace_cat
   (omega2 : (ℓ2.+1).-tuple A) :
   pythCombinedPrefixTrace (fun j => tnth (cat_tuple omega1 omega2) j) =
   omega1.
-Admitted.
+Proof.
+apply: eq_from_tnth=> j.
+rewrite /pythCombinedPrefixTrace tnth_mktuple.
+rewrite (cat_tuple_tnth_prefix_choice omega1 omega2
+  (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) (ltn_ord j)).
+congr tnth.
+by apply: val_inj.
+Qed.
+
+Lemma pythCombinedPrefixTrace_tnth
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (j : 'I_(ℓ1.+1)) :
+  tnth (pythCombinedPrefixTrace a) j =
+  a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))).
+Proof.
+by rewrite /pythCombinedPrefixTrace tnth_mktuple.
+Qed.
+
+Lemma pythCombinedSuffixIndex_lt
+  {ℓ1 ℓ2 : nat}
+  (i j : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N)
+  (Hj : (ℓ1.+1 <= j)%N) :
+  (j < i)%N ->
+  (pythCombinedSuffixIndex j Hj < pythCombinedSuffixIndex i Hi)%N.
+Proof.
+move=> Hji.
+rewrite /pythCombinedSuffixIndex /=.
+exact: ltn_sub2r (leq_ltn_trans Hj Hji) Hji.
+Qed.
+
+Lemma pythCombinedSuffixOrdinal_lt
+  {ℓ1 ℓ2 : nat}
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N)
+  (j : 'I_(ℓ2.+1)) :
+  (j < pythCombinedSuffixIndex i Hi)%N ->
+  (ℓ1.+1 + j < i)%N.
+Proof.
+move=> Hji.
+move: Hji.
+rewrite /pythCombinedSuffixIndex /=.
+by rewrite (@leq_subRL ℓ1.+1 j.+1 i Hi) addnS.
+Qed.
 
 Lemma tuple_prefix_eq_cat_suffix
   {ℓ1 ℓ2 : nat}
@@ -899,7 +990,85 @@ Lemma tuple_prefix_eq_cat_suffix
       (pythCombinedSuffixIndex i Hi)
       (pythCombinedSuffixAssignment i Hi a)
       omega2.
-Admitted.
+Proof.
+move=> Hprefix.
+rewrite /tuple_prefix_eq.
+apply/idP/idP.
+- move=> HfullBool.
+  have Hfull := forallP HfullBool.
+  apply/andP; split.
+    apply/eqP.
+    apply: eq_from_tnth=> j.
+    have Hj : (j < ℓ1.+1 + ℓ2.+1)%N :=
+      leq_trans (ltn_ord j) (leq_addr _ _).
+    have Hji : (Ordinal Hj < i)%N := leq_trans (ltn_ord j) Hi.
+    move: (Hfull (Ordinal Hj)).
+    rewrite Hji /=.
+    rewrite (cat_tuple_tnth_prefix_choice omega1' omega2
+      (Ordinal Hj) (ltn_ord j)).
+    have -> : @Ordinal ℓ1.+1 (nat_of_ord j) (ltn_ord j) = j
+      by apply: val_inj.
+    rewrite -Hprefix pythCombinedPrefixTrace_tnth.
+    have -> :
+        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
+          (leq_trans (ltn_ord j) (leq_addr _ _)) =
+        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j) Hj
+      by apply: val_inj.
+    by move/eqP.
+  apply/forallP=> j.
+  case Hji: (j < pythCombinedSuffixIndex i Hi)%N.
+    have Hsum_i := pythCombinedSuffixOrdinal_lt i Hi j Hji.
+    pose k : 'I_(ℓ1.+1 + ℓ2.+1) :=
+      Ordinal (pythCombinedSuffixOrdinal_bound (ℓ1 := ℓ1) (ℓ2 := ℓ2) j).
+    move: (Hfull k).
+    rewrite Hsum_i /=.
+    rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 k
+      (leq_addr _ _)).
+    have -> :
+        @Ordinal ℓ2.+1 (nat_of_ord k - ℓ1.+1)
+          (cat_tuple_suffix_bound k (leq_addr _ _)) = j.
+      apply: val_inj.
+      rewrite /= /k /=.
+      by rewrite addKn.
+    by [].
+  by [].
+- move=> /andP [/eqP Homega HsuffixBool].
+  have Hsuffix := forallP HsuffixBool.
+  apply/forallP=> j.
+  case Hji: (j < i)%N.
+    case Hprefix_j: (j < ℓ1.+1)%N.
+      rewrite (cat_tuple_tnth_prefix_choice omega1' omega2 j Hprefix_j).
+      rewrite Homega.
+      rewrite -Hprefix pythCombinedPrefixTrace_tnth.
+      rewrite implyTb.
+      have -> :
+          @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
+            (leq_trans (ltn_ord (@Ordinal ℓ1.+1 (nat_of_ord j) Hprefix_j))
+              (leq_addr _ _)) = j
+        by apply: val_inj.
+      by [].
+    have Hjge : (ℓ1.+1 <= j)%N by rewrite leqNgt Hprefix_j.
+    rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 j Hjge).
+    rewrite implyTb.
+    move: (Hsuffix (pythCombinedSuffixIndex j Hjge)).
+    rewrite (pythCombinedSuffixIndex_lt i j Hi Hjge Hji) /=.
+    have -> :
+        @Ordinal ℓ2.+1 (nat_of_ord j - ℓ1.+1)
+          (cat_tuple_suffix_bound j Hjge) =
+        pythCombinedSuffixIndex j Hjge
+      by apply: val_inj.
+    rewrite /pythCombinedSuffixAssignment.
+    have -> :
+        @Ordinal (ℓ1.+1 + ℓ2.+1)
+          (ℓ1.+1 + nat_of_ord (pythCombinedSuffixIndex j Hjge))
+          (pythCombinedSuffixOrdinal_bound (pythCombinedSuffixIndex j Hjge)) =
+        j.
+      apply: val_inj.
+      rewrite /pythCombinedSuffixIndex /=.
+      by rewrite subnKC.
+    by [].
+  by [].
+Qed.
 
 Lemma pr_dlet_cat_prefix_lift_eq
   {ℓ1 ℓ2 : nat}
@@ -1307,7 +1476,13 @@ Qed.
 Lemma divr_cancel_left_pos (a b c : R) :
   0 < a ->
   a * b / (a * c) = b / c.
-Admitted.
+Proof.
+move=> Ha.
+(* TODO: revisit arithmetic automation after the local admits are closed.
+   This is the MathComp-native proof; `lra` does not see inverses here. *)
+rewrite -[a * b / (a * c)]mulf_div.
+by rewrite divff ?mul1r // lt0r_neq0.
+Qed.
 
 Lemma expectation_indicator_eq
   {T : choiceType}
@@ -2286,7 +2461,42 @@ Lemma pythTraceKernelR_bind_final_margin
     dmargin (fun omega2 => tnth omega2 ord_max)
       (pythTraceKernelR mid K omega)
   =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y).
-Admitted.
+Proof.
+move=> Hmargin Hmid HK z.
+pose final (omega : (ℓ1.+1).-tuple (nat * heap)) := tnth omega ord_max.
+pose H (x : nat * heap) : {distr (nat * heap) / R} :=
+  match @decode_output_heap mid_t x with
+  | Some y =>
+      match @idP (mid y) with
+      | ReflectT Hy => dmargin (fun omega2 => tnth omega2 ord_max) (K (exist _ y Hy)).2
+      | ReflectF _ => dmargin (fun omega2 => tnth omega2 ord_max)
+          (dunit (default_pyth_trace (n := ℓ2.+1)))
+      end
+  | None => dmargin (fun omega2 => tnth omega2 ord_max)
+      (dunit (default_pyth_trace (n := ℓ2.+1)))
+  end.
+rewrite -(eq_in_dlet (mu := Q0)
+  (f := fun omega : (ℓ1.+1).-tuple (nat * heap) => H (final omega))
+  (g := fun omega => dmargin (fun omega2 => tnth omega2 ord_max)
+          (pythTraceKernelR mid K omega))).
+  rewrite -(dlet_dmargin Q0 final H z).
+  rewrite -(eq_in_dlet (mu := dmargin (@pack_output_heap mid_t) MR)
+    (nu := dmargin final Q0) (f := H) (g := H)).
+    rewrite (dlet_dmargin MR (@pack_output_heap mid_t) H z).
+    rewrite dmargin_dlet.
+    apply: eq_in_dlet=> // y Hy z'.
+    rewrite /H decode_output_heap_pack.
+    destruct (@idP (mid y)) as [Hymid|Hymid].
+      by rewrite (HK (exist _ y Hymid)).
+    by case: Hymid; exact: (Hmid y Hy).
+  - by [].
+  - by move=> x; rewrite -Hmargin.
+- move=> omega Homega z'.
+  rewrite /H /pythTraceKernelR /final.
+  case: (decode_output_heap (tnth omega ord_max))=> [y|] //.
+  by destruct (@idP (mid y)).
+- by [].
+Qed.
 
 Lemma pythTraceBindL_final_margin
   {ℓ1 ℓ2 : nat}
