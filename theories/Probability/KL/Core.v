@@ -25,6 +25,40 @@ Lemma mass1_kl_left {T : choiceType} (P Q : {distr T / R}) :
     \E_[P] (fun x => ln (P x / Q x)).
 Proof. by []. Qed.
 
+Lemma kl_ext {T : choiceType} (P P' Q Q' : {distr T / R}) :
+  P =1 P' ->
+  Q =1 Q' ->
+  δ_KL P Q = δ_KL P' Q'.
+Proof.
+move=> HP HQ.
+rewrite /δ_KL.
+rewrite (expectation_distr_ext P P' _ HP).
+apply: expectation_ext=> x.
+by rewrite -HP -HQ.
+Qed.
+
+Lemma kl_left_dnull {T : choiceType} (P Q : {distr T / R}) :
+  P =1 dnull ->
+  δ_KL P Q = 0.
+Proof.
+move=> HP.
+rewrite /δ_KL.
+rewrite (expectation_distr_ext P dnull _ HP).
+exact: expectation_dnull.
+Qed.
+
+Lemma absolute_continuous_positive {T : choiceType}
+    (P Q : {distr T / R}) (x : T) :
+  absolute_continuous P Q ->
+  0 < P x -> 0 < Q x.
+Proof.
+move=> Hac HPx.
+rewrite lt_def ge0_mu andbT.
+apply/negP=> /eqP HQx0.
+have HPx0 := Hac x HQx0.
+by rewrite HPx0 ltxx in HPx.
+Qed.
+
 Lemma kl_dmargin_injective {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :
   injective f ->

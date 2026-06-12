@@ -16,7 +16,8 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
   pkg_notation.
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
-From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras
+  TupleExtras.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
 From Mending.ProgramLogics.Pyth Require Import Core.
@@ -249,63 +250,6 @@ exists (pythTraceBindL ML KL mid P0 K),
 by split=> omega.
 Qed.
 
-Lemma dweight1_dinsupp
-  {T : choiceType}
-  (mu : {distr T / R}) :
-  dweight mu = 1 ->
-  exists x, x \in dinsupp mu.
-Proof.
-rewrite pr_predT=> Hmass.
-have Hnz : psum mu <> 0.
-  move=> Hzero.
-  move: Hmass.
-  rewrite Hzero=> H01.
-  by move/eqP: H01; rewrite eq_sym oner_eq0.
-have [x Hx] := @neq0_psum R T mu Hnz.
-exists x.
-exact/dinsuppP.
-Qed.
-
-(* Maps support membership through a distribution margin. *)
-Lemma dmargin_dinsupp_image
-  {T U : choiceType}
-  (mu : {distr T / R})
-  (f : T -> U)
-  (x : T) :
-  x \in dinsupp mu ->
-  f x \in dinsupp (dmargin f mu).
-Proof.
-move=> Hx.
-rewrite dmarginE.
-apply: (@dlet_dinsupp R T U (fun x => dunit (f x)) mu x (f x) Hx).
-by rewrite dunit1E eqxx oner_neq0.
-Qed.
-
-(* Finds a supported preimage for support membership in a margin. *)
-Lemma dmargin_dinsupp_preimage
-  {T U : choiceType}
-  (mu : {distr T / R})
-  (f : T -> U)
-  (y : U) :
-  y \in dinsupp (dmargin f mu) ->
-  exists2 x, x \in dinsupp mu & f x = y.
-Proof.
-rewrite dmarginE=> /dinsupp_dlet [x Hx Hunit].
-exists x=> //.
-move: Hunit.
-by rewrite dunit1E pnatr_eq0 eqb0 negbK=> /eqP.
-Qed.
-
-Lemma pr_ext {T : choiceType} (P Q : {distr T / R}) (p : pred T) :
-  P =1 Q ->
-  \P_[P] p = \P_[Q] p.
-Proof.
-move=> HP.
-rewrite /pr.
-apply/eq_psum=> x.
-by rewrite HP.
-Qed.
-
 (* Pulls support of a concatenated dlet trace back to a concrete prefix and suffix. *)
 Lemma dlet_dunit_cat_dinsupp_preimage
   {ℓ1 ℓ2 : nat}
@@ -503,394 +447,6 @@ move=> omega HQomega0.
 rewrite HP.
 apply: Hac_bind.
 by rewrite -HQ.
-Qed.
-
-(* Converts a coordinate of a concatenated tuple into its prefix coordinate. *)
-Lemma cat_tuple_tnth_prefix_choice
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (t1 : (ℓ1.+1).-tuple A)
-  (t2 : (ℓ2.+1).-tuple A)
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (i < ℓ1.+1)%N) :
-  tnth (cat_tuple t1 t2) i = tnth t1 (Ordinal Hi).
-Proof.
-rewrite (tnth_nth (tnth t1 (Ordinal Hi))).
-rewrite (tnth_nth (tnth t1 (Ordinal Hi)) t1).
-rewrite nth_cat size_tuple Hi.
-by apply: set_nth_default; rewrite size_tuple.
-Qed.
-
-(* Reads a prefix coordinate out of a concatenated trace tuple. *)
-Lemma cat_tuple_tnth_prefix
-  {ℓ1 ℓ2 : nat}
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R)
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (i < ℓ1.+1)%N) :
-  tnth (cat_tuple s1 s2) i = tnth s1 (Ordinal Hi).
-Proof. exact: cat_tuple_tnth_prefix_choice. Qed.
-
-Lemma cat_tuple_suffix_bound
-  {ℓ1 ℓ2 : nat}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1)) :
-  (ℓ1.+1 <= i)%N ->
-  (i - ℓ1.+1 < ℓ2.+1)%N.
-Proof.
-move=> Hi.
-have Hord := ltn_ord i.
-by rewrite ltn_subLR // addnC.
-Qed.
-
-(* Converts a coordinate after the prefix into its suffix ordinal. *)
-Lemma cat_tuple_tnth_suffix_choice
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (t1 : (ℓ1.+1).-tuple A)
-  (t2 : (ℓ2.+1).-tuple A)
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N) :
-  tnth (cat_tuple t1 t2) i =
-  tnth t2 (Ordinal (cat_tuple_suffix_bound i Hi)).
-Proof.
-rewrite (tnth_nth (tnth t2 (Ordinal (cat_tuple_suffix_bound i Hi)))).
-rewrite nth_cat size_tuple.
-rewrite ltnNge Hi.
-rewrite /=.
-by rewrite [RHS](tnth_nth (tnth t2 (Ordinal (cat_tuple_suffix_bound i Hi)))).
-Qed.
-
-(* Reads a suffix coordinate out of a concatenated trace tuple. *)
-Lemma cat_tuple_tnth_suffix
-  {ℓ1 ℓ2 : nat}
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R)
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N) :
-  tnth (cat_tuple s1 s2) i =
-  tnth s2 (Ordinal (cat_tuple_suffix_bound i Hi)).
-Proof. exact: cat_tuple_tnth_suffix_choice. Qed.
-
-(* Combines nonnegativity proofs for prefix and suffix error budgets. *)
-Lemma cat_tuple_nonneg
-  {ℓ1 ℓ2 : nat}
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R)
-  (i : 'I_(ℓ1.+1 + ℓ2.+1)) :
-  (forall i : 'I_(ℓ1.+1), 0 <= tnth s1 i) ->
-  (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
-  0 <= tnth (cat_tuple s1 s2) i.
-Proof.
-move=> Hs1 Hs2.
-case Hi: (i < ℓ1.+1)%N.
-  rewrite (cat_tuple_tnth_prefix s1 s2 i Hi).
-  exact: Hs1.
-have Hi' : (ℓ1.+1 <= i)%N by rewrite leqNgt Hi.
-rewrite (cat_tuple_tnth_suffix s1 s2 i Hi').
-exact: Hs2.
-Qed.
-
-Definition pythCombinedPrefixTrace
-  {ℓ1 ℓ2 : nat}
-  {A : Type}
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A) :
-  (ℓ1.+1).-tuple A :=
-  [tuple a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _)))
-    | j < ℓ1.+1].
-
-Definition pythCombinedSuffixIndex
-  {ℓ1 ℓ2 : nat}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N) : 'I_(ℓ2.+1) :=
-  Ordinal (cat_tuple_suffix_bound i Hi).
-
-Lemma pythCombinedSuffixOrdinal_bound
-  {ℓ1 ℓ2 : nat}
-  (j : 'I_(ℓ2.+1)) :
-  (ℓ1.+1 + j < ℓ1.+1 + ℓ2.+1)%N.
-Proof.
-by rewrite ltn_add2l ltn_ord.
-Qed.
-
-Definition pythCombinedSuffixAssignment
-  {ℓ1 ℓ2 : nat}
-  {A : Type}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N)
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A) :
-  forall j : 'I_(ℓ2.+1), A :=
-  fun j =>
-    a (Ordinal (pythCombinedSuffixOrdinal_bound j)).
-
-Lemma kl_ext
-  {T : choiceType}
-  (P P' Q Q' : {distr T / R}) :
-  P =1 P' ->
-  Q =1 Q' ->
-  δ_KL P Q = δ_KL P' Q'.
-Proof.
-move=> HP HQ.
-rewrite /δ_KL.
-rewrite (expectation_distr_ext P P' _ HP).
-apply: expectation_ext=> x.
-by rewrite -HP -HQ.
-Qed.
-
-Lemma prc_ext {T : choiceType}
-    (P Q : {distr T / R}) (A p : pred T) :
-  P =1 Q ->
-  \P_[P, p] A = \P_[Q, p] A.
-Proof.
-move=> HP.
-rewrite /prc.
-by rewrite (pr_ext P Q [predI A & p] HP) (pr_ext P Q p HP).
-Qed.
-
-Lemma dcond_ext {T : choiceType}
-    (P Q : {distr T / R}) (p : pred T) :
-  P =1 Q ->
-  dcond P p =1 dcond Q p.
-Proof.
-move=> HP x.
-rewrite !dcondE.
-exact: (prc_ext P Q (pred1 x) p HP).
-Qed.
-
-Lemma dmargin_ext {T U : choiceType} (f : T -> U) (P Q : {distr T / R}) :
-  P =1 Q ->
-  dmargin f P =1 dmargin f Q.
-Proof.
-move=> HPQ y.
-rewrite !dmargin_psumE.
-apply/eq_psum=> x.
-by rewrite HPQ.
-Qed.
-
-Lemma dunit_dweight {T : choiceType} (x : T) :
-  dweight (dunit x : {distr T / R}) = 1.
-Proof.
-by rewrite pr_dunit.
-Qed.
-
-(* Rewrites conditional-coordinate distances along pointwise-equal distributions. *)
-Lemma conditional_coordinate_dist_ext
-  {n : nat}
-  {A : choiceType}
-  (P Q : {distr (n.-tuple A) / R})
-  (i : 'I_n)
-  (a : forall j : 'I_n, A) :
-  P =1 Q ->
-  conditional_coordinate P i a =1 conditional_coordinate Q i a.
-Proof.
-move=> HP.
-apply: dmargin_ext.
-exact: dcond_ext.
-Qed.
-
-(* Characterizes when a concatenated trace has a given prefix. *)
-Lemma tuple_prefix_eq_cat_prefix
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-  (Hi : (i < ℓ1.+1)%N)
-  (omega1 : (ℓ1.+1).-tuple A)
-  (omega2 : (ℓ2.+1).-tuple A) :
-  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-  let a0 : forall j : 'I_(ℓ1.+1), A :=
-    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-  tuple_prefix_eq i a (cat_tuple omega1 omega2) =
-  tuple_prefix_eq i0 a0 omega1.
-Proof.
-rewrite /tuple_prefix_eq.
-apply/idP/idP.
-- move=> Hbool.
-  have Hfull := forallP Hbool.
-  apply/forallP=> j.
-  have Hj : (j < ℓ1.+1 + ℓ2.+1)%N :=
-    leq_trans (ltn_ord j) (leq_addr _ _).
-  move: (Hfull (Ordinal Hj)).
-  rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 (Ordinal Hj)
-    (ltn_ord j)) /=.
-  have -> : @Ordinal ℓ1.+1 (nat_of_ord j) (ltn_ord j) = j
-    by apply: val_inj.
-  have -> :
-      @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j) Hj =
-      @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
-        (leq_trans (ltn_ord j) (leq_addr _ _))
-    by apply: val_inj.
-  by [].
-- move=> HsmallBool.
-  have Hsmall := forallP HsmallBool.
-  apply/forallP=> k.
-  case Hki: (k < i)%N.
-    have Hklt : (k < ℓ1.+1)%N := leq_ltn_trans (ltnW Hki) Hi.
-    move: (Hsmall (@Ordinal ℓ1.+1 (nat_of_ord k) Hklt)).
-    rewrite /= Hki.
-    rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 k Hklt).
-    rewrite implyTb.
-    have -> :
-        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord k)
-          (leq_trans
-            (ltn_ord (@Ordinal ℓ1.+1 (nat_of_ord k) Hklt))
-            (leq_addr _ _)) = k
-      by apply: val_inj.
-    by [].
-  by [].
-Qed.
-
-(* Recovers the original prefix trace from a concatenated trace. *)
-Lemma pythCombinedPrefixTrace_cat
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (omega1 : (ℓ1.+1).-tuple A)
-  (omega2 : (ℓ2.+1).-tuple A) :
-  pythCombinedPrefixTrace (fun j => tnth (cat_tuple omega1 omega2) j) =
-  omega1.
-Proof.
-apply: eq_from_tnth=> j.
-rewrite /pythCombinedPrefixTrace tnth_mktuple.
-rewrite (cat_tuple_tnth_prefix_choice omega1 omega2
-  (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) (ltn_ord j)).
-congr tnth.
-by apply: val_inj.
-Qed.
-
-(* Reads coordinates from the extracted prefix trace. *)
-Lemma pythCombinedPrefixTrace_tnth
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-  (j : 'I_(ℓ1.+1)) :
-  tnth (pythCombinedPrefixTrace a) j =
-  a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))).
-Proof.
-by rewrite /pythCombinedPrefixTrace tnth_mktuple.
-Qed.
-
-(* Preserves strict order when converting combined indices to suffix indices. *)
-Lemma pythCombinedSuffixIndex_lt
-  {ℓ1 ℓ2 : nat}
-  (i j : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N)
-  (Hj : (ℓ1.+1 <= j)%N) :
-  (j < i)%N ->
-  (pythCombinedSuffixIndex j Hj < pythCombinedSuffixIndex i Hi)%N.
-Proof.
-move=> Hji.
-rewrite /pythCombinedSuffixIndex /=.
-exact: ltn_sub2r (leq_ltn_trans Hj Hji) Hji.
-Qed.
-
-(* Bounds earlier combined indices by the current suffix ordinal. *)
-Lemma pythCombinedSuffixOrdinal_lt
-  {ℓ1 ℓ2 : nat}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N)
-  (j : 'I_(ℓ2.+1)) :
-  (j < pythCombinedSuffixIndex i Hi)%N ->
-  (ℓ1.+1 + j < i)%N.
-Proof.
-move=> Hji.
-move: Hji.
-rewrite /pythCombinedSuffixIndex /=.
-by rewrite (@leq_subRL ℓ1.+1 j.+1 i Hi) addnS.
-Qed.
-
-(* Characterizes suffix-prefix equality after fixing the concatenated prefix. *)
-Lemma tuple_prefix_eq_cat_suffix
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-  (Hi : (ℓ1.+1 <= i)%N)
-  (omega1 omega1' : (ℓ1.+1).-tuple A)
-  (omega2 : (ℓ2.+1).-tuple A) :
-  pythCombinedPrefixTrace a = omega1 ->
-  tuple_prefix_eq i a (cat_tuple omega1' omega2) =
-    (omega1' == omega1) &&
-    tuple_prefix_eq
-      (pythCombinedSuffixIndex i Hi)
-      (pythCombinedSuffixAssignment i Hi a)
-      omega2.
-Proof.
-move=> Hprefix.
-rewrite /tuple_prefix_eq.
-apply/idP/idP.
-- move=> HfullBool.
-  have Hfull := forallP HfullBool.
-  apply/andP; split.
-    apply/eqP.
-    apply: eq_from_tnth=> j.
-    have Hj : (j < ℓ1.+1 + ℓ2.+1)%N :=
-      leq_trans (ltn_ord j) (leq_addr _ _).
-    have Hji : (Ordinal Hj < i)%N := leq_trans (ltn_ord j) Hi.
-    move: (Hfull (Ordinal Hj)).
-    rewrite Hji /=.
-    rewrite (cat_tuple_tnth_prefix_choice omega1' omega2
-      (Ordinal Hj) (ltn_ord j)).
-    have -> : @Ordinal ℓ1.+1 (nat_of_ord j) (ltn_ord j) = j
-      by apply: val_inj.
-    rewrite -Hprefix pythCombinedPrefixTrace_tnth.
-    have -> :
-        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
-          (leq_trans (ltn_ord j) (leq_addr _ _)) =
-        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j) Hj
-      by apply: val_inj.
-    by move/eqP.
-  apply/forallP=> j.
-  case Hji: (j < pythCombinedSuffixIndex i Hi)%N.
-    have Hsum_i := pythCombinedSuffixOrdinal_lt i Hi j Hji.
-    pose k : 'I_(ℓ1.+1 + ℓ2.+1) :=
-      Ordinal (pythCombinedSuffixOrdinal_bound (ℓ1 := ℓ1) (ℓ2 := ℓ2) j).
-    move: (Hfull k).
-    rewrite Hsum_i /=.
-    rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 k
-      (leq_addr _ _)).
-    have -> :
-        @Ordinal ℓ2.+1 (nat_of_ord k - ℓ1.+1)
-          (cat_tuple_suffix_bound k (leq_addr _ _)) = j.
-      apply: val_inj.
-      rewrite /= /k /=.
-      by rewrite addKn.
-    by [].
-  by [].
-- move=> /andP [/eqP Homega HsuffixBool].
-  have Hsuffix := forallP HsuffixBool.
-  apply/forallP=> j.
-  case Hji: (j < i)%N.
-    case Hprefix_j: (j < ℓ1.+1)%N.
-      rewrite (cat_tuple_tnth_prefix_choice omega1' omega2 j Hprefix_j).
-      rewrite Homega.
-      rewrite -Hprefix pythCombinedPrefixTrace_tnth.
-      rewrite implyTb.
-      have -> :
-          @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
-            (leq_trans (ltn_ord (@Ordinal ℓ1.+1 (nat_of_ord j) Hprefix_j))
-              (leq_addr _ _)) = j
-        by apply: val_inj.
-      by [].
-    have Hjge : (ℓ1.+1 <= j)%N by rewrite leqNgt Hprefix_j.
-    rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 j Hjge).
-    rewrite implyTb.
-    move: (Hsuffix (pythCombinedSuffixIndex j Hjge)).
-    rewrite (pythCombinedSuffixIndex_lt i j Hi Hjge Hji) /=.
-    have -> :
-        @Ordinal ℓ2.+1 (nat_of_ord j - ℓ1.+1)
-          (cat_tuple_suffix_bound j Hjge) =
-        pythCombinedSuffixIndex j Hjge
-      by apply: val_inj.
-    rewrite /pythCombinedSuffixAssignment.
-    have -> :
-        @Ordinal (ℓ1.+1 + ℓ2.+1)
-          (ℓ1.+1 + nat_of_ord (pythCombinedSuffixIndex j Hjge))
-          (pythCombinedSuffixOrdinal_bound (pythCombinedSuffixIndex j Hjge)) =
-        j.
-      apply: val_inj.
-      rewrite /pythCombinedSuffixIndex /=.
-      by rewrite subnKC.
-    by [].
-  by [].
 Qed.
 
 (* Computes a prefix event probability through the composed trace dlet. *)
@@ -1311,35 +867,6 @@ exact: (traceBind_prefix_bound_from_P0
   HK Hi).
 Qed.
 
-Lemma divr_cancel_left_pos (a b c : R) :
-  0 < a ->
-  a * b / (a * c) = b / c.
-Proof.
-move=> Ha.
-(* TODO: revisit arithmetic automation after the local admits are closed.
-   This is the MathComp-native proof; `lra` does not see inverses here. *)
-rewrite -[a * b / (a * c)]mulf_div.
-by rewrite divff ?mul1r // lt0r_neq0.
-Qed.
-
-(* Rewrites expectation of an indicator as the probability of its event. *)
-Lemma expectation_indicator_eq
-  {T : choiceType}
-  (P0 : {distr T / R})
-  (omega1 : T)
-  (c : R) :
-  \E_[P0] (fun omega1' => if omega1' == omega1 then c else 0) =
-    P0 omega1 * c.
-Proof.
-rewrite /esp (sum_seq1 omega1).
-- by rewrite eqxx mulrC.
-- move=> omega1' Hnz.
-  case Homega1' : (omega1' == omega1).
-    by rewrite eq_sym Homega1'.
-  move: Hnz.
-  by rewrite Homega1' mul0r eqxx.
-Qed.
-
 (* Computes a dlet probability when the outer prefix is fixed. *)
 Lemma pr_dlet_fixed_prefix_from_inner
   {T U : choiceType}
@@ -1424,7 +951,7 @@ Lemma pr_dlet_cat_suffix_prefix_event_eq
   (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
   (Hi : (ℓ1.+1 <= i)%N)
   (omega1 : (ℓ1.+1).-tuple A) :
-  pythCombinedPrefixTrace a = omega1 ->
+  catTuplePrefix a = omega1 ->
   0 < P0 omega1 ->
   \P_[
     \dlet_(omega1 <- P0)
@@ -1435,8 +962,8 @@ Lemma pr_dlet_cat_suffix_prefix_event_eq
   \P_[K0 omega1]
     (fun omega2 =>
       tuple_prefix_eq
-        (pythCombinedSuffixIndex i Hi)
-        (pythCombinedSuffixAssignment i Hi a)
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a)
         omega2).
 Proof.
 move=> Hprefix _.
@@ -1455,7 +982,7 @@ Lemma pr_dlet_cat_suffix_coordinate_event_eq
   (Hi : (ℓ1.+1 <= i)%N)
   (omega1 : (ℓ1.+1).-tuple A)
   (x : A) :
-  pythCombinedPrefixTrace a = omega1 ->
+  catTuplePrefix a = omega1 ->
   0 < P0 omega1 ->
   \P_[
     \dlet_(omega1 <- P0)
@@ -1466,20 +993,20 @@ Lemma pr_dlet_cat_suffix_coordinate_event_eq
   P0 omega1 *
   \P_[K0 omega1]
     (fun omega2 =>
-      (tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x) &&
+      (tnth omega2 (catTupleSuffixIndex i Hi) \in pred1 x) &&
       tuple_prefix_eq
-        (pythCombinedSuffixIndex i Hi)
-        (pythCombinedSuffixAssignment i Hi a)
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a)
         omega2).
 Proof.
 move=> Hprefix _.
 apply: pr_dlet_cat_fixed_prefix_event_eq=> omega1' omega2.
 rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 i Hi).
 rewrite (tuple_prefix_eq_cat_suffix i a Hi omega1 omega1' omega2 Hprefix).
-by case: (tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x);
+by case: (tnth omega2 (catTupleSuffixIndex i Hi) \in pred1 x);
    case: (omega1' == omega1);
-   case: (tuple_prefix_eq (pythCombinedSuffixIndex i Hi)
-     (pythCombinedSuffixAssignment i Hi a) omega2).
+   case: (tuple_prefix_eq (catTupleSuffixIndex i Hi)
+     (catTupleSuffixAssignment i Hi a) omega2).
 Qed.
 
 (* Computes suffix conditional probabilities for the inner trace kernel. *)
@@ -1493,7 +1020,7 @@ Lemma prc_dlet_cat_suffix_coordinate_eq
   (Hi : (ℓ1.+1 <= i)%N)
   (omega1 : (ℓ1.+1).-tuple A)
   (x : A) :
-  pythCombinedPrefixTrace a = omega1 ->
+  catTuplePrefix a = omega1 ->
   0 < P0 omega1 ->
   \P_[
     \dlet_(omega1 <- P0)
@@ -1504,11 +1031,11 @@ Lemma prc_dlet_cat_suffix_coordinate_eq
   \P_[K0 omega1,
     fun omega2 =>
       tuple_prefix_eq
-        (pythCombinedSuffixIndex i Hi)
-        (pythCombinedSuffixAssignment i Hi a)
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a)
         omega2
   ] [pred omega2 |
-    tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x].
+    tnth omega2 (catTupleSuffixIndex i Hi) \in pred1 x].
 Proof.
 move=> Hprefix Hpos.
 rewrite /prc.
@@ -1529,7 +1056,7 @@ Lemma conditional_coordinate_dlet_cat_suffix_eq
   (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
   (Hi : (ℓ1.+1 <= i)%N)
   (omega1 : (ℓ1.+1).-tuple A) :
-  pythCombinedPrefixTrace a = omega1 ->
+  catTuplePrefix a = omega1 ->
   0 < P0 omega1 ->
   conditional_coordinate
     (\dlet_(omega1 <- P0)
@@ -1537,8 +1064,8 @@ Lemma conditional_coordinate_dlet_cat_suffix_eq
        dunit (cat_tuple omega1 omega2))
     i a
     =1 conditional_coordinate (K0 omega1)
-        (pythCombinedSuffixIndex i Hi)
-        (pythCombinedSuffixAssignment i Hi a).
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a).
 Proof.
 move=> Hprefix Hpos x.
 rewrite !pr_pred1.
@@ -1546,42 +1073,6 @@ rewrite !pr_dmargin.
 rewrite !pr_dcond.
 exact: (prc_dlet_cat_suffix_coordinate_eq
   P0 K0 i a Hi omega1 x Hprefix Hpos).
-Qed.
-
-Lemma absolute_continuous_positive
-  {T : choiceType}
-  (P Q : {distr T / R})
-  (x : T) :
-  absolute_continuous P Q ->
-  0 < P x -> 0 < Q x.
-Proof.
-move=> Hac HPx.
-rewrite lt_def ge0_mu andbT.
-apply/negP=> /eqP HQx0.
-have HPx0 := Hac x HQx0.
-by rewrite HPx0 ltxx in HPx.
-Qed.
-
-Lemma expectation_dnull
-  {T : choiceType}
-  (f : T -> R) :
-  \E_[dnull] f = 0.
-Proof.
-rewrite /esp (eq_sum (F2 := fun _ : T => 0)).
-  exact: sum0.
-by move=> x; rewrite dnullE mulr0.
-Qed.
-
-Lemma kl_left_dnull
-  {T : choiceType}
-  (P Q : {distr T / R}) :
-  P =1 dnull ->
-  δ_KL P Q = 0.
-Proof.
-move=> HP.
-rewrite /δ_KL.
-rewrite (expectation_distr_ext P dnull _ HP).
-exact: expectation_dnull.
 Qed.
 
 (* Collapses conditional-coordinate distance when both conditioning prefixes have zero mass. *)
@@ -1624,32 +1115,32 @@ Lemma traceBind_suffix_bound_zero_prefix
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  P0 (pythCombinedPrefixTrace a) = 0 ->
+  P0 (catTuplePrefix a) = 0 ->
   δ_KL (conditional_coordinate P i a)
        (conditional_coordinate Q i a) <=
-    tnth s2 (pythCombinedSuffixIndex i Hi).
+    tnth s2 (catTupleSuffixIndex i Hi).
 Proof.
 move=> Hbind Hdist0 HmarginL0 _ HmidL _ HK HP0z.
-have Hs2 : 0 <= tnth s2 (pythCombinedSuffixIndex i Hi) :=
+have Hs2 : 0 <= tnth s2 (catTupleSuffixIndex i Hi) :=
   traceBind_s2_nonneg ML mid s1 s2 P0 Q0 K
-    (pythCombinedSuffixIndex i Hi) Hdist0 HmarginL0 HmidL HK.
+    (catTupleSuffixIndex i Hi) Hdist0 HmarginL0 HmidL HK.
 have HPprefix0 :
     \P_[P] (fun omega => tuple_prefix_eq i a omega) = 0.
   case: Hbind=> HP _.
   rewrite (pr_ext P (pythTraceBindL ML KL mid P0 K)
     (fun omega => tuple_prefix_eq i a omega) HP).
   rewrite (pr_dlet_cat_fixed_prefix_event_eq
-    P0 (pythTraceKernelL mid K) (pythCombinedPrefixTrace a)
+    P0 (pythTraceKernelL mid K) (catTuplePrefix a)
     (fun omega => tuple_prefix_eq i a omega)
     (fun omega2 =>
       tuple_prefix_eq
-        (pythCombinedSuffixIndex i Hi)
-        (pythCombinedSuffixAssignment i Hi a)
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a)
         omega2)).
     by rewrite HP0z mul0r.
   move=> omega1' omega2.
   exact: (tuple_prefix_eq_cat_suffix i a Hi
-    (pythCombinedPrefixTrace a) omega1' omega2 erefl).
+    (catTuplePrefix a) omega1' omega2 erefl).
 rewrite (kl_left_dnull
   (conditional_coordinate P i a)
   (conditional_coordinate Q i a)
@@ -1718,18 +1209,18 @@ Lemma traceBind_suffix_condL_valid_mid
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   @decode_output_heap mid_t
-    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    (tnth (catTuplePrefix a) ord_max) =
     Some (proj1_sig y) ->
-  0 < P0 (pythCombinedPrefixTrace a) ->
+  0 < P0 (catTuplePrefix a) ->
   conditional_coordinate P i a
     =1 conditional_coordinate (K y).1
-        (pythCombinedSuffixIndex i Hi)
-        (pythCombinedSuffixAssignment i Hi a).
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a).
 Proof.
 move=> [HP _] _ _ _ _ _ Hy Hpos x.
 rewrite (conditional_coordinate_dist_ext P
   (pythTraceBindL ML KL mid P0 K) i a HP x).
-pose omega1 := pythCombinedPrefixTrace a.
+pose omega1 := catTuplePrefix a.
 rewrite (conditional_coordinate_dlet_cat_suffix_eq
   P0 (pythTraceKernelL mid K) i a Hi omega1 erefl Hpos x).
 rewrite (pythTraceKernelL_valid_mid mid K omega1 y Hy).
@@ -1761,18 +1252,18 @@ Lemma traceBind_suffix_condR_valid_mid
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   @decode_output_heap mid_t
-    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    (tnth (catTuplePrefix a) ord_max) =
     Some (proj1_sig y) ->
-  0 < Q0 (pythCombinedPrefixTrace a) ->
+  0 < Q0 (catTuplePrefix a) ->
   conditional_coordinate Q i a
     =1 conditional_coordinate (K y).2
-        (pythCombinedSuffixIndex i Hi)
-        (pythCombinedSuffixAssignment i Hi a).
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a).
 Proof.
 move=> [_ HQ] _ _ _ _ _ Hy Hpos x.
 rewrite (conditional_coordinate_dist_ext Q
   (pythTraceBindR MR KR mid Q0 K) i a HQ x).
-pose omega1 := pythCombinedPrefixTrace a.
+pose omega1 := catTuplePrefix a.
 rewrite (conditional_coordinate_dlet_cat_suffix_eq
   Q0 (pythTraceKernelR mid K) i a Hi omega1 erefl Hpos x).
 rewrite (pythTraceKernelR_valid_mid mid K omega1 y Hy).
@@ -1804,18 +1295,18 @@ Lemma traceBind_suffix_cond_valid_mid
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   @decode_output_heap mid_t
-    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    (tnth (catTuplePrefix a) ord_max) =
     Some (proj1_sig y) ->
-  0 < P0 (pythCombinedPrefixTrace a) ->
-  0 < Q0 (pythCombinedPrefixTrace a) ->
+  0 < P0 (catTuplePrefix a) ->
+  0 < Q0 (catTuplePrefix a) ->
   δ_KL (conditional_coordinate P i a)
        (conditional_coordinate Q i a) =
   δ_KL (conditional_coordinate (K y).1
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a))
+          (catTupleSuffixIndex i Hi)
+          (catTupleSuffixAssignment i Hi a))
        (conditional_coordinate (K y).2
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a)).
+          (catTupleSuffixIndex i Hi)
+          (catTupleSuffixAssignment i Hi a)).
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy HPpos HQpos.
 apply: kl_ext.
@@ -1853,33 +1344,33 @@ Lemma traceBind_suffix_bound_valid_mid
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
   @decode_output_heap mid_t
-    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    (tnth (catTuplePrefix a) ord_max) =
     Some (proj1_sig y) ->
   δ_KL (conditional_coordinate P i a)
        (conditional_coordinate Q i a) <=
-    tnth s2 (pythCombinedSuffixIndex i Hi).
+    tnth s2 (catTupleSuffixIndex i Hi).
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hy.
 move: Hdist0=> [Hs1 [Hac0 [HP0mass [HQ0mass Hcond0]]]].
 have Hdist0 : pythDist P0 Q0 s1.
   by split; first exact: Hs1; split; first exact: Hac0;
      split; first exact: HP0mass; split; first exact: HQ0mass.
-case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
+case HP0z: (P0 (catTuplePrefix a) == 0).
   exact: (traceBind_suffix_bound_zero_prefix
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK
     (eqP HP0z)).
-have HP0pos : 0 < P0 (pythCombinedPrefixTrace a).
+have HP0pos : 0 < P0 (catTuplePrefix a).
   by rewrite lt_def ge0_mu HP0z.
-have HQ0pos : 0 < Q0 (pythCombinedPrefixTrace a).
+have HQ0pos : 0 < Q0 (catTuplePrefix a).
   exact: (absolute_continuous_positive P0 Q0 _ Hac0 HP0pos).
 rewrite (traceBind_suffix_cond_valid_mid
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy
   HP0pos HQ0pos).
 case: (HK y)=> _ [_ [_ [_ Hcond]]].
-exact: (Hcond (pythCombinedSuffixIndex i Hi)
-  (pythCombinedSuffixAssignment i Hi a)).
+exact: (Hcond (catTupleSuffixIndex i Hi)
+  (catTupleSuffixAssignment i Hi a)).
 Qed.
 
 (* Handles suffix coordinates when the prefix final state does not decode. *)
@@ -1907,31 +1398,31 @@ Lemma traceBind_suffix_bound_decode_none
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
   @decode_output_heap mid_t
-    (tnth (pythCombinedPrefixTrace a) ord_max) = None ->
+    (tnth (catTuplePrefix a) ord_max) = None ->
   δ_KL (conditional_coordinate P i a)
        (conditional_coordinate Q i a) <=
-    tnth s2 (pythCombinedSuffixIndex i Hi).
+    tnth s2 (catTupleSuffixIndex i Hi).
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode_none.
-have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
-  case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
+have HP0z : P0 (catTuplePrefix a) = 0.
+  case HP0z: (P0 (catTuplePrefix a) == 0).
     exact/eqP.
   have Hprefix_supp :
-      pythCombinedPrefixTrace a \in dinsupp P0.
+      catTuplePrefix a \in dinsupp P0.
     by rewrite in_dinsupp HP0z.
   have Hfinal_supp_P0 :
-      tnth (pythCombinedPrefixTrace a) ord_max \in
+      tnth (catTuplePrefix a) ord_max \in
         dinsupp (dmargin (fun omega => tnth omega ord_max) P0).
     exact: (dmargin_dinsupp_image P0
       (fun omega => tnth omega ord_max) _ Hprefix_supp).
   have Hfinal_supp_ML :
-      tnth (pythCombinedPrefixTrace a) ord_max \in
+      tnth (catTuplePrefix a) ord_max \in
         dinsupp (dmargin (@pack_output_heap mid_t) ML).
     rewrite in_dinsupp -HmarginL0.
     by move: Hfinal_supp_P0; rewrite in_dinsupp.
   have [z Hz Hpack] :=
     dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
-      (tnth (pythCombinedPrefixTrace a) ord_max) Hfinal_supp_ML.
+      (tnth (catTuplePrefix a) ord_max) Hfinal_supp_ML.
   move: Hdecode_none.
   by rewrite -Hpack decode_output_heap_pack.
 exact: (traceBind_suffix_bound_zero_prefix
@@ -1965,35 +1456,35 @@ Lemma traceBind_suffix_bound_not_mid
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
   @decode_output_heap mid_t
-    (tnth (pythCombinedPrefixTrace a) ord_max) = Some y ->
+    (tnth (catTuplePrefix a) ord_max) = Some y ->
   ~~ mid y ->
   δ_KL (conditional_coordinate P i a)
        (conditional_coordinate Q i a) <=
-    tnth s2 (pythCombinedSuffixIndex i Hi).
+    tnth s2 (catTupleSuffixIndex i Hi).
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode Hnot_mid.
-have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
-  case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
+have HP0z : P0 (catTuplePrefix a) = 0.
+  case HP0z: (P0 (catTuplePrefix a) == 0).
     exact/eqP.
   have Hprefix_supp :
-      pythCombinedPrefixTrace a \in dinsupp P0.
+      catTuplePrefix a \in dinsupp P0.
     by rewrite in_dinsupp HP0z.
   have Hfinal_supp_P0 :
-      tnth (pythCombinedPrefixTrace a) ord_max \in
+      tnth (catTuplePrefix a) ord_max \in
         dinsupp (dmargin (fun omega => tnth omega ord_max) P0).
     exact: (dmargin_dinsupp_image P0
       (fun omega => tnth omega ord_max) _ Hprefix_supp).
   have Hfinal_supp_ML :
-      tnth (pythCombinedPrefixTrace a) ord_max \in
+      tnth (catTuplePrefix a) ord_max \in
         dinsupp (dmargin (@pack_output_heap mid_t) ML).
     rewrite in_dinsupp -HmarginL0.
     by move: Hfinal_supp_P0; rewrite in_dinsupp.
   have [z Hz Hpack] :=
     dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
-      (tnth (pythCombinedPrefixTrace a) ord_max) Hfinal_supp_ML.
+      (tnth (catTuplePrefix a) ord_max) Hfinal_supp_ML.
   have Hdecode_z :
       @decode_output_heap mid_t
-        (tnth (pythCombinedPrefixTrace a) ord_max) = Some z.
+        (tnth (catTuplePrefix a) ord_max) = Some z.
     by rewrite -Hpack decode_output_heap_pack.
   have Hyz : y = z by move: Hdecode; rewrite Hdecode_z=> -[].
   move: Hnot_mid.
@@ -2035,7 +1526,7 @@ Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
 case Hdecode:
     (@decode_output_heap mid_t
-      (tnth (pythCombinedPrefixTrace a) ord_max))=> [y|].
+      (tnth (catTuplePrefix a) ord_max))=> [y|].
   case Hmidy: (mid y).
   - have Hy : mid y by rewrite Hmidy.
     exact: (traceBind_suffix_bound_valid_mid

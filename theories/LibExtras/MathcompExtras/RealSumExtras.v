@@ -93,6 +93,15 @@ congr (_ - _).
   exists (fun x => - x) => x _; ring.
 Qed.
 
+Lemma divr_cancel_left_pos (a b c : R) :
+  0 < a ->
+  a * b / (a * c) = b / c.
+Proof.
+move=> Ha.
+rewrite -[a * b / (a * c)]mulf_div.
+by rewrite divff ?mul1r // lt0r_neq0.
+Qed.
+
 End RealSumExtras.
 
 Fixpoint max_nat_lst (s : list nat) : nat :=

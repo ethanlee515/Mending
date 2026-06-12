@@ -11,7 +11,7 @@ From Mending.Security Require Import IndcpadSimulator.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.ProgramLogics Require Import Ae.
 From Mending.ProgramLogics.Pyth Require Import Core Rules.
-From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 
 Import PackageNotation.
 Import GRing.Theory Num.Theory Order.Theory Order.POrderTheory.

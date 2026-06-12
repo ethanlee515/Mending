@@ -154,6 +154,27 @@ apply/eq_sum=> x.
 by rewrite eq_PQ.
 Qed.
 
+Lemma expectation_dnull {T : choiceType} (f : T -> R) :
+  \E_[dnull] f = 0.
+Proof.
+rewrite /esp (eq_sum (F2 := fun _ : T => 0)).
+  exact: sum0.
+by move=> x; rewrite dnullE mulr0.
+Qed.
+
+Lemma expectation_indicator_eq {T : choiceType}
+    (P : {distr T / R}) (x : T) (c : R) :
+  \E_[P] (fun y => if y == x then c else 0) = P x * c.
+Proof.
+rewrite /esp (sum_seq1 x).
+- by rewrite eqxx mulrC.
+- move=> y Hnz.
+  case Hy : (y == x).
+    by rewrite eq_sym Hy.
+  move: Hnz.
+  by rewrite Hy mul0r eqxx.
+Qed.
+
 Lemma expectation_const {T : choiceType} (P : {distr T / R}) c :
   dweight P = 1 ->
   \E_[P] (fun _ => c) = c.
@@ -224,6 +245,89 @@ Lemma expectation_scale_right {T : choiceType}
 Proof.
 rewrite (expectation_ext P _ (fun x => c * f x)); last by move=> x; rewrite mulrC.
 by rewrite expectation_scale mulrC.
+Qed.
+
+Lemma dweight1_dinsupp {T : choiceType} (mu : {distr T / R}) :
+  dweight mu = 1 ->
+  exists x, x \in dinsupp mu.
+Proof.
+rewrite pr_predT=> Hmass.
+have Hnz : psum mu <> 0.
+  move=> Hzero.
+  move: Hmass.
+  rewrite Hzero=> H01.
+  by move/eqP: H01; rewrite eq_sym oner_eq0.
+have [x Hx] := @neq0_psum R T mu Hnz.
+exists x.
+exact/dinsuppP.
+Qed.
+
+Lemma dmargin_dinsupp_image {T U : choiceType}
+    (mu : {distr T / R}) (f : T -> U) (x : T) :
+  x \in dinsupp mu ->
+  f x \in dinsupp (dmargin f mu).
+Proof.
+move=> Hx.
+rewrite dmarginE.
+apply: (@dlet_dinsupp R T U (fun x => dunit (f x)) mu x (f x) Hx).
+by rewrite dunit1E eqxx oner_neq0.
+Qed.
+
+Lemma dmargin_dinsupp_preimage {T U : choiceType}
+    (mu : {distr T / R}) (f : T -> U) (y : U) :
+  y \in dinsupp (dmargin f mu) ->
+  exists2 x, x \in dinsupp mu & f x = y.
+Proof.
+rewrite dmarginE=> /dinsupp_dlet [x Hx Hunit].
+exists x=> //.
+move: Hunit.
+by rewrite dunit1E pnatr_eq0 eqb0 negbK=> /eqP.
+Qed.
+
+Lemma pr_ext {T : choiceType} (P Q : {distr T / R}) (p : pred T) :
+  P =1 Q ->
+  \P_[P] p = \P_[Q] p.
+Proof.
+move=> HP.
+rewrite /pr.
+apply/eq_psum=> x.
+by rewrite HP.
+Qed.
+
+Lemma prc_ext {T : choiceType}
+    (P Q : {distr T / R}) (A p : pred T) :
+  P =1 Q ->
+  \P_[P, p] A = \P_[Q, p] A.
+Proof.
+move=> HP.
+rewrite /prc.
+by rewrite (pr_ext P Q [predI A & p] HP) (pr_ext P Q p HP).
+Qed.
+
+Lemma dcond_ext {T : choiceType}
+    (P Q : {distr T / R}) (p : pred T) :
+  P =1 Q ->
+  dcond P p =1 dcond Q p.
+Proof.
+move=> HP x.
+rewrite !dcondE.
+exact: (prc_ext P Q (pred1 x) p HP).
+Qed.
+
+Lemma dmargin_ext {T U : choiceType} (f : T -> U) (P Q : {distr T / R}) :
+  P =1 Q ->
+  dmargin f P =1 dmargin f Q.
+Proof.
+move=> HPQ y.
+rewrite !dmargin_psumE.
+apply/eq_psum=> x.
+by rewrite HPQ.
+Qed.
+
+Lemma dunit_dweight {T : choiceType} (x : T) :
+  dweight (dunit x : {distr T / R}) = 1.
+Proof.
+by rewrite pr_dunit.
 Qed.
 
 Lemma dmargin_add_intE center (P : {distr int / R}) x :
