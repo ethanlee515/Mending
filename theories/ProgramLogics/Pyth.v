@@ -59,6 +59,15 @@ Notation "⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
 Notation "⊨Pyth1 ⦃ pre ⦄ progL ≈( eps ) progR ⦃ post ⦄" :=
   (pythJudgment progL progR pre post [tuple eps] ) : PythNotations.
 
+Lemma pythCallErrors_size (q : nat) (eps : R) :
+  size (flatten (nseq q.+1 [:: 0; eps])) == (q.*2).+2.
+Proof.
+by rewrite size_flatten /shape map_nseq sumn_nseq /= mul2n.
+Qed.
+
+Definition pythCallErrors (q : nat) (eps : R) : (q.*2).+2.-tuple R :=
+  Tuple (pythCallErrors_size q eps).
+
 Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R}) : raw_code out_t :=
   x <$ (existT _ out_t D) ;;
   ret x.
@@ -235,7 +244,7 @@ Lemma pythCompileCallsRule
     (fun x => code_link
       (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
       P')
-    ≈( nseq (q.+1) eps )
+    ≈( pythCallErrors q eps )
     (fun x => code_link
       (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
       P')
