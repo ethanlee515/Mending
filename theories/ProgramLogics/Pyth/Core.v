@@ -17,6 +17,7 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
+From Mending.Probability Require Import OutputHeap.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
 Local Open Scope AeNotations.
@@ -27,17 +28,6 @@ Import pkg_heap.
 Import GRing.Theory Num.Theory Order.Theory.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
-
-Definition pack_output_heap {out_t : choice_type}
-    (out : out_t * heap) : (nat * heap)%type :=
-  (pickle out.1, out.2).
-
-Lemma total_variation_pack_output_heap
-    {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
-  total_variation P Q =
-  total_variation (dmargin (@pack_output_heap out_t) P)
-                  (dmargin (@pack_output_heap out_t) Q).
-Admitted.
 
 Definition pythJudgment
   {ℓ : nat}
@@ -82,4 +72,3 @@ apply: eq_in_dlet; last by [].
 move=> x _ z.
 by rewrite Pr_code_ret.
 Qed.
-

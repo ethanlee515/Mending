@@ -18,8 +18,9 @@ From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 From Mending.Probability.KL Require Import Pyth.
+From Mending.Probability Require Import OutputHeap PythSeq.
 From Mending.ProgramLogics Require Import Ae Hoare.
-From Mending.ProgramLogics.Pyth Require Import Core PythSeqScratch.
+From Mending.ProgramLogics.Pyth Require Import Core.
 
 Local Open Scope AeNotations.
 Local Open Scope HoareNotations.
@@ -318,4 +319,3 @@ split; first exact: HmarginL.
 split; first exact: HmarginR.
 by split.
 Qed.
-

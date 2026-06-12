@@ -1,4 +1,4 @@
-(* Scratch proof machinery for sequential Pythagorean composition. *)
+(* Proof machinery for sequential Pythagorean composition. *)
 
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
@@ -16,17 +16,11 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
   pkg_notation.
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
-From Mending.Probability Require Import ConditionalCoordinate DletTuple.
+From Mending.Probability Require Import ConditionalCoordinate DletTuple
+  OutputHeap.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras
   TupleExtras.
 From Mending.Probability.KL Require Import Pyth.
-From Mending.ProgramLogics Require Import Ae Hoare.
-From Mending.ProgramLogics.Pyth Require Import Core.
-
-Local Open Scope AeNotations.
-Local Open Scope HoareNotations.
-Local Open Scope PythNotations.
-
 Import PackageNotation.
 Import pkg_heap.
 Import GRing.Theory Num.Theory Order.Theory.
