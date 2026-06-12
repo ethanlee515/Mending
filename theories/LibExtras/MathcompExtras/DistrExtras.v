@@ -109,16 +109,6 @@ Definition conditional_second {T U : choiceType}
   dmargin (fun xy : T * U => xy.2)
     (dcond P (fun xy : T * U => xy.1 == x)).
 
-Definition tuple_prefix_eq {n : nat} {A : choiceType}
-    (i : 'I_n) (a : forall j : 'I_n, A) (omega : n.-tuple A) : bool :=
-  [forall j : 'I_n, (j < i)%N ==> (tnth omega j == a j)].
-
-Definition conditional_coordinate {n : nat} {A : choiceType}
-    (P : {distr (n.-tuple A) / R}) (i : 'I_n)
-    (a : forall j : 'I_n, A) : {distr A / R} :=
-  dmargin (fun omega : n.-tuple A => tnth omega i)
-    (dcond P (fun omega : n.-tuple A => tuple_prefix_eq i a omega)).
-
 Lemma conditional_secondE {T U : choiceType}
     (P : {distr (T * U) / R}) (x : T) (y : U) :
   conditional_second P x y =

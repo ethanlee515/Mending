@@ -8,6 +8,7 @@ From mathcomp Require Import reals distr ssrZ realseq realsum.
 From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From Mending.Probability.KL Require Import Core.
+From Mending.Probability Require Import ConditionalCoordinate.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras
   TupleExtras.
 
@@ -298,6 +299,38 @@ Proof.
 move=> Hp.
 apply: pr_dlet_fixed_prefix_from_inner=> omega1'.
 exact: (pr_dlet_cat_fixed_prefix_inner_eq K0 omega1 omega1' p q Hp).
+Qed.
+
+(* Collapses suffix conditionals when the fixed outer prefix has zero mass. *)
+Lemma conditional_coordinate_dlet_cat_suffix_zero_prefix
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (ℓ1.+1 <= i)%N) :
+  P0 (catTuplePrefix a) = 0 ->
+  conditional_coordinate
+    (\dlet_(omega1 <- P0)
+     \dlet_(omega2 <- K0 omega1)
+       dunit (cat_tuple omega1 omega2))
+    i a =1 dnull.
+Proof.
+move=> Hzero.
+apply: conditional_coordinate_zero_prefix.
+rewrite (pr_dlet_cat_fixed_prefix_event_eq
+  P0 K0 (catTuplePrefix a)
+  (fun omega => tuple_prefix_eq i a omega)
+  (fun omega2 =>
+    tuple_prefix_eq
+      (catTupleSuffixIndex i Hi)
+      (catTupleSuffixAssignment i Hi a)
+      omega2)).
+  by rewrite Hzero mul0r.
+move=> omega1' omega2.
+exact: (tuple_prefix_eq_cat_suffix i a Hi
+  (catTuplePrefix a) omega1' omega2 erefl).
 Qed.
 
 (* Computes suffix-prefix events after fixing the outer trace prefix. *)

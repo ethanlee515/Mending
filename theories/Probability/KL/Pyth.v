@@ -8,6 +8,7 @@ Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.Probability Require Import Ae.
 From Mending.Probability.KL Require Import Core Conditional Pinsker.
+From Mending.Probability Require Import ConditionalCoordinate.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.

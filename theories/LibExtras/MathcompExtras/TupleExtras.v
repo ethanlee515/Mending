@@ -3,8 +3,6 @@ From mathcomp Require Import all_boot all_order all_algebra.
 From mathcomp Require Import reals distr.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
-From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
-
 Import GRing.Theory Num.Theory Order.Theory.
 
 Local Open Scope ring_scope.
@@ -111,20 +109,9 @@ Definition catTupleSuffixAssignment
   fun j =>
     a (Ordinal (catTupleSuffixOrdinal_bound j)).
 
-(* Rewrites conditional-coordinate distances along pointwise-equal distributions. *)
-Lemma conditional_coordinate_dist_ext
-  {n : nat}
-  {A : choiceType}
-  (P Q : {distr (n.-tuple A) / R})
-  (i : 'I_n)
-  (a : forall j : 'I_n, A) :
-  P =1 Q ->
-  conditional_coordinate P i a =1 conditional_coordinate Q i a.
-Proof.
-move=> HP.
-apply: dmargin_ext.
-exact: dcond_ext.
-Qed.
+Definition tuple_prefix_eq {n : nat} {A : choiceType}
+    (i : 'I_n) (a : forall j : 'I_n, A) (omega : n.-tuple A) : bool :=
+  [forall j : 'I_n, (j < i)%N ==> (tnth omega j == a j)].
 
 (* Characterizes when a concatenated trace has a given prefix. *)
 Lemma tuple_prefix_eq_cat_prefix

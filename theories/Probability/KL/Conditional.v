@@ -5,6 +5,7 @@ Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 From Mending.Probability.KL Require Import Core.
+From Mending.Probability Require Import ConditionalCoordinate.
 
 Import GRing.Theory Num.Theory Order.Theory.
 
