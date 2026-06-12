@@ -51,6 +51,7 @@ Definition pythKernelSpec
   (forall x, x \in dinsupp KL -> post x) /\
   (forall x, x \in dinsupp KR -> post x).
 
+(* Extracts the Pythagorean distance component from a kernel specification. *)
 Lemma pythKernelSpec_dist
   {ℓ : nat}
   {out_t : choice_type}
@@ -62,6 +63,7 @@ Lemma pythKernelSpec_dist
   pythDist W.1 W.2 s.
 Proof. by case: W=> P Q /= [Hdist _]. Qed.
 
+(* Extracts the left final-margin component from a kernel specification. *)
 Lemma pythKernelSpec_marginL
   {ℓ : nat}
   {out_t : choice_type}
@@ -74,6 +76,7 @@ Lemma pythKernelSpec_marginL
     =1 dmargin (@pack_output_heap out_t) KL.
 Proof. by case: W=> P Q /= [_ [Hmargin _]]. Qed.
 
+(* Extracts the right final-margin component from a kernel specification. *)
 Lemma pythKernelSpec_marginR
   {ℓ : nat}
   {out_t : choice_type}
@@ -86,6 +89,7 @@ Lemma pythKernelSpec_marginR
     =1 dmargin (@pack_output_heap out_t) KR.
 Proof. by case: W=> P Q /= [_ [_ [Hmargin _]]]. Qed.
 
+(* Extracts the left postcondition guarantee from a kernel specification. *)
 Lemma pythKernelSpec_postL
   {ℓ : nat}
   {out_t : choice_type}
@@ -100,6 +104,7 @@ Proof.
 by case: W=> P Q /= [_ [_ [_ [Hpost _]]]]; exact: Hpost.
 Qed.
 
+(* Extracts the right postcondition guarantee from a kernel specification. *)
 Lemma pythKernelSpec_postR
   {ℓ : nat}
   {out_t : choice_type}
@@ -128,6 +133,7 @@ Lemma decode_output_heap_pack {out_t : choice_type} (x : out_t * heap) :
   decode_output_heap (pack_output_heap x) = Some x.
 Proof. by case: x=> y mem; rewrite /decode_output_heap /pack_output_heap pickleK. Qed.
 
+(* Chooses one certified continuation trace kernel for every valid midpoint. *)
 Lemma pythKernel_choice
   {ℓ : nat}
   {mid_t out_t : choice_type}
@@ -226,7 +232,8 @@ Definition pythTraceBindPair
   P =1 pythTraceBindL ML KL mid P0 K /\
   Q =1 pythTraceBindR MR KR mid Q0 K.
 
-Lemma pythTraceBindPair_exists
+(* Packages the left and right composed trace distributions as a witness pair. *)
+Lemma traceBind_exists
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -259,6 +266,7 @@ exists x.
 exact/dinsuppP.
 Qed.
 
+(* Maps support membership through a distribution margin. *)
 Lemma dmargin_dinsupp_image
   {T U : choiceType}
   (mu : {distr T / R})
@@ -273,6 +281,7 @@ apply: (@dlet_dinsupp R T U (fun x => dunit (f x)) mu x (f x) Hx).
 by rewrite dunit1E eqxx oner_neq0.
 Qed.
 
+(* Finds a supported preimage for support membership in a margin. *)
 Lemma dmargin_dinsupp_preimage
   {T U : choiceType}
   (mu : {distr T / R})
@@ -297,6 +306,7 @@ apply/eq_psum=> x.
 by rewrite HP.
 Qed.
 
+(* Pulls support of a concatenated dlet trace back to a concrete prefix and suffix. *)
 Lemma dlet_dunit_cat_dinsupp_preimage
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -322,6 +332,7 @@ split.
 by split.
 Qed.
 
+(* Builds support of a concatenated dlet trace from supported prefix and suffix traces. *)
 Lemma dlet_dunit_cat_dinsupp_image
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -347,6 +358,7 @@ apply: (@dlet_dinsupp R _ _
 by rewrite dunit1E eqxx oner_neq0.
 Qed.
 
+(* Shows concatenating dlet traces preserves absolute continuity componentwise. *)
 Lemma dlet_dunit_cat_absolute_continuous
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -394,7 +406,8 @@ move: HQomega_supp.
 by rewrite -Homega in_dinsupp HQomega0 eqxx.
 Qed.
 
-Lemma pythTraceBindPair_s2_nonneg
+(* Extracts nonnegativity of the continuation budget from each chosen kernel. *)
+Lemma traceBind_s2_nonneg
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML : {distr (mid_t * heap) / R})
@@ -432,6 +445,7 @@ case: (HK (exist _ y Hmidy))=> Hs2 _.
 exact: Hs2.
 Qed.
 
+(* Transfers absolute continuity from decoded midpoints to the chosen trace kernels. *)
 Lemma pythTraceKernel_absolute_continuous
   {ℓ1 ℓ2 : nat}
   {mid_t : choice_type}
@@ -453,7 +467,8 @@ case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
 by move=> x Hx.
 Qed.
 
-Lemma pythTraceBindPair_absolute_continuous
+(* Shows the composed left trace distribution is absolutely continuous w.r.t. the right one. *)
+Lemma traceBind_absolute_continuous
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -490,6 +505,7 @@ apply: Hac_bind.
 by rewrite -HQ.
 Qed.
 
+(* Converts a coordinate of a concatenated tuple into its prefix coordinate. *)
 Lemma cat_tuple_tnth_prefix_choice
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -505,6 +521,7 @@ rewrite nth_cat size_tuple Hi.
 by apply: set_nth_default; rewrite size_tuple.
 Qed.
 
+(* Reads a prefix coordinate out of a concatenated trace tuple. *)
 Lemma cat_tuple_tnth_prefix
   {ℓ1 ℓ2 : nat}
   (s1 : (ℓ1.+1).-tuple R)
@@ -525,6 +542,7 @@ have Hord := ltn_ord i.
 by rewrite ltn_subLR // addnC.
 Qed.
 
+(* Converts a coordinate after the prefix into its suffix ordinal. *)
 Lemma cat_tuple_tnth_suffix_choice
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -542,6 +560,7 @@ rewrite /=.
 by rewrite [RHS](tnth_nth (tnth t2 (Ordinal (cat_tuple_suffix_bound i Hi)))).
 Qed.
 
+(* Reads a suffix coordinate out of a concatenated trace tuple. *)
 Lemma cat_tuple_tnth_suffix
   {ℓ1 ℓ2 : nat}
   (s1 : (ℓ1.+1).-tuple R)
@@ -552,6 +571,7 @@ Lemma cat_tuple_tnth_suffix
   tnth s2 (Ordinal (cat_tuple_suffix_bound i Hi)).
 Proof. exact: cat_tuple_tnth_suffix_choice. Qed.
 
+(* Combines nonnegativity proofs for prefix and suffix error budgets. *)
 Lemma cat_tuple_nonneg
   {ℓ1 ℓ2 : nat}
   (s1 : (ℓ1.+1).-tuple R)
@@ -652,6 +672,7 @@ Proof.
 by rewrite pr_dunit.
 Qed.
 
+(* Rewrites conditional-coordinate distances along pointwise-equal distributions. *)
 Lemma conditional_coordinate_dist_ext
   {n : nat}
   {A : choiceType}
@@ -666,6 +687,7 @@ apply: dmargin_ext.
 exact: dcond_ext.
 Qed.
 
+(* Characterizes when a concatenated trace has a given prefix. *)
 Lemma tuple_prefix_eq_cat_prefix
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -717,6 +739,7 @@ apply/idP/idP.
   by [].
 Qed.
 
+(* Recovers the original prefix trace from a concatenated trace. *)
 Lemma pythCombinedPrefixTrace_cat
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -733,6 +756,7 @@ congr tnth.
 by apply: val_inj.
 Qed.
 
+(* Reads coordinates from the extracted prefix trace. *)
 Lemma pythCombinedPrefixTrace_tnth
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -744,6 +768,7 @@ Proof.
 by rewrite /pythCombinedPrefixTrace tnth_mktuple.
 Qed.
 
+(* Preserves strict order when converting combined indices to suffix indices. *)
 Lemma pythCombinedSuffixIndex_lt
   {ℓ1 ℓ2 : nat}
   (i j : 'I_(ℓ1.+1 + ℓ2.+1))
@@ -757,6 +782,7 @@ rewrite /pythCombinedSuffixIndex /=.
 exact: ltn_sub2r (leq_ltn_trans Hj Hji) Hji.
 Qed.
 
+(* Bounds earlier combined indices by the current suffix ordinal. *)
 Lemma pythCombinedSuffixOrdinal_lt
   {ℓ1 ℓ2 : nat}
   (i : 'I_(ℓ1.+1 + ℓ2.+1))
@@ -771,6 +797,7 @@ rewrite /pythCombinedSuffixIndex /=.
 by rewrite (@leq_subRL ℓ1.+1 j.+1 i Hi) addnS.
 Qed.
 
+(* Characterizes suffix-prefix equality after fixing the concatenated prefix. *)
 Lemma tuple_prefix_eq_cat_suffix
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -866,6 +893,7 @@ apply/idP/idP.
   by [].
 Qed.
 
+(* Computes a prefix event probability through the composed trace dlet. *)
 Lemma pr_dlet_cat_prefix_lift_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -898,6 +926,7 @@ rewrite pr_dunit Hp.
 by case: (p0 omega1).
 Qed.
 
+(* Computes prefix conditional probabilities for composed trace distributions. *)
 Lemma prc_dlet_cat_prefix_coordinate_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -943,6 +972,7 @@ by rewrite (tuple_prefix_eq_cat_prefix i a Hi omega1 omega2).
 Qed.
 
 
+(* Reduces prefix conditional-coordinate distance to the outer trace distributions. *)
 Lemma conditional_coordinate_dlet_cat_prefix_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -969,6 +999,7 @@ rewrite !pr_dcond.
 exact: (prc_dlet_cat_prefix_coordinate_eq P0 K0 i a Hi x Hmass).
 Qed.
 
+(* Shows the selected left continuation kernel has total weight one. *)
 Lemma pythTraceKernelL_dweight1
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -988,6 +1019,7 @@ case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
 exact: dunit_dweight.
 Qed.
 
+(* Shows the selected right continuation kernel has total weight one. *)
 Lemma pythTraceKernelR_dweight1
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -1007,7 +1039,8 @@ case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
 exact: dunit_dweight.
 Qed.
 
-Lemma pythTraceBindPair_dweightL
+(* Shows the composed left trace distribution has total weight one. *)
+Lemma traceBind_dweightL
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1038,7 +1071,8 @@ rewrite (pr_dlet_cat_prefix_lift_eq P0 (pythTraceKernelL mid K)
 exact: HP0mass.
 Qed.
 
-Lemma pythTraceBindPair_dweightR
+(* Shows the composed right trace distribution has total weight one. *)
+Lemma traceBind_dweightR
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1069,6 +1103,7 @@ rewrite (pr_dlet_cat_prefix_lift_eq Q0 (pythTraceKernelR mid K)
 exact: HQ0mass.
 Qed.
 
+(* Identifies left composed prefix conditionals with the original left trace conditionals. *)
 Lemma pythTraceBindL_conditional_coordinate_prefix_eq
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -1094,6 +1129,7 @@ exact: (conditional_coordinate_dlet_cat_prefix_eq
   (fun omega => pythTraceKernelL_dweight1 mid s2 K omega HK)).
 Qed.
 
+(* Identifies right composed prefix conditionals with the original right trace conditionals. *)
 Lemma pythTraceBindR_conditional_coordinate_prefix_eq
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -1119,7 +1155,8 @@ exact: (conditional_coordinate_dlet_cat_prefix_eq
   (fun omega => pythTraceKernelR_dweight1 mid s2 K omega HK)).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_prefix_eqL
+(* Rewrites the left composed prefix conditional using the original left witness. *)
+Lemma traceBind_prefix_condL
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1147,7 +1184,8 @@ exact: (pythTraceBindL_conditional_coordinate_prefix_eq
   ML KL mid s2 P0 K i a Hi HK x).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_prefix_eqR
+(* Rewrites the right composed prefix conditional using the original right witness. *)
+Lemma traceBind_prefix_condR
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1175,7 +1213,8 @@ exact: (pythTraceBindR_conditional_coordinate_prefix_eq
   MR KR mid s2 Q0 K i a Hi HK x).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_prefix_eq
+(* Rewrites prefix conditional-coordinate distance for the composed witness pair. *)
+Lemma traceBind_prefix_cond
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1200,13 +1239,14 @@ Lemma pythTraceBindPair_conditional_coordinate_prefix_eq
 Proof.
 move=> Hbind HK.
 apply: kl_ext.
-- exact: (pythTraceBindPair_conditional_coordinate_prefix_eqL
+- exact: (traceBind_prefix_condL
     ML MR KL KR mid s2 P0 Q0 K P Q i a Hi Hbind HK).
-- exact: (pythTraceBindPair_conditional_coordinate_prefix_eqR
+- exact: (traceBind_prefix_condR
     ML MR KL KR mid s2 P0 Q0 K P Q i a Hi Hbind HK).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_bound_prefix_from_P0
+(* Bounds a composed prefix coordinate using the original Pythagorean prefix witness. *)
+Lemma traceBind_prefix_bound_from_P0
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1231,13 +1271,14 @@ move=> Hbind [_ [_ [_ [_ Hcond0]]]] HK Hi.
 pose i0 : 'I_(ℓ1.+1) := Ordinal Hi.
 pose a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
   fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))).
-rewrite (pythTraceBindPair_conditional_coordinate_prefix_eq
+rewrite (traceBind_prefix_cond
   ML MR KL KR mid s2 P0 Q0 K P Q i a Hi Hbind HK).
 rewrite (cat_tuple_tnth_prefix s1 s2 i Hi).
 exact: (Hcond0 i0 a0).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_bound_prefix
+(* Proves the Pythagorean coordinate bound for every prefix coordinate. *)
+Lemma traceBind_prefix_bound
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1265,7 +1306,7 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_prefix
     tnth (cat_tuple s1 s2) i.
 Proof.
 move=> Hbind Hdist0 _ _ _ _ HK Hi.
-exact: (pythTraceBindPair_conditional_coordinate_bound_prefix_from_P0
+exact: (traceBind_prefix_bound_from_P0
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hbind Hdist0
   HK Hi).
 Qed.
@@ -1281,6 +1322,7 @@ rewrite -[a * b / (a * c)]mulf_div.
 by rewrite divff ?mul1r // lt0r_neq0.
 Qed.
 
+(* Rewrites expectation of an indicator as the probability of its event. *)
 Lemma expectation_indicator_eq
   {T : choiceType}
   (P0 : {distr T / R})
@@ -1298,6 +1340,7 @@ rewrite /esp (sum_seq1 omega1).
   by rewrite Homega1' mul0r eqxx.
 Qed.
 
+(* Computes a dlet probability when the outer prefix is fixed. *)
 Lemma pr_dlet_fixed_prefix_from_inner
   {T U : choiceType}
   (P0 : {distr T / R})
@@ -1320,6 +1363,7 @@ rewrite (expectation_ext P0
 exact: Hinner.
 Qed.
 
+(* Relates a fixed-prefix concatenation event to the inner suffix event. *)
 Lemma pr_dlet_cat_fixed_prefix_inner_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -1347,6 +1391,7 @@ apply: expectation_ext=> omega2.
 by rewrite pr_dunit Hp Homega1'.
 Qed.
 
+(* Computes the probability of a full concatenated prefix by conditioning on its prefix part. *)
 Lemma pr_dlet_cat_fixed_prefix_event_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -1369,6 +1414,7 @@ apply: pr_dlet_fixed_prefix_from_inner=> omega1'.
 exact: (pr_dlet_cat_fixed_prefix_inner_eq K0 omega1 omega1' p q Hp).
 Qed.
 
+(* Computes suffix-prefix events after fixing the outer trace prefix. *)
 Lemma pr_dlet_cat_suffix_prefix_event_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -1398,6 +1444,7 @@ apply: pr_dlet_cat_fixed_prefix_event_eq=> omega1' omega2.
 exact: (tuple_prefix_eq_cat_suffix i a Hi omega1 omega1' omega2 Hprefix).
 Qed.
 
+(* Computes suffix coordinate events after fixing the outer trace prefix. *)
 Lemma pr_dlet_cat_suffix_coordinate_event_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -1435,6 +1482,7 @@ by case: (tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x);
      (pythCombinedSuffixAssignment i Hi a) omega2).
 Qed.
 
+(* Computes suffix conditional probabilities for the inner trace kernel. *)
 Lemma prc_dlet_cat_suffix_coordinate_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -1471,6 +1519,7 @@ rewrite (pr_dlet_cat_suffix_prefix_event_eq
 exact: divr_cancel_left_pos.
 Qed.
 
+(* Reduces suffix conditional-coordinate distance to the selected continuation kernels. *)
 Lemma conditional_coordinate_dlet_cat_suffix_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -1535,6 +1584,7 @@ rewrite (expectation_distr_ext P dnull _ HP).
 exact: expectation_dnull.
 Qed.
 
+(* Collapses conditional-coordinate distance when both conditioning prefixes have zero mass. *)
 Lemma conditional_coordinate_zero_prefix
   {n : nat}
   {A : choiceType}
@@ -1550,7 +1600,8 @@ rewrite /conditional_coordinate pr_dmargin pr_dcond /prc Hzero.
 by rewrite invr0 mulr0.
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
+(* Bounds a suffix coordinate when the composed prefix has zero left mass. *)
+Lemma traceBind_suffix_bound_zero_prefix
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1580,7 +1631,7 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
 Proof.
 move=> Hbind Hdist0 HmarginL0 _ HmidL _ HK HP0z.
 have Hs2 : 0 <= tnth s2 (pythCombinedSuffixIndex i Hi) :=
-  pythTraceBindPair_s2_nonneg ML mid s1 s2 P0 Q0 K
+  traceBind_s2_nonneg ML mid s1 s2 P0 Q0 K
     (pythCombinedSuffixIndex i Hi) Hdist0 HmarginL0 HmidL HK.
 have HPprefix0 :
     \P_[P] (fun omega => tuple_prefix_eq i a omega) = 0.
@@ -1606,6 +1657,7 @@ rewrite (kl_left_dnull
 exact: Hs2.
 Qed.
 
+(* Selects the left continuation kernel when the decoded final prefix state satisfies mid. *)
 Lemma pythTraceKernelL_valid_mid
   {ℓ1 ℓ2 : nat}
   {mid_t : choice_type}
@@ -1623,6 +1675,7 @@ destruct (@idP (mid y)) as [Hy'|Hy'].
 by case: Hy'.
 Qed.
 
+(* Selects the right continuation kernel when the decoded final prefix state satisfies mid. *)
 Lemma pythTraceKernelR_valid_mid
   {ℓ1 ℓ2 : nat}
   {mid_t : choice_type}
@@ -1640,7 +1693,8 @@ destruct (@idP (mid y)) as [Hy'|Hy'].
 by case: Hy'.
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_eqL_valid_mid
+(* Rewrites left suffix conditionals to the chosen kernel at a valid midpoint. *)
+Lemma traceBind_suffix_condL_valid_mid
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1682,7 +1736,8 @@ rewrite (pythTraceKernelL_valid_mid mid K omega1 y Hy).
 by [].
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_eqR_valid_mid
+(* Rewrites right suffix conditionals to the chosen kernel at a valid midpoint. *)
+Lemma traceBind_suffix_condR_valid_mid
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1724,7 +1779,8 @@ rewrite (pythTraceKernelR_valid_mid mid K omega1 y Hy).
 by [].
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_eq_valid_mid
+(* Reduces suffix conditional-coordinate distance to the kernel distance at a valid midpoint. *)
+Lemma traceBind_suffix_cond_valid_mid
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1763,15 +1819,16 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_eq_valid_mid
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy HPpos HQpos.
 apply: kl_ext.
-- exact: (pythTraceBindPair_conditional_coordinate_suffix_eqL_valid_mid
+- exact: (traceBind_suffix_condL_valid_mid
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy HPpos).
-- exact: (pythTraceBindPair_conditional_coordinate_suffix_eqR_valid_mid
+- exact: (traceBind_suffix_condR_valid_mid
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy HQpos).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_valid_mid
+(* Bounds a suffix coordinate using the selected kernel's Pythagorean condition. *)
+Lemma traceBind_suffix_bound_valid_mid
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1808,7 +1865,7 @@ have Hdist0 : pythDist P0 Q0 s1.
   by split; first exact: Hs1; split; first exact: Hac0;
      split; first exact: HP0mass; split; first exact: HQ0mass.
 case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
-  exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
+  exact: (traceBind_suffix_bound_zero_prefix
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK
     (eqP HP0z)).
@@ -1816,7 +1873,7 @@ have HP0pos : 0 < P0 (pythCombinedPrefixTrace a).
   by rewrite lt_def ge0_mu HP0z.
 have HQ0pos : 0 < Q0 (pythCombinedPrefixTrace a).
   exact: (absolute_continuous_positive P0 Q0 _ Hac0 HP0pos).
-rewrite (pythTraceBindPair_conditional_coordinate_suffix_eq_valid_mid
+rewrite (traceBind_suffix_cond_valid_mid
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy
   HP0pos HQ0pos).
@@ -1825,7 +1882,8 @@ exact: (Hcond (pythCombinedSuffixIndex i Hi)
   (pythCombinedSuffixAssignment i Hi a)).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_decode_none
+(* Handles suffix coordinates when the prefix final state does not decode. *)
+Lemma traceBind_suffix_bound_decode_none
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1876,12 +1934,13 @@ have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
       (tnth (pythCombinedPrefixTrace a) ord_max) Hfinal_supp_ML.
   move: Hdecode_none.
   by rewrite -Hpack decode_output_heap_pack.
-exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
+exact: (traceBind_suffix_bound_zero_prefix
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK HP0z).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
+(* Handles suffix coordinates when the decoded prefix final state violates mid. *)
+Lemma traceBind_suffix_bound_not_mid
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1940,12 +1999,13 @@ have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
   move: Hnot_mid.
   rewrite Hyz.
   by rewrite (HmidL z Hz).
-exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
+exact: (traceBind_suffix_bound_zero_prefix
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK HP0z).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
+(* Dispatches all suffix cases by decoding the prefix final state. *)
+Lemma traceBind_suffix_bound_from_kernel
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -1978,20 +2038,21 @@ case Hdecode:
       (tnth (pythCombinedPrefixTrace a) ord_max))=> [y|].
   case Hmidy: (mid y).
   - have Hy : mid y by rewrite Hmidy.
-    exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_valid_mid
+    exact: (traceBind_suffix_bound_valid_mid
       ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi (exist _ y Hy)
       Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode).
-  - exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
+  - exact: (traceBind_suffix_bound_not_mid
       ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
       Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK
       Hdecode (negbT Hmidy)).
-- exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_decode_none
+- exact: (traceBind_suffix_bound_decode_none
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode).
 Qed.
 
 
-Lemma pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
+(* Lifts the suffix bound from chosen kernels to extensionally equal trace witnesses. *)
+Lemma traceBind_suffix_bound_from_K
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -2020,12 +2081,13 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi.
 rewrite (cat_tuple_tnth_suffix s1 s2 i Hi).
-exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
+exact: (traceBind_suffix_bound_from_kernel
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_bound_suffix
+(* Proves the Pythagorean coordinate bound for every suffix coordinate. *)
+Lemma traceBind_suffix_bound
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -2053,12 +2115,13 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_suffix
     tnth (cat_tuple s1 s2) i.
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi.
-exact: (pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
+exact: (traceBind_suffix_bound_from_K
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi).
 Qed.
 
-Lemma pythTraceBindPair_conditional_coordinate_bound
+(* Combines prefix and suffix coordinate bounds for the composed trace witness. *)
+Lemma traceBind_cond_bound
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -2086,15 +2149,16 @@ Lemma pythTraceBindPair_conditional_coordinate_bound
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
 case: (ltnP i ℓ1.+1)=> Hi.
-- exact: (pythTraceBindPair_conditional_coordinate_bound_prefix
+- exact: (traceBind_prefix_bound
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi).
-- exact: (pythTraceBindPair_conditional_coordinate_bound_suffix
+- exact: (traceBind_suffix_bound
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi).
 Qed.
 
-Lemma pythTraceBindPair_pythDist
+(* Assembles the full Pythagorean distance proof for the composed trace witness. *)
+Lemma traceBind_pythDist
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -2122,7 +2186,7 @@ have Hdist0 : pythDist P0 Q0 s1.
   by split; first exact: Hs1; split; first exact: Hac0;
      split; first exact: HP0; split; first exact: HQ0.
 have Hs2 : forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i :=
-  fun i => pythTraceBindPair_s2_nonneg ML mid s1 s2 P0 Q0 K i
+  fun i => traceBind_s2_nonneg ML mid s1 s2 P0 Q0 K i
     Hdist0 HmarginL0 HmidL HK.
 split.
 - move=> i.
@@ -2130,19 +2194,19 @@ split.
   + exact: Hs1.
   + exact: Hs2.
 split.
-- exact: (pythTraceBindPair_absolute_continuous
+- exact: (traceBind_absolute_continuous
     ML MR KL KR mid s1 s2 P0 Q0 K P Q
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 split.
-- exact: (pythTraceBindPair_dweightL
+- exact: (traceBind_dweightL
     ML MR KL KR mid s1 s2 P0 Q0 K P Q
     Hbind Hdist0 HmarginL0 HmidL HK).
 split.
-- exact: (pythTraceBindPair_dweightR
+- exact: (traceBind_dweightR
     ML MR KL KR mid s1 s2 P0 Q0 K P Q
     Hbind Hdist0 HmarginR0 HmidR HK).
 - move=> i a.
-  exact: (pythTraceBindPair_conditional_coordinate_bound
+  exact: (traceBind_cond_bound
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 Qed.
@@ -2165,6 +2229,7 @@ change ((ℓ1 + ℓ2.+1 - ℓ1.+1)%N = ℓ2).
 by rewrite subnS addnC addnK.
 Qed.
 
+(* Pushes the final-coordinate margin of a concatenated trace through the inner dlet. *)
 Lemma dmargin_dlet_cat_final
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
@@ -2187,6 +2252,7 @@ rewrite dmargin_dunit.
 by rewrite cat_tuple_tnth_ord_max_suffix.
 Qed.
 
+(* Computes the left continuation kernel's final margin after decoding valid midpoints. *)
 Lemma pythTraceKernelL_bind_final_margin
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -2242,6 +2308,7 @@ rewrite -(eq_in_dlet (mu := P0)
 - by [].
 Qed.
 
+(* Computes the right continuation kernel's final margin after decoding valid midpoints. *)
 Lemma pythTraceKernelR_bind_final_margin
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -2297,6 +2364,7 @@ rewrite -(eq_in_dlet (mu := Q0)
 - by [].
 Qed.
 
+(* Identifies the final margin of the composed left trace with the semantic left bind. *)
 Lemma pythTraceBindL_final_margin
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -2322,6 +2390,7 @@ exact: (pythTraceKernelL_bind_final_margin ML KL mid P0 K
   Hmargin Hmid HK z).
 Qed.
 
+(* Identifies the final margin of the composed right trace with the semantic right bind. *)
 Lemma pythTraceBindR_final_margin
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -2347,7 +2416,8 @@ exact: (pythTraceKernelR_bind_final_margin MR KR mid Q0 K
   Hmargin Hmid HK z).
 Qed.
 
-Lemma pythTraceBindPair_final_margins
+(* Proves both final-margin obligations for the composed trace witness. *)
+Lemma traceBind_final_margins
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -2388,7 +2458,8 @@ split.
     HmarginR0 HmidR HKR z).
 Qed.
 
-Lemma pythTraceBindPair_post
+(* Propagates the postcondition through the semantic continuation binds. *)
+Lemma traceBind_post
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
   (ML MR : {distr (mid_t * heap) / R})
@@ -2424,6 +2495,7 @@ split.
   exact: (HpostR (exist _ y Hy_mid) x Hx_inner).
 Qed.
 
+(* Builds a composed trace witness from an existing prefix witness and chosen kernels. *)
 Lemma pythDist_bind_pyth_kernel_witness
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -2456,11 +2528,11 @@ Lemma pythDist_bind_pyth_kernel_witness
 Proof.
 move=> Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
 have [P [Q Hbind]] :=
-  pythTraceBindPair_exists ML MR KL KR mid P0 Q0 K.
+  traceBind_exists ML MR KL KR mid P0 Q0 K.
 exists P, Q.
 have Hdist :
     pythDist P Q (cat_tuple s1 s2).
-  apply: (pythTraceBindPair_pythDist
+  apply: (traceBind_pythDist
     ML MR KL KR mid s1 s2 P0 Q0 K P Q Hbind
     Hdist0 HmarginL0 HmarginR0 HmidL HmidR).
   move=> y.
@@ -2470,7 +2542,7 @@ have [HmarginL HmarginR] :
       =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- ML) KL y) /\
     dmargin (fun omega => tnth omega ord_max) Q
       =1 dmargin (@pack_output_heap out_t) (\dlet_(y <- MR) KR y).
-  apply: (pythTraceBindPair_final_margins
+  apply: (traceBind_final_margins
     ML MR KL KR mid P0 Q0 K P Q Hbind
     HmarginL0 HmarginR0 HmidL HmidR).
   - move=> y.
@@ -2480,7 +2552,7 @@ have [HmarginL HmarginR] :
 have [HpostL HpostR] :
     (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
     (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
-  apply: (pythTraceBindPair_post
+  apply: (traceBind_post
     ML MR KL KR mid post P0 Q0 K P Q Hbind HmidL HmidR).
   - move=> y.
     move=> x.
@@ -2494,6 +2566,7 @@ split; first exact: HmarginR.
 by split.
 Qed.
 
+(* Chooses the continuation kernels and exposes the composed Pythagorean bind witness. *)
 Lemma pythDist_bind_pyth_kernel
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -2544,4 +2617,3 @@ exact:
   (pythDist_bind_pyth_kernel_witness ML MR KL KR mid post s1 s2 P0 Q0 K
     Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 Qed.
-
