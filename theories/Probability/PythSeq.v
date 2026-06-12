@@ -27,6 +27,8 @@ Import GRing.Theory Num.Theory Order.Theory.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
+(* === Kernel Witnesses And Trace Binds === *)
+
 Definition pythKernelPair {ℓ : nat} : Type :=
   ({distr ((ℓ.+1).-tuple (nat * heap)) / R} *
    {distr ((ℓ.+1).-tuple (nat * heap)) / R})%type.
@@ -117,17 +119,6 @@ Qed.
 
 Definition default_pyth_trace {n : nat} : n.-tuple (nat * heap) :=
   nseq_tuple n (0%N, empty_heap).
-
-Definition decode_output_heap {out_t : choice_type}
-    (x : nat * heap) : option (out_t * heap) :=
-  match unpickle x.1 with
-  | Some y => Some (y, x.2)
-  | None => None
-  end.
-
-Lemma decode_output_heap_pack {out_t : choice_type} (x : out_t * heap) :
-  decode_output_heap (pack_output_heap x) = Some x.
-Proof. by case: x=> y mem; rewrite /decode_output_heap /pack_output_heap pickleK. Qed.
 
 (* Chooses one certified continuation trace kernel for every valid midpoint. *)
 Lemma pythKernel_choice
@@ -244,6 +235,8 @@ exists (pythTraceBindL ML KL mid P0 K),
        (pythTraceBindR MR KR mid Q0 K).
 by split=> omega.
 Qed.
+
+(* === Basic Validity Facts For Composed Trace Binds === *)
 
 (* Extracts nonnegativity of the continuation budget from each chosen kernel. *)
 Lemma traceBind_s2_nonneg
@@ -447,6 +440,8 @@ rewrite (pr_dlet_cat_prefix_lift_eq Q0 (pythTraceKernelR mid K)
   last by move=> omega1 omega2.
 exact: HQ0mass.
 Qed.
+
+(* === Prefix Coordinate Bounds === *)
 
 (* Identifies left composed prefix conditionals with the original left trace conditionals. *)
 Lemma traceBind_conditional_coordinate_prefix_eqL
@@ -655,6 +650,8 @@ exact: (traceBind_prefix_bound_from_P0
   ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hbind Hdist0
   HK Hi).
 Qed.
+
+(* === Suffix Coordinate Bounds === *)
 
 (* Bounds a suffix coordinate when the composed prefix has zero left mass. *)
 Lemma traceBind_suffix_bound_zero_prefix
@@ -1165,6 +1162,8 @@ exact: (traceBind_suffix_bound_from_K
   Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi).
 Qed.
 
+(* === Composed Pythagorean Distance === *)
+
 (* Combines prefix and suffix coordinate bounds for the composed trace witness. *)
 Lemma traceBind_cond_bound
   {ℓ1 ℓ2 : nat}
@@ -1255,6 +1254,8 @@ split.
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 Qed.
+
+(* === Final Margins And Postconditions === *)
 
 (* Computes the left continuation kernel's final margin after decoding valid midpoints. *)
 Lemma traceKernel_bind_final_marginL
@@ -1498,6 +1499,8 @@ split.
     by rewrite in_dinsupp.
   exact: (HpostR (exist _ y Hy_mid) x Hx_inner).
 Qed.
+
+(* === Sequential Witness Construction === *)
 
 (* Builds a composed trace witness from an existing prefix witness and chosen kernels. *)
 Lemma pythDist_bind_pyth_kernel_witness

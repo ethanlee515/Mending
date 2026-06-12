@@ -27,6 +27,17 @@ Definition pack_output_heap {out_t : choice_type}
     (out : out_t * heap) : (nat * heap)%type :=
   (pickle out.1, out.2).
 
+Definition decode_output_heap {out_t : choice_type}
+    (x : nat * heap) : option (out_t * heap) :=
+  match unpickle x.1 with
+  | Some y => Some (y, x.2)
+  | None => None
+  end.
+
+Lemma decode_output_heap_pack {out_t : choice_type} (x : out_t * heap) :
+  decode_output_heap (pack_output_heap x) = Some x.
+Proof. by case: x=> y mem; rewrite /decode_output_heap /pack_output_heap pickleK. Qed.
+
 Lemma total_variation_pack_output_heap
     {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
   total_variation P Q =

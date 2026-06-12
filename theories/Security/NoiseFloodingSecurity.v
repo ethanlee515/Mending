@@ -10,7 +10,7 @@ From Mending.Constructions Require Import NoiseFlooding.
 From Mending.Security Require Import IndcpadSimulator.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.ProgramLogics Require Import Ae.
-From Mending.ProgramLogics.Pyth Require Import Core Rules.
+From Mending.ProgramLogics Require Import Pyth.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 
 Import PackageNotation.

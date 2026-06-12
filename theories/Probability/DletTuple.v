@@ -19,6 +19,8 @@ Section DletTuple.
 
 Context {R : realType}.
 
+(* === Support And Absolute Continuity For Concatenated Dlets === *)
+
 (* Pulls support of a concatenated dlet trace back to a concrete prefix and suffix. *)
 Lemma dlet_dunit_cat_dinsupp_preimage
   {ℓ1 ℓ2 : nat}
@@ -119,6 +121,8 @@ move: HQomega_supp.
 by rewrite -Homega in_dinsupp HQomega0 eqxx.
 Qed.
 
+
+(* === Prefix Coordinates Of Concatenated Dlets === *)
 
 (* Computes a prefix event probability through the composed trace dlet. *)
 Lemma pr_dlet_cat_prefix_lift_eq
@@ -226,6 +230,8 @@ rewrite !pr_dcond.
 exact: (prc_dlet_cat_prefix_coordinate_eq P0 K0 i a Hi x Hmass).
 Qed.
 
+
+(* === Suffix Coordinates Of Concatenated Dlets === *)
 
 (* Computes a dlet probability when the outer prefix is fixed. *)
 Lemma pr_dlet_fixed_prefix_from_inner
@@ -467,6 +473,8 @@ exact: (prc_dlet_cat_suffix_coordinate_eq
   P0 K0 i a Hi omega1 x Hprefix Hpos).
 Qed.
 
+
+(* === Final Coordinates Of Concatenated Dlets === *)
 
 Lemma cat_tuple_tnth_ord_max_suffix
   {ℓ1 ℓ2 : nat}
