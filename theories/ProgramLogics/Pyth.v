@@ -304,10 +304,13 @@ Lemma pythKernelSpec_postL
   (KL KR : {distr (out_t * heap) / R})
   (post : pred (out_t * heap))
   (s : (ℓ.+1).-tuple R)
-  (W : pythKernelPair (ℓ := ℓ)) :
+  (W : pythKernelPair (ℓ := ℓ))
+  (x : out_t * heap) :
   pythKernelSpec KL KR post s W ->
-  forall x, x \in dinsupp KL -> post x.
-Proof. by case: W=> P Q /= [_ [_ [_ [Hpost _]]]]. Qed.
+  x \in dinsupp KL -> post x.
+Proof.
+by case: W=> P Q /= [_ [_ [_ [Hpost _]]]]; exact: Hpost.
+Qed.
 
 Lemma pythKernelSpec_postR
   {ℓ : nat}
@@ -315,10 +318,13 @@ Lemma pythKernelSpec_postR
   (KL KR : {distr (out_t * heap) / R})
   (post : pred (out_t * heap))
   (s : (ℓ.+1).-tuple R)
-  (W : pythKernelPair (ℓ := ℓ)) :
+  (W : pythKernelPair (ℓ := ℓ))
+  (x : out_t * heap) :
   pythKernelSpec KL KR post s W ->
-  forall x, x \in dinsupp KR -> post x.
-Proof. by case: W=> P Q /= [_ [_ [_ [_ Hpost]]]]. Qed.
+  x \in dinsupp KR -> post x.
+Proof.
+by case: W=> P Q /= [_ [_ [_ [_ Hpost]]]]; exact: Hpost.
+Qed.
 
 Definition default_pyth_trace {n : nat} : n.-tuple (nat * heap) :=
   nseq_tuple n (0%N, empty_heap).
@@ -608,15 +614,16 @@ Lemma pythTraceBindPair_s2_nonneg
   (s1 : (ℓ1.+1).-tuple R)
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (i : 'I_(ℓ2.+1)) :
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
     =1 dmargin (@pack_output_heap mid_t) ML ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i.
+  0 <= tnth s2 i.
 Proof.
-move=> Hdist0 HmarginL0 HmidL HK i.
+move=> Hdist0 HmarginL0 HmidL HK.
 case: Hdist0=> _ [_ [HP0mass _]].
 have [omega Homega] := dweight1_dinsupp P0 HP0mass.
 have Hfinal_supp_P0 :
@@ -642,14 +649,14 @@ Lemma pythTraceKernel_absolute_continuous
   {mid_t : choice_type}
   (mid : pred (mid_t * heap))
   (s2 : (ℓ2.+1).-tuple R)
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (omega : (ℓ1.+1).-tuple (nat * heap)) :
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall omega : (ℓ1.+1).-tuple (nat * heap),
-    absolute_continuous
-      (pythTraceKernelL mid K omega)
-      (pythTraceKernelR mid K omega).
+  absolute_continuous
+    (pythTraceKernelL mid K omega)
+    (pythTraceKernelR mid K omega).
 Proof.
-move=> HK omega.
+move=> HK.
 rewrite /pythTraceKernelL /pythTraceKernelR.
 case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
   destruct (@idP (mid y)) as [Hy|Hnot].
@@ -688,7 +695,7 @@ have Hac_bind :
       (pythTraceBindR MR KR mid Q0 K).
   rewrite /pythTraceBindL /pythTraceBindR.
   apply: dlet_dunit_cat_absolute_continuous=> // omega1 _.
-  exact: (pythTraceKernel_absolute_continuous mid s2 K HK omega1).
+  exact: (pythTraceKernel_absolute_continuous mid s2 K omega1 HK).
 move=> omega HQomega0.
 rewrite HP.
 apply: Hac_bind.
@@ -760,12 +767,13 @@ Proof. exact: cat_tuple_tnth_suffix_choice. Qed.
 Lemma cat_tuple_nonneg
   {ℓ1 ℓ2 : nat}
   (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R) :
+  (s2 : (ℓ2.+1).-tuple R)
+  (i : 'I_(ℓ1.+1 + ℓ2.+1)) :
   (forall i : 'I_(ℓ1.+1), 0 <= tnth s1 i) ->
   (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
-  forall i : 'I_(ℓ1.+1 + ℓ2.+1), 0 <= tnth (cat_tuple s1 s2) i.
+  0 <= tnth (cat_tuple s1 s2) i.
 Proof.
-move=> Hs1 Hs2 i.
+move=> Hs1 Hs2.
 case Hi: (i < ℓ1.+1)%N.
   rewrite (cat_tuple_tnth_prefix s1 s2 i Hi).
   exact: Hs1.
@@ -1074,20 +1082,19 @@ Lemma pr_dlet_cat_prefix_lift_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (P0 : {distr ((ℓ1.+1).-tuple A) / R})
-  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (p : pred ((ℓ1.+1 + ℓ2.+1).-tuple A))
+  (p0 : pred ((ℓ1.+1).-tuple A)) :
   (forall omega1, dweight (K0 omega1) = 1) ->
-  forall
-    (p : pred ((ℓ1.+1 + ℓ2.+1).-tuple A))
-    (p0 : pred ((ℓ1.+1).-tuple A)),
-    (forall omega1 omega2, p (cat_tuple omega1 omega2) = p0 omega1) ->
-    \P_[
-      \dlet_(omega1 <- P0)
-      \dlet_(omega2 <- K0 omega1)
-        dunit (cat_tuple omega1 omega2)
-    ] p =
-    \P_[P0] p0.
+  (forall omega1 omega2, p (cat_tuple omega1 omega2) = p0 omega1) ->
+  \P_[
+    \dlet_(omega1 <- P0)
+    \dlet_(omega2 <- K0 omega1)
+      dunit (cat_tuple omega1 omega2)
+  ] p =
+  \P_[P0] p0.
 Proof.
-move=> Hmass p p0 Hp.
+move=> Hmass Hp.
 rewrite pr_dlet.
 rewrite [RHS]pr_exp.
 apply: expectation_ext=> omega1.
@@ -1107,39 +1114,39 @@ Lemma prc_dlet_cat_prefix_coordinate_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (P0 : {distr ((ℓ1.+1).-tuple A) / R})
-  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (i < ℓ1.+1)%N)
+  (x : A) :
   (forall omega1, dweight (K0 omega1) = 1) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-         (Hi : (i < ℓ1.+1)%N)
-         (x : A),
-    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-    let a0 : forall j : 'I_(ℓ1.+1), A :=
-      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-    \P_[
-      \dlet_(omega1 <- P0)
-      \dlet_(omega2 <- K0 omega1)
-        dunit (cat_tuple omega1 omega2),
-      fun omega => tuple_prefix_eq i a omega
-    ] [pred omega | tnth omega i \in pred1 x] =
-    \P_[P0, fun omega1 => tuple_prefix_eq i0 a0 omega1]
-      [pred omega1 | tnth omega1 i0 \in pred1 x].
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), A :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  \P_[
+    \dlet_(omega1 <- P0)
+    \dlet_(omega2 <- K0 omega1)
+      dunit (cat_tuple omega1 omega2),
+    fun omega => tuple_prefix_eq i a omega
+  ] [pred omega | tnth omega i \in pred1 x] =
+  \P_[P0, fun omega1 => tuple_prefix_eq i0 a0 omega1]
+    [pred omega1 | tnth omega1 i0 \in pred1 x].
 Proof.
-move=> Hmass i a Hi x /=.
+move=> Hmass /=.
 rewrite /prc.
-rewrite (pr_dlet_cat_prefix_lift_eq P0 K0 Hmass
+rewrite (pr_dlet_cat_prefix_lift_eq P0 K0
   (fun omega =>
     (tnth omega i \in pred1 x) && tuple_prefix_eq i a omega)
   (fun omega1 =>
     (tnth omega1 (Ordinal Hi) \in pred1 x) &&
     tuple_prefix_eq (Ordinal Hi)
       (fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))))
-      omega1)).
-  rewrite (pr_dlet_cat_prefix_lift_eq P0 K0 Hmass
+      omega1) Hmass).
+  rewrite (pr_dlet_cat_prefix_lift_eq P0 K0
     (fun omega => tuple_prefix_eq i a omega)
     (fun omega1 => tuple_prefix_eq (Ordinal Hi)
       (fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))))
-      omega1)) //.
+      omega1) Hmass) //.
   move=> omega1 omega2.
 	  exact: tuple_prefix_eq_cat_prefix.
 move=> omega1 omega2.
@@ -1152,26 +1159,26 @@ Lemma conditional_coordinate_dlet_cat_prefix_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (P0 : {distr ((ℓ1.+1).-tuple A) / R})
-  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (i < ℓ1.+1)%N) :
   (forall omega1, dweight (K0 omega1) = 1) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-         (Hi : (i < ℓ1.+1)%N),
-    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-    let a0 : forall j : 'I_(ℓ1.+1), A :=
-      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-    conditional_coordinate
-      (\dlet_(omega1 <- P0)
-       \dlet_(omega2 <- K0 omega1)
-         dunit (cat_tuple omega1 omega2))
-      i a
-      =1 conditional_coordinate P0 i0 a0.
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), A :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  conditional_coordinate
+    (\dlet_(omega1 <- P0)
+     \dlet_(omega2 <- K0 omega1)
+       dunit (cat_tuple omega1 omega2))
+    i a
+    =1 conditional_coordinate P0 i0 a0.
 Proof.
-move=> Hmass i a Hi /= x.
+move=> Hmass /= x.
 rewrite !pr_pred1.
 rewrite !pr_dmargin.
 rewrite !pr_dcond.
-exact: (prc_dlet_cat_prefix_coordinate_eq P0 K0 Hmass i a Hi x).
+exact: (prc_dlet_cat_prefix_coordinate_eq P0 K0 i a Hi x Hmass).
 Qed.
 
 Lemma pythTraceKernelL_dweight1
@@ -1179,12 +1186,12 @@ Lemma pythTraceKernelL_dweight1
   {mid_t out_t : choice_type}
   (mid : pred (mid_t * heap))
   (s2 : (ℓ2.+1).-tuple R)
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (omega : (ℓ1.+1).-tuple (nat * heap)) :
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall omega : (ℓ1.+1).-tuple (nat * heap),
-    dweight (pythTraceKernelL mid K omega) = 1.
+  dweight (pythTraceKernelL mid K omega) = 1.
 Proof.
-move=> HK omega.
+move=> HK.
 rewrite /pythTraceKernelL.
 case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
   destruct (@idP (mid y)) as [Hy|Hnot].
@@ -1198,12 +1205,12 @@ Lemma pythTraceKernelR_dweight1
   {mid_t out_t : choice_type}
   (mid : pred (mid_t * heap))
   (s2 : (ℓ2.+1).-tuple R)
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (omega : (ℓ1.+1).-tuple (nat * heap)) :
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall omega : (ℓ1.+1).-tuple (nat * heap),
-    dweight (pythTraceKernelR mid K omega) = 1.
+  dweight (pythTraceKernelR mid K omega) = 1.
 Proof.
-move=> HK omega.
+move=> HK.
 rewrite /pythTraceKernelR.
 case Hdecode: (decode_output_heap (tnth omega ord_max))=> [y|].
   destruct (@idP (mid y)) as [Hy|Hnot].
@@ -1236,8 +1243,9 @@ case: Hdist0=> _ [_ [HP0mass _]].
 rewrite (pr_ext P (pythTraceBindL ML KL mid P0 K) predT HP).
 rewrite /pythTraceBindL.
 rewrite (pr_dlet_cat_prefix_lift_eq P0 (pythTraceKernelL mid K)
-  (@pythTraceKernelL_dweight1 ℓ1 ℓ2 mid_t out_t mid s2 K HK)
-  predT predT);
+  predT predT
+  (fun omega => @pythTraceKernelL_dweight1
+    ℓ1 ℓ2 mid_t out_t mid s2 K omega HK));
   last by move=> omega1 omega2.
 exact: HP0mass.
 Qed.
@@ -1266,8 +1274,9 @@ case: Hdist0=> _ [_ [_ [HQ0mass _]]].
 rewrite (pr_ext Q (pythTraceBindR MR KR mid Q0 K) predT HQ).
 rewrite /pythTraceBindR.
 rewrite (pr_dlet_cat_prefix_lift_eq Q0 (pythTraceKernelR mid K)
-  (@pythTraceKernelR_dweight1 ℓ1 ℓ2 mid_t out_t mid s2 K HK)
-  predT predT);
+  predT predT
+  (fun omega => @pythTraceKernelR_dweight1
+    ℓ1 ℓ2 mid_t out_t mid s2 K omega HK));
   last by move=> omega1 omega2.
 exact: HQ0mass.
 Qed.
@@ -1280,21 +1289,21 @@ Lemma pythTraceBindL_conditional_coordinate_prefix_eq
   (mid : pred (mid_t * heap))
   (s2 : (ℓ2.+1).-tuple R)
   (P0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (i < ℓ1.+1)%N) :
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (i < ℓ1.+1)%N),
-    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
-      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-    conditional_coordinate (pythTraceBindL ML KL mid P0 K) i a
-      =1 conditional_coordinate P0 i0 a0.
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  conditional_coordinate (pythTraceBindL ML KL mid P0 K) i a
+    =1 conditional_coordinate P0 i0 a0.
 Proof.
-move=> HK i a Hi.
+move=> HK.
 exact: (conditional_coordinate_dlet_cat_prefix_eq
-  P0 (pythTraceKernelL mid K)
-  (pythTraceKernelL_dweight1 mid s2 K HK) i a Hi).
+  P0 (pythTraceKernelL mid K) i a Hi
+  (fun omega => pythTraceKernelL_dweight1 mid s2 K omega HK)).
 Qed.
 
 Lemma pythTraceBindR_conditional_coordinate_prefix_eq
@@ -1305,21 +1314,21 @@ Lemma pythTraceBindR_conditional_coordinate_prefix_eq
   (mid : pred (mid_t * heap))
   (s2 : (ℓ2.+1).-tuple R)
   (Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
-  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2)) :
+  (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (i < ℓ1.+1)%N) :
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (i < ℓ1.+1)%N),
-    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
-      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-    conditional_coordinate (pythTraceBindR MR KR mid Q0 K) i a
-      =1 conditional_coordinate Q0 i0 a0.
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  conditional_coordinate (pythTraceBindR MR KR mid Q0 K) i a
+    =1 conditional_coordinate Q0 i0 a0.
 Proof.
-move=> HK i a Hi.
+move=> HK.
 exact: (conditional_coordinate_dlet_cat_prefix_eq
-  Q0 (pythTraceKernelR mid K)
-  (pythTraceKernelR_dweight1 mid s2 K HK) i a Hi).
+  Q0 (pythTraceKernelR mid K) i a Hi
+  (fun omega => pythTraceKernelR_dweight1 mid s2 K omega HK)).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_prefix_eqL
@@ -1331,23 +1340,23 @@ Lemma pythTraceBindPair_conditional_coordinate_prefix_eqL
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (i < ℓ1.+1)%N) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (i < ℓ1.+1)%N),
-    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
-      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-    conditional_coordinate P i a
-      =1 conditional_coordinate P0 i0 a0.
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  conditional_coordinate P i a
+    =1 conditional_coordinate P0 i0 a0.
 Proof.
-move=> [HP _] HK i a Hi /= x.
+move=> [HP _] HK /= x.
 rewrite (conditional_coordinate_dist_ext P
   (pythTraceBindL ML KL mid P0 K) i a HP x).
 exact: (pythTraceBindL_conditional_coordinate_prefix_eq
-  ML KL mid s2 P0 K HK i a Hi x).
+  ML KL mid s2 P0 K i a Hi HK x).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_prefix_eqR
@@ -1359,23 +1368,23 @@ Lemma pythTraceBindPair_conditional_coordinate_prefix_eqR
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (i < ℓ1.+1)%N) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (i < ℓ1.+1)%N),
-    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
-      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-    conditional_coordinate Q i a
-      =1 conditional_coordinate Q0 i0 a0.
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  conditional_coordinate Q i a
+    =1 conditional_coordinate Q0 i0 a0.
 Proof.
-move=> [_ HQ] HK i a Hi /= x.
+move=> [_ HQ] HK /= x.
 rewrite (conditional_coordinate_dist_ext Q
   (pythTraceBindR MR KR mid Q0 K) i a HQ x).
 exact: (pythTraceBindR_conditional_coordinate_prefix_eq
-  MR KR mid s2 Q0 K HK i a Hi x).
+  MR KR mid s2 Q0 K i a Hi HK x).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_prefix_eq
@@ -1387,26 +1396,26 @@ Lemma pythTraceBindPair_conditional_coordinate_prefix_eq
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (i < ℓ1.+1)%N) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (i < ℓ1.+1)%N),
-    let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-    let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
-      fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) =
-    δ_KL (conditional_coordinate P0 i0 a0)
-         (conditional_coordinate Q0 i0 a0).
+  let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
+  let a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) =
+  δ_KL (conditional_coordinate P0 i0 a0)
+       (conditional_coordinate Q0 i0 a0).
 Proof.
-move=> Hbind HK i a Hi.
+move=> Hbind HK.
 apply: kl_ext.
 - exact: (pythTraceBindPair_conditional_coordinate_prefix_eqL
-    ML MR KL KR mid s2 P0 Q0 K P Q Hbind HK i a Hi).
+    ML MR KL KR mid s2 P0 Q0 K P Q i a Hi Hbind HK).
 - exact: (pythTraceBindPair_conditional_coordinate_prefix_eqR
-    ML MR KL KR mid s2 P0 Q0 K P Q Hbind HK i a Hi).
+    ML MR KL KR mid s2 P0 Q0 K P Q i a Hi Hbind HK).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_bound_prefix_from_P0
@@ -1419,23 +1428,23 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_prefix_from_P0
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
-    (i < ℓ1.+1)%N ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth (cat_tuple s1 s2) i.
+  (i < ℓ1.+1)%N ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth (cat_tuple s1 s2) i.
 Proof.
-move=> Hbind [_ [_ [_ [_ Hcond0]]]] HK i a Hi.
+move=> Hbind [_ [_ [_ [_ Hcond0]]]] HK Hi.
 pose i0 : 'I_(ℓ1.+1) := Ordinal Hi.
 pose a0 : forall j : 'I_(ℓ1.+1), nat * heap :=
   fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))).
 rewrite (pythTraceBindPair_conditional_coordinate_prefix_eq
-  ML MR KL KR mid s2 P0 Q0 K P Q Hbind HK i a Hi).
+  ML MR KL KR mid s2 P0 Q0 K P Q i a Hi Hbind HK).
 rewrite (cat_tuple_tnth_prefix s1 s2 i Hi).
 exact: (Hcond0 i0 a0).
 Qed.
@@ -1450,7 +1459,9 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_prefix
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -1460,17 +1471,15 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_prefix
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
-    (i < ℓ1.+1)%N ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth (cat_tuple s1 s2) i.
+  (i < ℓ1.+1)%N ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth (cat_tuple s1 s2) i.
 Proof.
-move=> Hbind Hdist0 _ _ _ _ HK i a Hi.
+move=> Hbind Hdist0 _ _ _ _ HK Hi.
 exact: (pythTraceBindPair_conditional_coordinate_bound_prefix_from_P0
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q Hbind Hdist0
-  HK i a Hi).
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hbind Hdist0
+  HK Hi).
 Qed.
 
 Lemma divr_cancel_left_pos (a b c : R) :
@@ -1576,27 +1585,27 @@ Lemma pr_dlet_cat_suffix_prefix_event_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (P0 : {distr ((ℓ1.+1).-tuple A) / R})
-  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (omega1 : (ℓ1.+1).-tuple A),
-    pythCombinedPrefixTrace a = omega1 ->
-    0 < P0 omega1 ->
-    \P_[
-      \dlet_(omega1 <- P0)
-      \dlet_(omega2 <- K0 omega1)
-        dunit (cat_tuple omega1 omega2)
-    ] (fun omega => tuple_prefix_eq i a omega) =
-    P0 omega1 *
-    \P_[K0 omega1]
-      (fun omega2 =>
-        tuple_prefix_eq
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a)
-          omega2).
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (omega1 : (ℓ1.+1).-tuple A) :
+  pythCombinedPrefixTrace a = omega1 ->
+  0 < P0 omega1 ->
+  \P_[
+    \dlet_(omega1 <- P0)
+    \dlet_(omega2 <- K0 omega1)
+      dunit (cat_tuple omega1 omega2)
+  ] (fun omega => tuple_prefix_eq i a omega) =
+  P0 omega1 *
+  \P_[K0 omega1]
+    (fun omega2 =>
+      tuple_prefix_eq
+        (pythCombinedSuffixIndex i Hi)
+        (pythCombinedSuffixAssignment i Hi a)
+        omega2).
 Proof.
-move=> i a Hi omega1 Hprefix _.
+move=> Hprefix _.
 apply: pr_dlet_cat_fixed_prefix_event_eq=> omega1' omega2.
 exact: (tuple_prefix_eq_cat_suffix i a Hi omega1 omega1' omega2 Hprefix).
 Qed.
@@ -1605,30 +1614,30 @@ Lemma pr_dlet_cat_suffix_coordinate_event_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (P0 : {distr ((ℓ1.+1).-tuple A) / R})
-  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (omega1 : (ℓ1.+1).-tuple A)
-         (x : A),
-    pythCombinedPrefixTrace a = omega1 ->
-    0 < P0 omega1 ->
-    \P_[
-      \dlet_(omega1 <- P0)
-      \dlet_(omega2 <- K0 omega1)
-        dunit (cat_tuple omega1 omega2)
-    ] (fun omega =>
-      (tnth omega i \in pred1 x) && tuple_prefix_eq i a omega) =
-    P0 omega1 *
-    \P_[K0 omega1]
-      (fun omega2 =>
-        (tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x) &&
-        tuple_prefix_eq
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a)
-          omega2).
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (omega1 : (ℓ1.+1).-tuple A)
+  (x : A) :
+  pythCombinedPrefixTrace a = omega1 ->
+  0 < P0 omega1 ->
+  \P_[
+    \dlet_(omega1 <- P0)
+    \dlet_(omega2 <- K0 omega1)
+      dunit (cat_tuple omega1 omega2)
+  ] (fun omega =>
+    (tnth omega i \in pred1 x) && tuple_prefix_eq i a omega) =
+  P0 omega1 *
+  \P_[K0 omega1]
+    (fun omega2 =>
+      (tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x) &&
+      tuple_prefix_eq
+        (pythCombinedSuffixIndex i Hi)
+        (pythCombinedSuffixAssignment i Hi a)
+        omega2).
 Proof.
-move=> i a Hi omega1 x Hprefix _.
+move=> Hprefix _.
 apply: pr_dlet_cat_fixed_prefix_event_eq=> omega1' omega2.
 rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 i Hi).
 rewrite (tuple_prefix_eq_cat_suffix i a Hi omega1 omega1' omega2 Hprefix).
@@ -1642,30 +1651,30 @@ Lemma prc_dlet_cat_suffix_coordinate_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (P0 : {distr ((ℓ1.+1).-tuple A) / R})
-  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (omega1 : (ℓ1.+1).-tuple A)
-         (x : A),
-    pythCombinedPrefixTrace a = omega1 ->
-    0 < P0 omega1 ->
-    \P_[
-      \dlet_(omega1 <- P0)
-      \dlet_(omega2 <- K0 omega1)
-        dunit (cat_tuple omega1 omega2),
-      fun omega => tuple_prefix_eq i a omega
-    ] [pred omega | tnth omega i \in pred1 x] =
-    \P_[K0 omega1,
-      fun omega2 =>
-        tuple_prefix_eq
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a)
-          omega2
-    ] [pred omega2 |
-      tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x].
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (omega1 : (ℓ1.+1).-tuple A)
+  (x : A) :
+  pythCombinedPrefixTrace a = omega1 ->
+  0 < P0 omega1 ->
+  \P_[
+    \dlet_(omega1 <- P0)
+    \dlet_(omega2 <- K0 omega1)
+      dunit (cat_tuple omega1 omega2),
+    fun omega => tuple_prefix_eq i a omega
+  ] [pred omega | tnth omega i \in pred1 x] =
+  \P_[K0 omega1,
+    fun omega2 =>
+      tuple_prefix_eq
+        (pythCombinedSuffixIndex i Hi)
+        (pythCombinedSuffixAssignment i Hi a)
+        omega2
+  ] [pred omega2 |
+    tnth omega2 (pythCombinedSuffixIndex i Hi) \in pred1 x].
 Proof.
-move=> i a Hi omega1 x Hprefix Hpos.
+move=> Hprefix Hpos.
 rewrite /prc.
 rewrite (pr_dlet_cat_suffix_coordinate_event_eq
   P0 K0 i a Hi omega1 x Hprefix Hpos).
@@ -1678,23 +1687,23 @@ Lemma conditional_coordinate_dlet_cat_suffix_eq
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (P0 : {distr ((ℓ1.+1).-tuple A) / R})
-  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R}) :
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (omega1 : (ℓ1.+1).-tuple A),
-    pythCombinedPrefixTrace a = omega1 ->
-    0 < P0 omega1 ->
-    conditional_coordinate
-      (\dlet_(omega1 <- P0)
-       \dlet_(omega2 <- K0 omega1)
-         dunit (cat_tuple omega1 omega2))
-      i a
-      =1 conditional_coordinate (K0 omega1)
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a).
+  (K0 : (ℓ1.+1).-tuple A -> {distr ((ℓ2.+1).-tuple A) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (omega1 : (ℓ1.+1).-tuple A) :
+  pythCombinedPrefixTrace a = omega1 ->
+  0 < P0 omega1 ->
+  conditional_coordinate
+    (\dlet_(omega1 <- P0)
+     \dlet_(omega2 <- K0 omega1)
+       dunit (cat_tuple omega1 omega2))
+    i a
+    =1 conditional_coordinate (K0 omega1)
+        (pythCombinedSuffixIndex i Hi)
+        (pythCombinedSuffixAssignment i Hi a).
 Proof.
-move=> i a Hi omega1 Hprefix Hpos x.
+move=> Hprefix Hpos x.
 rewrite !pr_pred1.
 rewrite !pr_dmargin.
 rewrite !pr_dcond.
@@ -1704,11 +1713,12 @@ Qed.
 
 Lemma absolute_continuous_positive
   {T : choiceType}
-  (P Q : {distr T / R}) :
+  (P Q : {distr T / R})
+  (x : T) :
   absolute_continuous P Q ->
-  forall x, 0 < P x -> 0 < Q x.
+  0 < P x -> 0 < Q x.
 Proof.
-move=> Hac x HPx.
+move=> Hac HPx.
 rewrite lt_def ge0_mu andbT.
 apply/negP=> /eqP HQx0.
 have HPx0 := Hac x HQx0.
@@ -1762,7 +1772,10 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -1772,18 +1785,15 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N),
-    P0 (pythCombinedPrefixTrace a) = 0 ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth s2 (pythCombinedSuffixIndex i Hi).
+  P0 (pythCombinedPrefixTrace a) = 0 ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth s2 (pythCombinedSuffixIndex i Hi).
 Proof.
-move=> Hbind Hdist0 HmarginL0 _ HmidL _ HK i a Hi HP0z.
+move=> Hbind Hdist0 HmarginL0 _ HmidL _ HK HP0z.
 have Hs2 : 0 <= tnth s2 (pythCombinedSuffixIndex i Hi) :=
   pythTraceBindPair_s2_nonneg ML mid s1 s2 P0 Q0 K
-    Hdist0 HmarginL0 HmidL HK (pythCombinedSuffixIndex i Hi).
+    (pythCombinedSuffixIndex i Hi) Hdist0 HmarginL0 HmidL HK.
 have HPprefix0 :
     \P_[P] (fun omega => tuple_prefix_eq i a omega) = 0.
   case: Hbind=> HP _.
@@ -1852,7 +1862,11 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_eqL_valid_mid
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (y : { y : mid_t * heap | mid y }) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -1861,20 +1875,16 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_eqL_valid_mid
     =1 dmargin (@pack_output_heap mid_t) MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (y : { y : mid_t * heap | mid y }),
-    @decode_output_heap mid_t
-      (tnth (pythCombinedPrefixTrace a) ord_max) =
-      Some (proj1_sig y) ->
-    0 < P0 (pythCombinedPrefixTrace a) ->
-    conditional_coordinate P i a
-      =1 conditional_coordinate (K y).1
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a).
+  @decode_output_heap mid_t
+    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    Some (proj1_sig y) ->
+  0 < P0 (pythCombinedPrefixTrace a) ->
+  conditional_coordinate P i a
+    =1 conditional_coordinate (K y).1
+        (pythCombinedSuffixIndex i Hi)
+        (pythCombinedSuffixAssignment i Hi a).
 Proof.
-move=> [HP _] _ _ _ _ _ i a Hi y Hy Hpos x.
+move=> [HP _] _ _ _ _ _ Hy Hpos x.
 rewrite (conditional_coordinate_dist_ext P
   (pythTraceBindL ML KL mid P0 K) i a HP x).
 pose omega1 := pythCombinedPrefixTrace a.
@@ -1894,7 +1904,11 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_eqR_valid_mid
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (y : { y : mid_t * heap | mid y }) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -1903,20 +1917,16 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_eqR_valid_mid
     =1 dmargin (@pack_output_heap mid_t) MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (y : { y : mid_t * heap | mid y }),
-    @decode_output_heap mid_t
-      (tnth (pythCombinedPrefixTrace a) ord_max) =
-      Some (proj1_sig y) ->
-    0 < Q0 (pythCombinedPrefixTrace a) ->
-    conditional_coordinate Q i a
-      =1 conditional_coordinate (K y).2
-          (pythCombinedSuffixIndex i Hi)
-          (pythCombinedSuffixAssignment i Hi a).
+  @decode_output_heap mid_t
+    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    Some (proj1_sig y) ->
+  0 < Q0 (pythCombinedPrefixTrace a) ->
+  conditional_coordinate Q i a
+    =1 conditional_coordinate (K y).2
+        (pythCombinedSuffixIndex i Hi)
+        (pythCombinedSuffixAssignment i Hi a).
 Proof.
-move=> [_ HQ] _ _ _ _ _ i a Hi y Hy Hpos x.
+move=> [_ HQ] _ _ _ _ _ Hy Hpos x.
 rewrite (conditional_coordinate_dist_ext Q
   (pythTraceBindR MR KR mid Q0 K) i a HQ x).
 pose omega1 := pythCombinedPrefixTrace a.
@@ -1936,7 +1946,11 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_eq_valid_mid
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (y : { y : mid_t * heap | mid y }) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -1945,32 +1959,28 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_eq_valid_mid
     =1 dmargin (@pack_output_heap mid_t) MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (y : { y : mid_t * heap | mid y }),
-    @decode_output_heap mid_t
-      (tnth (pythCombinedPrefixTrace a) ord_max) =
-      Some (proj1_sig y) ->
-    0 < P0 (pythCombinedPrefixTrace a) ->
-    0 < Q0 (pythCombinedPrefixTrace a) ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) =
-    δ_KL (conditional_coordinate (K y).1
-            (pythCombinedSuffixIndex i Hi)
-            (pythCombinedSuffixAssignment i Hi a))
-         (conditional_coordinate (K y).2
-            (pythCombinedSuffixIndex i Hi)
-            (pythCombinedSuffixAssignment i Hi a)).
+  @decode_output_heap mid_t
+    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    Some (proj1_sig y) ->
+  0 < P0 (pythCombinedPrefixTrace a) ->
+  0 < Q0 (pythCombinedPrefixTrace a) ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) =
+  δ_KL (conditional_coordinate (K y).1
+          (pythCombinedSuffixIndex i Hi)
+          (pythCombinedSuffixAssignment i Hi a))
+       (conditional_coordinate (K y).2
+          (pythCombinedSuffixIndex i Hi)
+          (pythCombinedSuffixAssignment i Hi a)).
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR i a Hi y Hy HPpos HQpos.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy HPpos HQpos.
 apply: kl_ext.
 - exact: (pythTraceBindPair_conditional_coordinate_suffix_eqL_valid_mid
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q
-  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR i a Hi y Hy HPpos).
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy HPpos).
 - exact: (pythTraceBindPair_conditional_coordinate_suffix_eqR_valid_mid
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q
-  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR i a Hi y Hy HQpos).
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy HQpos).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_valid_mid
@@ -1983,7 +1993,11 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_valid_mid
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (y : { y : mid_t * heap | mid y }) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -1993,34 +2007,30 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_valid_mid
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (y : { y : mid_t * heap | mid y }),
-    @decode_output_heap mid_t
-      (tnth (pythCombinedPrefixTrace a) ord_max) =
-      Some (proj1_sig y) ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth s2 (pythCombinedSuffixIndex i Hi).
+  @decode_output_heap mid_t
+    (tnth (pythCombinedPrefixTrace a) ord_max) =
+    Some (proj1_sig y) ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth s2 (pythCombinedSuffixIndex i Hi).
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi y Hy.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hy.
 move: Hdist0=> [Hs1 [Hac0 [HP0mass [HQ0mass Hcond0]]]].
 have Hdist0 : pythDist P0 Q0 s1.
   by split; first exact: Hs1; split; first exact: Hac0;
      split; first exact: HP0mass; split; first exact: HQ0mass.
 case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
   exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
-    ML MR KL KR mid s1 s2 P0 Q0 K P Q
-    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK
     (eqP HP0z)).
 have HP0pos : 0 < P0 (pythCombinedPrefixTrace a).
   by rewrite lt_def ge0_mu HP0z.
 have HQ0pos : 0 < Q0 (pythCombinedPrefixTrace a).
-  exact: (absolute_continuous_positive P0 Q0 Hac0 _ HP0pos).
+  exact: (absolute_continuous_positive P0 Q0 _ Hac0 HP0pos).
 rewrite (pythTraceBindPair_conditional_coordinate_suffix_eq_valid_mid
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q
-  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR i a Hi y Hy
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hy
   HP0pos HQ0pos).
 case: (HK y)=> _ [_ [_ [_ Hcond]]].
 exact: (Hcond (pythCombinedSuffixIndex i Hi)
@@ -2037,7 +2047,10 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_decode_none
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -2047,16 +2060,13 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_decode_none
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N),
-    @decode_output_heap mid_t
-      (tnth (pythCombinedPrefixTrace a) ord_max) = None ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth s2 (pythCombinedSuffixIndex i Hi).
+  @decode_output_heap mid_t
+    (tnth (pythCombinedPrefixTrace a) ord_max) = None ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth s2 (pythCombinedSuffixIndex i Hi).
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi Hdecode_none.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode_none.
 have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
   case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
     exact/eqP.
@@ -2079,8 +2089,8 @@ have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
   move: Hdecode_none.
   by rewrite -Hpack decode_output_heap_pack.
 exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q
-  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi HP0z).
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK HP0z).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
@@ -2093,7 +2103,11 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N)
+  (y : mid_t * heap) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -2103,18 +2117,14 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N)
-         (y : mid_t * heap),
-    @decode_output_heap mid_t
-      (tnth (pythCombinedPrefixTrace a) ord_max) = Some y ->
-    ~~ mid y ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth s2 (pythCombinedSuffixIndex i Hi).
+  @decode_output_heap mid_t
+    (tnth (pythCombinedPrefixTrace a) ord_max) = Some y ->
+  ~~ mid y ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth s2 (pythCombinedSuffixIndex i Hi).
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi y Hdecode Hnot_mid.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode Hnot_mid.
 have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
   case HP0z: (P0 (pythCombinedPrefixTrace a) == 0).
     exact/eqP.
@@ -2143,8 +2153,8 @@ have HP0z : P0 (pythCombinedPrefixTrace a) = 0.
   rewrite Hyz.
   by rewrite (HmidL z Hz).
 exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_zero_prefix
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q
-  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi HP0z).
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK HP0z).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
@@ -2157,7 +2167,10 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
+  (Hi : (ℓ1.+1 <= i)%N) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -2167,30 +2180,26 @@ Lemma pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap)
-         (Hi : (ℓ1.+1 <= i)%N),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth s2 (Ordinal (cat_tuple_suffix_bound i Hi)).
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth s2 (Ordinal (cat_tuple_suffix_bound i Hi)).
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
 case Hdecode:
     (@decode_output_heap mid_t
       (tnth (pythCombinedPrefixTrace a) ord_max))=> [y|].
   case Hmidy: (mid y).
   - have Hy : mid y by rewrite Hmidy.
     exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_valid_mid
-      ML MR KL KR mid s1 s2 P0 Q0 K P Q
-      Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK
-      i a Hi (exist _ y Hy) Hdecode).
+      ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi (exist _ y Hy)
+      Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode).
   - exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_not_mid
-      ML MR KL KR mid s1 s2 P0 Q0 K P Q
+      ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi y
       Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK
-      i a Hi y Hdecode (negbT Hmidy)).
+      Hdecode (negbT Hmidy)).
 - exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_decode_none
-    ML MR KL KR mid s1 s2 P0 Q0 K P Q
-    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi Hdecode).
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hdecode).
 Qed.
 
 
@@ -2204,7 +2213,9 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -2214,18 +2225,16 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
-    (ℓ1.+1 <= i)%N ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth (cat_tuple s1 s2) i.
+  (ℓ1.+1 <= i)%N ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth (cat_tuple s1 s2) i.
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi.
 rewrite (cat_tuple_tnth_suffix s1 s2 i Hi).
 exact: (pythTraceBindPair_conditional_coordinate_suffix_bound_from_kernel
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q
-  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_bound_suffix
@@ -2238,7 +2247,9 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_suffix
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -2248,17 +2259,15 @@ Lemma pythTraceBindPair_conditional_coordinate_bound_suffix
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
-    (ℓ1.+1 <= i)%N ->
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth (cat_tuple s1 s2) i.
+  (ℓ1.+1 <= i)%N ->
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth (cat_tuple s1 s2) i.
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi.
 exact: (pythTraceBindPair_conditional_coordinate_bound_suffix_from_K
-  ML MR KL KR mid s1 s2 P0 Q0 K P Q
-  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+  ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
+  Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi).
 Qed.
 
 Lemma pythTraceBindPair_conditional_coordinate_bound
@@ -2271,7 +2280,9 @@ Lemma pythTraceBindPair_conditional_coordinate_bound
   (s2 : (ℓ2.+1).-tuple R)
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (nat * heap)) / R})
   (K : { y : mid_t * heap | mid y } -> pythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R}) :
+  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple (nat * heap)) / R})
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap) :
   pythTraceBindPair ML MR KL KR mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
@@ -2281,20 +2292,18 @@ Lemma pythTraceBindPair_conditional_coordinate_bound
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y, pythDist (K y).1 (K y).2 s2) ->
-  forall (i : 'I_(ℓ1.+1 + ℓ2.+1))
-         (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), nat * heap),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
-      tnth (cat_tuple s1 s2) i.
+  δ_KL (conditional_coordinate P i a)
+       (conditional_coordinate Q i a) <=
+    tnth (cat_tuple s1 s2) i.
 Proof.
-move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK.
 case: (ltnP i ℓ1.+1)=> Hi.
 - exact: (pythTraceBindPair_conditional_coordinate_bound_prefix
-    ML MR KL KR mid s1 s2 P0 Q0 K P Q
-    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi).
 - exact: (pythTraceBindPair_conditional_coordinate_bound_suffix
-    ML MR KL KR mid s1 s2 P0 Q0 K P Q
-    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK i a Hi).
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK Hi).
 Qed.
 
 Lemma pythTraceBindPair_pythDist
@@ -2325,10 +2334,11 @@ have Hdist0 : pythDist P0 Q0 s1.
   by split; first exact: Hs1; split; first exact: Hac0;
      split; first exact: HP0; split; first exact: HQ0.
 have Hs2 : forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i :=
-  pythTraceBindPair_s2_nonneg ML mid s1 s2 P0 Q0 K
+  fun i => pythTraceBindPair_s2_nonneg ML mid s1 s2 P0 Q0 K i
     Hdist0 HmarginL0 HmidL HK.
 split.
-- apply: cat_tuple_nonneg.
+- move=> i.
+  apply: (cat_tuple_nonneg s1 s2 i).
   + exact: Hs1.
   + exact: Hs2.
 split.
@@ -2343,8 +2353,9 @@ split.
 - exact: (pythTraceBindPair_dweightR
     ML MR KL KR mid s1 s2 P0 Q0 K P Q
     Hbind Hdist0 HmarginR0 HmidR HK).
-- exact: (pythTraceBindPair_conditional_coordinate_bound
-    ML MR KL KR mid s1 s2 P0 Q0 K P Q
+- move=> i a.
+  exact: (pythTraceBindPair_conditional_coordinate_bound
+    ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR HK).
 Qed.
 
@@ -2684,9 +2695,11 @@ have [HpostL HpostR] :
   apply: (pythTraceBindPair_post
     ML MR KL KR mid post P0 Q0 K P Q Hbind HmidL HmidR).
   - move=> y.
-    exact: (pythKernelSpec_postL _ _ _ _ _ (HK y)).
+    move=> x.
+    exact: (pythKernelSpec_postL _ _ _ _ _ x (HK y)).
   - move=> y.
-    exact: (pythKernelSpec_postR _ _ _ _ _ (HK y)).
+    move=> x.
+    exact: (pythKernelSpec_postR _ _ _ _ _ x (HK y)).
 split; first exact: Hdist.
 split; first exact: HmarginL.
 split; first exact: HmarginR.
