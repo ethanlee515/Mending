@@ -1,4 +1,4 @@
-From Stdlib Require Import Utf8 BinInt.
+From Stdlib Require Import Utf8 Unicode.Utf8 BinInt.
 From extructures Require Import ord fset fmap.
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_boot all_order all_algebra reals distr realsum lra.
@@ -9,7 +9,8 @@ From Mending.Schemes Require Import ApproxFHE Indcpa Indcpad.
 From Mending.Constructions Require Import NoiseFlooding.
 From Mending.Security Require Import IndcpadSimulator.
 From Mending.Schemes.Utils Require Import IntVec.
-From Mending.ProgramLogics Require Import Ae Pyth.
+From Mending.ProgramLogics Require Import Ae.
+From Mending.ProgramLogics.Pyth Require Import Core Rules.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealTupleExtras.
 
 Import PackageNotation.
