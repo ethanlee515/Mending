@@ -16,7 +16,7 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
-From Mending.Probability Require Import Ae OutputHeap PythSeq CompletedPythSeq.
+From Mending.Probability Require Import Ae OutputHeap CompletedPythSeq.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare Pyth.
 Local Open Scope AeNotations.

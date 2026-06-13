@@ -103,53 +103,6 @@ rewrite kl_self.
 exact: Heps i.
 Qed.
 
-Lemma dmargin_id {A : choiceType} (P : {distr A / R}) :
-  dmargin (fun x : A => x) P =1 P.
-Proof.
-move=> x.
-rewrite dmargin_psumE.
-rewrite (psum_finseq (r := [:: x])).
-- by rewrite big_seq1 eqxx mul1r ger0_norm ?ge0_mu.
-- by [].
-move=> y.
-rewrite !inE.
-case Hyx: (y == x)=> //=.
-by rewrite mul0r eqxx.
-Qed.
-
-Lemma singleton_trace_final_margin
-  {A : choiceType} (D : {distr A / R}) :
-  dmargin (fun omega : 1.-tuple A => tnth omega ord_max)
-    (dmargin (fun x : A => [tuple x]) D) =1 D.
-Proof.
-move=> x.
-rewrite dmarginE.
-rewrite (dmargin_dlet D (fun omega : 1.-tuple A => tnth omega ord_max)
-  (fun y : A => dunit [tuple y]) x).
-rewrite -(dmargin_id D x).
-apply: eq_in_dlet; last by [].
-move=> y _ z.
-rewrite dmargin_dunit.
-by rewrite (tnth_nth y) /=.
-Qed.
-
-Lemma pythDist_singleton_trace
-  {A : choiceType} (D : {distr A / R}) :
-  dweight D = 1 ->
-  exists P : {distr (1.-tuple A) / R},
-    pythDist P P [tuple 0] /\
-    dmargin (fun omega : 1.-tuple A => tnth omega ord_max) P =1 D.
-Proof.
-move=> HD.
-pose P := dmargin (fun x : A => [tuple x]) D.
-exists P.
-split.
-- apply: pythDist_refl.
-  + by move=> i; rewrite (ord1 i) (tnth_nth 0).
-  + by rewrite /P dmargin_dweight.
-- exact: singleton_trace_final_margin.
-Qed.
-
 Lemma pythDist_total_variation
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
@@ -168,35 +121,6 @@ Lemma pythDist_final_total_variation
   total_variation (dmargin (fun omega => tnth omega ord_max) P)
     (dmargin (fun omega => tnth omega ord_max) Q) <=
     pythagorean_tv_bound eps.
-Admitted.
-
-Lemma pythDist_bind_same_kernel
-  {n : nat}
-  {A mid_t out_t : choiceType}
-  (h_mid : mid_t -> A)
-  (h_out : out_t -> A)
-  (ML MR : {distr mid_t / R})
-  (K : mid_t -> {distr out_t / R})
-  (mid : pred mid_t)
-  (post : pred out_t)
-  (eps : n.+1.-tuple R)
-  (P0 Q0 : {distr (n.+1.-tuple A) / R}) :
-  pythDist P0 Q0 eps ->
-  dmargin (fun omega => tnth omega ord_max) P0
-    =1 dmargin h_mid ML ->
-  dmargin (fun omega => tnth omega ord_max) Q0
-    =1 dmargin h_mid MR ->
-  (forall y, y \in dinsupp ML -> mid y) ->
-  (forall y, y \in dinsupp MR -> mid y) ->
-  (forall y, mid y -> forall x, x \in dinsupp (K y) -> post x) ->
-  exists (P Q : {distr (n.+1.-tuple A) / R}),
-    pythDist P Q eps /\
-    dmargin (fun omega => tnth omega ord_max) P
-      =1 dmargin h_out (\dlet_(y <- ML) K y) /\
-    dmargin (fun omega => tnth omega ord_max) Q
-      =1 dmargin h_out (\dlet_(y <- MR) K y) /\
-    (forall x, x \in dinsupp (\dlet_(y <- ML) K y) -> post x) /\
-    (forall x, x \in dinsupp (\dlet_(y <- MR) K y) -> post x).
 Admitted.
 
 End PythagoreanDistributionJudgments.
