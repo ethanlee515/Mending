@@ -85,6 +85,71 @@ Definition pythDist
          (conditional_coordinate Q i a) <=
       tnth eps i.
 
+Lemma pythDist_refl
+  {n : nat} {A : choiceType}
+  (P : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  (forall i : 'I_n, 0 <= tnth eps i) ->
+  dweight P = 1 ->
+  pythDist P P eps.
+Proof.
+move=> Heps HP.
+split; first exact: Heps.
+split.
+  by move=> x ->.
+split; first exact: HP.
+split; first exact: HP.
+move=> i a.
+rewrite kl_self.
+exact: Heps i.
+Qed.
+
+Lemma dmargin_id {A : choiceType} (P : {distr A / R}) :
+  dmargin (fun x : A => x) P =1 P.
+Proof.
+move=> x.
+rewrite dmargin_psumE.
+rewrite (psum_finseq (r := [:: x])).
+- by rewrite big_seq1 eqxx mul1r ger0_norm ?ge0_mu.
+- by [].
+move=> y.
+rewrite !inE.
+case Hyx: (y == x)=> //=.
+by rewrite mul0r eqxx.
+Qed.
+
+Lemma singleton_trace_final_margin
+  {A : choiceType} (D : {distr A / R}) :
+  dmargin (fun omega : 1.-tuple A => tnth omega ord_max)
+    (dmargin (fun x : A => [tuple x]) D) =1 D.
+Proof.
+move=> x.
+rewrite dmarginE.
+rewrite (dmargin_dlet D (fun omega : 1.-tuple A => tnth omega ord_max)
+  (fun y : A => dunit [tuple y]) x).
+rewrite -(dmargin_id D x).
+apply: eq_in_dlet; last by [].
+move=> y _ z.
+rewrite dmargin_dunit.
+by rewrite (tnth_nth y) /=.
+Qed.
+
+Lemma pythDist_singleton_trace
+  {A : choiceType} (D : {distr A / R}) :
+  dweight D = 1 ->
+  exists P : {distr (1.-tuple A) / R},
+    pythDist P P [tuple 0] /\
+    dmargin (fun omega : 1.-tuple A => tnth omega ord_max) P =1 D.
+Proof.
+move=> HD.
+pose P := dmargin (fun x : A => [tuple x]) D.
+exists P.
+split.
+- apply: pythDist_refl.
+  + by move=> i; rewrite (ord1 i) (tnth_nth 0).
+  + by rewrite /P dmargin_dweight.
+- exact: singleton_trace_final_margin.
+Qed.
+
 Lemma pythDist_total_variation
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :

@@ -75,6 +75,81 @@ Definition coupling_with_loss
   (outR : {distr outR_t / R}) : Prop :=
   dmargin fst d <=1 outL /\ dmargin snd d <=1 outR.
 
+Lemma pr_le_dweight {A : choiceType} (D : {distr A / R}) (p : pred A) :
+  \P_[D] p <= dweight D.
+Proof.
+have H : \P_[D] p <= \P_[D] predT.
+  apply: subset_pr => x _.
+  by [].
+exact: H.
+Qed.
+
+Lemma dweight_le_pointwise {A : choiceType} (D E : {distr A / R}) :
+  D <=1 E ->
+  dweight D <= dweight E.
+Proof.
+move=> HDE.
+rewrite !pr_predT.
+apply: le_psum; last exact: summable_mu.
+move=> x.
+apply/andP; split.
+- exact: ge0_mu.
+- exact: HDE x.
+Qed.
+
+Lemma coupling_with_loss_left_mass1
+  {outL_t outR_t : choiceType}
+  (d : {distr (outL_t * outR_t) / R})
+  (outL : {distr outL_t / R})
+  (outR : {distr outR_t / R})
+  (post : pred (outL_t * outR_t)) :
+  coupling_with_loss d outL outR ->
+  \P_[ d ] post >= 1 ->
+  dweight outL = 1.
+Proof.
+move=> [HdL _] Hpost.
+have Hprob_le : \P_[ d ] post <= dweight d.
+  exact: pr_le_dweight.
+have Hd_ge1 : 1 <= dweight d := le_trans Hpost Hprob_le.
+have Hd_le1 : dweight d <= 1 by rewrite pr_predT; exact: le1_mu.
+have Hd_weight : dweight d = 1.
+  apply/eqP; rewrite eq_le; apply/andP; split.
+  - exact: Hd_le1.
+  - exact: Hd_ge1.
+have Hout_ge1 : 1 <= dweight outL.
+  have := dweight_le_pointwise (dmargin fst d) outL HdL.
+  by rewrite dmargin_dweight Hd_weight.
+have Hout_le1 : dweight outL <= 1 by rewrite pr_predT; exact: le1_mu.
+apply/eqP; rewrite eq_le; apply/andP; split.
+- exact: Hout_le1.
+- exact: Hout_ge1.
+Qed.
+
+Lemma coupling_with_loss_eq_output_heaps
+  {out_t mem_t : choiceType}
+  (d : {distr ((out_t * mem_t) * (out_t * mem_t)) / R})
+  (outL outR : {distr (out_t * mem_t) / R})
+  (post : pred (out_t * mem_t)) :
+  coupling_with_loss d outL outR ->
+  \P_[ d ] (fun outs =>
+    let '((yL, memL'), (yR, memR')) := outs in
+    (yL == yR) && (memL' == memR') && post (yL, memL')) >= 1 ->
+  outL =1 outR.
+Admitted.
+
+Lemma coupling_with_loss_eq_output_heap_post_support
+  {out_t mem_t : choiceType}
+  (d : {distr ((out_t * mem_t) * (out_t * mem_t)) / R})
+  (outL outR : {distr (out_t * mem_t) / R})
+  (post : pred (out_t * mem_t)) :
+  coupling_with_loss d outL outR ->
+  \P_[ d ] (fun outs =>
+    let '((yL, memL'), (yR, memR')) := outs in
+    (yL == yR) && (memL' == memR') && post (yL, memL')) >= 1 ->
+  (forall y, y \in dinsupp outL -> post y) /\
+  (forall y, y \in dinsupp outR -> post y).
+Admitted.
+
 Definition lift_loss_post
   {outL_t outR_t : choiceType}
   (post : pred (outL_t * outR_t)) : pred (option outL_t * option outR_t) :=

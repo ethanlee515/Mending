@@ -4,8 +4,7 @@ From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals distr ssrZ realseq realsum.
-From mathcomp Require Import lra.
+From mathcomp Require Import reals distr ssrZ realseq realsum exp.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
@@ -17,7 +16,7 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
-From Mending.Probability Require Import OutputHeap PythSeq.
+From Mending.Probability Require Import Ae OutputHeap PythSeq.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
 Local Open Scope AeNotations.
@@ -147,16 +146,12 @@ split.
 - move: Hdist=> [Heps [Hac [HP [HQ Hcond]]]].
   split.
     move=> i.
-    have := Heps i.
-    have := Hs i.
-    lra.
+    exact: (le_trans (Heps i) (Hs i)).
   split; first exact: Hac.
   split; first exact: HP.
   split; first exact: HQ.
   move=> i a.
-  have := Hcond i a.
-  have := Hs i.
-  lra.
+  exact: (le_trans (Hcond i a) (Hs i)).
 split; first exact: HmarginL.
 split; first exact: HmarginR.
 split.
@@ -167,16 +162,50 @@ split.
 Qed.
 
 Lemma aeEqPyth1Rule
-  {in_t mid_t : choice_type}
-  (progL progR : in_t -> raw_code mid_t)
+  {in_t out_t : choice_type}
+  (progL progR : in_t -> raw_code out_t)
   (pre : pred ((in_t * heap) * (in_t * heap)))
-  (mid : pred (mid_t * heap)) :
+  (post : pred (out_t * heap)) :
   ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃
     fun outs =>
       let '((yL, memL'), (yR, memR')) := outs in
-      (yL == yR) && (memL' == memR') && mid (yL, memL') ⦄ ->
-  ⊨Pyth1 ⦃ pre ⦄ progL ≈( 0 ) progR ⦃ mid ⦄.
-Admitted.
+      (yL == yR) && (memL' == memR') && post (yL, memL') ⦄ ->
+  ⊨Pyth1 ⦃ pre ⦄ progL ≈( 0 ) progR ⦃ post ⦄.
+Proof.
+move=> [_ Hae] memL memR xL xR Hpre.
+pose outL := Pr_code (progL xL) memL.
+pose outR := Pr_code (progR xR) memR.
+pose pack := @pack_output_heap out_t.
+have [d [Hcoupling Hpost]] := Hae memL memR xL xR Hpre.
+have Hpost1 : \P_[ d ] (fun outs =>
+      let '((yL, memL'), (yR, memR')) := outs in
+      (yL == yR) && (memL' == memR') && post (yL, memL')) >= 1.
+  rewrite -[1]subr0.
+  exact: Hpost.
+have Hout_eq :=
+  coupling_with_loss_eq_output_heaps d outL outR post Hcoupling Hpost1.
+have [HpostL HpostR] :=
+  coupling_with_loss_eq_output_heap_post_support d outL outR post
+    Hcoupling Hpost1.
+have HmassL :=
+  coupling_with_loss_left_mass1 d outL outR _ Hcoupling Hpost1.
+pose D := dmargin pack outL.
+have HDmass : dweight D = 1.
+  by rewrite /D dmargin_dweight.
+have [P [Hdist Hfinal]] := pythDist_singleton_trace D HDmass.
+exists P, P.
+split; first exact: Hdist.
+split.
+- move=> z.
+  rewrite Hfinal.
+  by [].
+split.
+- move=> z.
+  rewrite Hfinal.
+  apply: dmargin_ext.
+  exact: Hout_eq.
+by split.
+Qed.
 
 Lemma pythAeSeqRule
   {ℓ : nat}
@@ -215,98 +244,6 @@ split; first exact: Hdist.
 split; first exact: HmarginL.
 split; first exact: HmarginR.
 by split.
-Qed.
-
-Lemma pythCompileCallsRule
-  (q : nat) (X Y A B : choice_type)
-  (L' L'' : Locations) (M : Interface)
-  (P' P'' : raw_package) (fn : ident)
-  (prog : A -> raw_code B)
-  (eps : R)
-  (call_invariant : pred heap) :
-  ValidPackage L' [interface] M P' ->
-  ValidPackage L'' [interface] M P'' ->
-  fhas M (mkopsig fn X Y) ->
-  ⊨Pyth ⦃ fun inps =>
-          let '((xL, memL), (xR, memR)) := inps in
-          (xL == xR) && (memL == memR) &&
-          call_invariant memL ⦄
-    (fun x => resolve P' (mkopsig fn X Y) x)
-    ≈( [tuple eps] )
-    (fun x => resolve P'' (mkopsig fn X Y) x)
-  ⦃ fun out =>
-    let '(y, mem) := out in
-    call_invariant mem ⦄ ->
-  ⊨Pyth ⦃ fun inps =>
-          let '((xL, memL), (xR, memR)) := inps in
-          (xL == xR) && (memL == memR) &&
-          call_invariant memL ⦄
-    (fun x => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
-      P')
-    ≈( pythCallErrors q eps )
-    (fun x => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
-      P')
-  ⦃ fun out =>
-    let '(y, mem) := out in
-    call_invariant mem ⦄.
-Proof.
-Admitted.
-
-Lemma pythSeq1Rule
-  {ℓ : nat}
-  {inL_t inR_t mid_t out_t : choice_type}
-  (progL : inL_t -> raw_code mid_t)
-  (progR : inR_t -> raw_code mid_t)
-  (contL : mid_t -> raw_code out_t)
-  (contR : mid_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (mid : pred (mid_t * heap))
-  (post : pred (out_t * heap))
-  (eps : R)
-  (s : (ℓ.+1).-tuple R) :
-  ⊨Pyth1 ⦃ pre ⦄ progL ≈( eps ) progR ⦃ mid ⦄ ->
-  ⊨Pyth ⦃
-    fun xs =>
-      let '((xL, memL), (xR, memR)) := xs in
-      (xL == xR) && (memL == memR) && mid (xL, memL)
-  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
-  ⊨Pyth ⦃ pre ⦄
-    (fun xL => yL ← progL xL ;; contL yL)
-    ≈( eps :: s )
-    (fun xR => yR ← progR xR ;; contR yR)
-  ⦃ post ⦄.
-Admitted.
-
-Lemma aePythSeqRule
-  {ℓ : nat}
-  {in_t mid_t out_t : choice_type}
-  (progL progR : in_t -> raw_code mid_t)
-  (contL contR : mid_t -> raw_code out_t)
-  (pre : pred ((in_t * heap) * (in_t * heap)))
-  (mid : pred (mid_t * heap))
-  (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R) :
-  ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃
-    fun outs =>
-      let '((yL, memL'), (yR, memR')) := outs in
-      (yL == yR) && (memL' == memR') && mid (yL, memL') ⦄ ->
-  ⊨Pyth ⦃
-    fun xs =>
-      let '((xL, memL), (xR, memR)) := xs in
-      (xL == xR) && (memL == memR) && mid (xL, memL)
-  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
-  ⊨Pyth ⦃ pre ⦄
-    (fun xL => yL ← progL xL ;; contL yL)
-    ≈( 0 :: s )
-    (fun xR => yR ← progR xR ;; contR yR)
-  ⦃ post ⦄.
-Proof.
-move=> Hae Hpyth.
-apply: (pythSeq1Rule progL progR contL contR pre mid post 0 s).
-- exact: aeEqPyth1Rule Hae.
-- exact: Hpyth.
 Qed.
 
 Lemma pythSeqRule
@@ -367,5 +304,110 @@ rewrite !Pr_code_bind.
 split; first exact: Hdist.
 split; first exact: HmarginL.
 split; first exact: HmarginR.
-by split.
+  by split.
 Qed.
+
+Lemma pythSeq1Rule
+  {ℓ : nat}
+  {inL_t inR_t mid_t out_t : choice_type}
+  (progL : inL_t -> raw_code mid_t)
+  (progR : inR_t -> raw_code mid_t)
+  (contL : mid_t -> raw_code out_t)
+  (contR : mid_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (eps : R)
+  (s : (ℓ.+1).-tuple R) :
+  ⊨Pyth1 ⦃ pre ⦄ progL ≈( eps ) progR ⦃ mid ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( eps :: s )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
+Proof.
+move=> Hpyth1 Hpyth2.
+apply: (pythConseqRule
+  (fun xL => yL ← progL xL ;; contL yL)
+  (fun xR => yR ← progR xR ;; contR yR)
+  pre pre post post (cat_tuple [tuple eps] s) (eps :: s)).
+- by [].
+- by [].
+- move=> i.
+  rewrite ![tnth _ i](tnth_nth 0) /=.
+  exact: lexx.
+- exact: (pythSeqRule progL progR contL contR pre mid post
+    [tuple eps] s Hpyth1 Hpyth2).
+Qed.
+
+Lemma aePythSeqRule
+  {ℓ : nat}
+  {in_t mid_t out_t : choice_type}
+  (progL progR : in_t -> raw_code mid_t)
+  (contL contR : mid_t -> raw_code out_t)
+  (pre : pred ((in_t * heap) * (in_t * heap)))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  ⊨AE ⦃ pre ⦄ progL ≈( 0 ) progR ⦃
+    fun outs =>
+      let '((yL, memL'), (yR, memR')) := outs in
+      (yL == yR) && (memL' == memR') && mid (yL, memL') ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( 0 :: s )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
+Proof.
+move=> Hae Hpyth.
+apply: (pythSeq1Rule progL progR contL contR pre mid post 0 s).
+- exact: aeEqPyth1Rule Hae.
+- exact: Hpyth.
+Qed.
+
+Lemma pythCompileCallsRule
+  (q : nat) (X Y A B : choice_type)
+  (L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (prog : A -> raw_code B)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( [tuple eps] )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
+      P')
+    ≈( pythCallErrors q eps )
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+Admitted.

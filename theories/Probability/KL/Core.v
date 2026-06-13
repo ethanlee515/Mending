@@ -47,6 +47,20 @@ rewrite (expectation_distr_ext P dnull _ HP).
 exact: expectation_dnull.
 Qed.
 
+Lemma kl_self {T : choiceType} (P : {distr T / R}) :
+  δ_KL P P = 0.
+Proof.
+rewrite /δ_KL /esp.
+rewrite (eq_sum (F2 := fun _ : T => 0)).
+  exact: sum0.
+move=> x.
+case Px0: (P x == 0).
+  by rewrite (eqP Px0) mulr0.
+have HPx : P x != 0 by rewrite Px0.
+have -> : P x / P x = 1 by rewrite divff ?unitfE ?HPx.
+by rewrite ln1 mul0r.
+Qed.
+
 Lemma absolute_continuous_positive {T : choiceType}
     (P Q : {distr T / R}) (x : T) :
   absolute_continuous P Q ->
