@@ -4,7 +4,7 @@ From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals distr ssrZ realseq realsum exp.
+From mathcomp Require Import reals distr ssrZ realseq realsum exp lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
@@ -120,6 +120,72 @@ Lemma pythCompletedRule
   ⊨CPyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄.
 Admitted.
 
+Lemma total_variation_complete_output_heap_ge
+  {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
+  total_variation P Q <=
+  total_variation (complete_output_heap P) (complete_output_heap Q).
+Proof.
+rewrite (total_variation_pack_output_heap P Q).
+rewrite /complete_output_heap.
+set P' := dmargin _ P.
+set Q' := dmargin _ Q.
+rewrite /total_variation.
+apply: ler_wpM2l.
+  by lra.
+rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
+set S := fun x : option (nat * heap) => `|complete P' x - complete Q' x|.
+have HSnonneg : forall x, 0 <= S x by move=> x; exact: normr_ge0.
+have HSsumm : summable S.
+  apply/summable_abs.
+  apply: summableD; first exact: summable_mu.
+  by apply: summableN; exact: summable_mu.
+have -> : psum (fun x : nat * heap => `|P' x - Q' x|) =
+    psum (fun x : nat * heap => S (Some x)).
+  apply/eq_psum=> x.
+  by rewrite /S !completeE.
+rewrite (psum_option_split S HSnonneg HSsumm).
+by rewrite lerDl.
+Qed.
+
+Lemma additiveErrorCompletedOutputHeapTvdEqRule
+  {inL_t inR_t out_t : choice_type}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (ε : R) :
+  0 <= ε ->
+  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
+    total_variation
+      (complete_output_heap (Pr_code (progL xL) memL))
+      (complete_output_heap (Pr_code (progR xR) memR)) <= ε) ->
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+    fun outs =>
+    let '(outL, outR) := outs in
+    outL == outR ⦄.
+Proof.
+move=> Heps Htv.
+have Hae : ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+    fun outs =>
+      let '((yL, memL'), (yR, memR')) := outs in
+      (yL == yR) && (memL' == memR') ⦄.
+  apply: (additiveErrorTvdEqRule progL progR pre ε)=> //.
+  move=> memL memR xL xR Hpre.
+  exact: (le_trans (total_variation_complete_output_heap_ge _ _)
+           (Htv memL memR xL xR Hpre)).
+move: Hae=> [_ Hae].
+split; first exact: Heps.
+move=> memL memR xL xR Hpre.
+have [d [Hd Hprob]] := Hae memL memR xL xR Hpre.
+exists d; split; first exact: Hd.
+apply: (le_trans Hprob).
+apply: subset_pr=> out Hout.
+case: out Hout=> [[outL|] [outR|]] //=.
+case: outL outR=> yL memL' [yR memR'] /= Hout.
+apply/eqP.
+move/andP: Hout=> [/eqP -> /eqP ->].
+by [].
+Qed.
+
 Lemma completedMicciancioWalterRule
   {ℓ : nat}
   {inL_t inR_t out_t : choice_type}
@@ -134,7 +200,30 @@ Lemma completedMicciancioWalterRule
     fun outs =>
     let '(outL, outR) := outs in
     outL == outR ⦄.
-Admitted.
+Proof.
+move=> [Hs_nonneg Hpyth].
+apply: additiveErrorCompletedOutputHeapTvdEqRule.
+- rewrite /pythagorean_tv_bound.
+  exact: Num.Theory.sqrtr_ge0.
+- move=> memL memR xL xR Hpre.
+  have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+    Hpyth memL memR xL xR Hpre.
+  pose outL := Pr_code (progL xL) memL.
+  pose outR := Pr_code (progR xR) memR.
+  pose final (omega : (ℓ.+1).-tuple (option (nat * heap))) :=
+    tnth omega ord_max.
+  have Htv := pythDist_final_total_variation P Q s Hdist.
+  have Htv_eq :
+      total_variation (complete_output_heap outL) (complete_output_heap outR) =
+      total_variation (dmargin final P) (dmargin final Q).
+    rewrite /total_variation.
+    congr (_ * _).
+    apply/eq_sum=> y.
+    by rewrite -(HmarginL y) -(HmarginR y).
+  rewrite Htv_eq.
+  exact: Htv.
+Qed.
+
 
 Lemma completedPythDnullRule
   {ℓ : nat}
