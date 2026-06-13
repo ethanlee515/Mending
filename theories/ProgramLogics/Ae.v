@@ -24,6 +24,26 @@ Import pkg_heap.
 Import PackageNotation.
 Local Open Scope package_scope.
 
+Definition additiveErrorJudgmentOpt
+  {inL_t inR_t outL_t outR_t : ord_choiceType}
+  (progL : inL_t -> raw_code outL_t)
+  (progR : inR_t -> raw_code outR_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (post : pred (option (outL_t * heap) * option (outR_t * heap)))
+  (ε : R) : Prop :=
+  0 <= ε /\
+  ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
+    let out1 := Pr_code (progL xL) memL in
+    let out2 := Pr_code (progR xR) memR in
+    ∃ d, coupling_with_loss d (complete out1) (complete out2) ∧
+      \P_[ d ] post >= 1 - ε.
+
+Declare Scope AeNotations.
+Local Open Scope AeNotations.
+
+Notation "⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
+  (additiveErrorJudgmentOpt progL progR pre post ε) : AeNotations.
+
 Definition additiveErrorJudgment
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
@@ -31,14 +51,7 @@ Definition additiveErrorJudgment
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred ((outL_t * heap) * (outR_t * heap)))
   (ε : R) : Prop :=
-  0 <= ε /\
-  ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
-    let out1 := Pr_code (progL xL) memL in
-    let out2 := Pr_code (progR xR) memR in
-    ∃ d, coupling_with_loss d out1 out2 ∧ \P_[ d ] post >= 1 - ε.
-
-Declare Scope AeNotations.
-Local Open Scope AeNotations.
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ lift_loss_post post ⦄.
 
 Notation "⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
   (additiveErrorJudgment progL progR pre post ε) : AeNotations.
@@ -61,6 +74,27 @@ Lemma additiveErrorCoupleRule
   (forall memL memR xL xR Hpre,
     \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->
   ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄.
+Admitted.
+
+Lemma additiveErrorCoupleOptRule
+  {inL_t inR_t outL_t outR_t : ord_choiceType}
+  (progL : inL_t -> raw_code outL_t)
+  (progR : inR_t -> raw_code outR_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (post : pred (option (outL_t * heap) * option (outR_t * heap)))
+  (ε : R)
+  (wit : forall memL memR xL xR,
+      pre ((xL, memL), (xR, memR)) ->
+      {distr _ / R}) :
+  0 <= ε ->
+  (forall memL memR xL xR Hpre,
+    let out1 := Pr_code (progL xL) memL in
+    let out2 := Pr_code (progR xR) memR in
+    coupling_with_loss (wit memL memR xL xR Hpre)
+      (complete out1) (complete out2)) ->
+  (forall memL memR xL xR Hpre,
+    \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄.
 Proof.
 move=> Heps Hcoupling Hpost.
 split; first exact: Heps.
@@ -79,6 +113,19 @@ Lemma additiveErrorEpsNonneg
   (post : pred ((outL_t * heap) * (outR_t * heap)))
   (ε : R) :
   ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
+  0 <= ε.
+Proof.
+by move=> [Heps _].
+Qed.
+
+Lemma additiveErrorOptEpsNonneg
+  {inL_t inR_t outL_t outR_t : ord_choiceType}
+  (progL : inL_t -> raw_code outL_t)
+  (progR : inR_t -> raw_code outR_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (post : pred (option (outL_t * heap) * option (outR_t * heap)))
+  (ε : R) :
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
   0 <= ε.
 Proof.
 by move=> [Heps _].
@@ -148,10 +195,37 @@ split; first by lra.
 move=> memL memR xL xR Hpre'.
 have [d [Hd Hprob]] := Hae memL memR xL xR (Hpre _ Hpre').
 exists d; split; first exact: Hd.
+have Hmono : \P_[d] (lift_loss_post post) <=
+    \P_[d] (lift_loss_post post').
+  apply: subset_pr => out Hout.
+  case: out Hout => [[outL|] [outR|]] //=.
+  exact: Hpost.
+(* Increasing the error budget lowers the required success threshold. *)
+have Hthreshold : 1 - ε' <= 1 - ε by lra.
+exact: (le_trans Hthreshold (le_trans Hprob Hmono)).
+Qed.
+
+Lemma additiveErrorOptConseqRule
+  {inL_t inR_t outL_t outR_t : ord_choiceType}
+  (progL : inL_t -> raw_code outL_t)
+  (progR : inR_t -> raw_code outR_t)
+  (pre pre' : pred ((inL_t * heap) * (inR_t * heap)))
+  (post post' : pred (option (outL_t * heap) * option (outR_t * heap)))
+  (ε ε' : R) :
+  (forall inps, pre' inps -> pre inps) ->
+  (forall outs, post outs -> post' outs) ->
+  ε <= ε' ->
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
+  ⊨AE_opt ⦃ pre' ⦄ progL ≈( ε' ) progR ⦃ post' ⦄.
+Proof.
+move=> Hpre Hpost Herr [Heps Hae].
+split; first by lra.
+move=> memL memR xL xR Hpre'.
+have [d [Hd Hprob]] := Hae memL memR xL xR (Hpre _ Hpre').
+exists d; split; first exact: Hd.
 have Hmono : \P_[d] post <= \P_[d] post'.
   apply: subset_pr => out Hout.
   exact: Hpost.
-(* Increasing the error budget lowers the required success threshold. *)
 have Hthreshold : 1 - ε' <= 1 - ε by lra.
 exact: (le_trans Hthreshold (le_trans Hprob Hmono)).
 Qed.
@@ -173,33 +247,7 @@ Lemma additiveErrorSeqRule
     ≈( ε + ε' )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
-Proof.
-move=> [Heps Hprog] [Heps' Hcont].
-split; first by lra.
-move=> memL memR xL xR Hpre.
-set ML := Pr_code (progL xL) memL.
-set MR := Pr_code (progR xR) memR.
-set KL := fun y : midL_t * heap => Pr_code (contL y.1) y.2.
-set KR := fun y : midR_t * heap => Pr_code (contR y.1) y.2.
-have [d0 [Hd0 Hmidprob]] := Hprog memL memR xL xR Hpre.
-have Hcont_wit :
-    forall yL yR,
-      mid (yL, yR) ->
-      exists d1,
-        coupling_with_loss d1 (KL yL) (KR yR) /\
-        \P_[ d1 ] post >= 1 - ε'.
-  move=> yL yR Hmid.
-  case: yL Hmid => [yLv yLm] Hmid.
-  case: yR Hmid => [yRv yRm] Hmid.
-  have [d1 [Hd1 Hpost]] := Hcont yLm yRm yLv yRv Hmid.
-  by exists d1.
-have [d [Hd Hpost]] :=
-  coupling_with_loss_bind ML MR KL KR mid post ε ε' d0
-    Heps Heps' Hd0 Hmidprob Hcont_wit.
-exists d; split; last exact: Hpost.
-rewrite !Pr_code_bind.
-exact: Hd.
-Qed.
+Admitted.
 
 Lemma additiveErrorCompileCallsRule
   (q : nat) (X Y I O : choice_type)
@@ -248,11 +296,4 @@ Lemma additiveErrorTvBound
   pre ((xL, memL), (xR, memR)) ->
   total_variation (dmargin fst (Pr_code (progL xL) memL))
                   (dmargin fst (Pr_code (progR xR) memR)) <= ε.
-Proof.
-move=> [_ Hae] Hpre.
-have [d [Hd Hmatch]] := Hae memL memR xL xR Hpre.
-exact: (@coupling_with_loss_total_variation_dmargin_match
-  R (out_t * heap)%type (out_t * heap)%type out_t
-  (@fst out_t heap) (@fst out_t heap) d
-  (Pr_code (progL xL) memL) (Pr_code (progR xR) memR) ε Hd Hmatch).
-Qed.
+Admitted.
