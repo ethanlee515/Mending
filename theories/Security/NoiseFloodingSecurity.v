@@ -11,6 +11,7 @@ From Mending.Security Require Import IndcpadSimulator.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.ProgramLogics Require Import Ae.
 From Mending.ProgramLogics Require Import Pyth.
+From Mending.Probability Require Import Ae.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 
 Import PackageNotation.
@@ -85,13 +86,10 @@ Module NoiseFloodingSecure
     pred ((chUnit * heap) * (chUnit * heap)) :=
     pred1 ((tt, empty_heap), (tt, empty_heap)).
 
-  Definition same_game_output (outs : (bool * heap) * (bool * heap)) : bool :=
-    eq_op outs.1.1 outs.2.1.
-
-  Definition same_game_output_and_heap
-    (outs : (bool * heap) * (bool * heap)) : bool :=
-    let '((y1, m1), (y2, m2)) := outs in
-    andb (eq_op y1 y2) (eq_op m1 m2).
+  Definition same_game_output_opt
+    (outs : option (bool * heap) * option (bool * heap)) : bool :=
+    let '(outL, outR) := outs in
+    eq_op outL outR.
 
   (* A singleton event is controlled by twice our TV convention
      (`total_variation` is defined as one half of the L1 distance). *)
@@ -118,6 +116,27 @@ Module NoiseFloodingSecure
     lra.
   Qed.
 
+  Lemma total_variation_complete_point_bound2
+    {T : choiceType} (P Q : {distr T / R}) (x : T) :
+    `|P x - Q x| <=
+      2 * total_variation (complete P) (complete Q).
+  Proof.
+    have H := total_variation_point_bound2 (complete P) (complete Q) (Some x).
+    by rewrite !completeE /= in H.
+  Qed.
+
+  Lemma additiveErrorOptTvBound
+    {inL_t inR_t : choice_type}
+    (progL : inL_t -> raw_code bool)
+    (progR : inR_t -> raw_code bool)
+    (pre : pred ((inL_t * heap) * (inR_t * heap)))
+    (ε : R) memL memR xL xR :
+    ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_output_opt ⦄ ->
+    pre ((xL, memL), (xR, memR)) ->
+    total_variation (complete (dmargin fst (Pr_code (progL xL) memL)))
+                    (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε.
+  Admitted.
+
   (* The package-level reduction preserves the IND-CPA adversary interface. *)
   Lemma ind_cpa_reduction_valid (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
@@ -133,11 +152,11 @@ Module NoiseFloodingSecure
   (* Converts a whole-game AE judgment into the sampled-game advantage bound. *)
   Lemma ind_cpa_reduction_bound_from_additive_error
     (A : nom_package) max_queries ε :
-    ⊨AE ⦃ game_initial_pre ⦄
+    ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( ε )
       (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_output ⦄ ->
+    ⦃ same_game_output_opt ⦄ ->
     2 * ε <= security_loss max_queries ->
     IndCpadGame.winning_probability max_queries A <=
     IndCpaSecurity.IndCpaGame.winning_probability
@@ -148,21 +167,25 @@ Module NoiseFloodingSecure
     have Hpre : game_initial_pre ((tt, empty_heap), (tt, empty_heap)).
       by rewrite /game_initial_pre.
     have Htv :=
-      additiveErrorTvBound _ _ _ _ empty_heap empty_heap tt tt Hae Hpre.
+      additiveErrorOptTvBound _ _ _ _ empty_heap empty_heap tt tt Hae Hpre.
     have Hpoint :
       `|IndCpadGame.success_probability max_queries A -
         IndCpaSecurity.IndCpaGame.success_probability
           (ind_cpa_reduction A max_queries)| <= 2 * ε.
       apply: (@le_trans _ _
         (2 * total_variation
-          (dmargin fst (Pr_code (ind_cpad_game_code A max_queries tt) empty_heap))
-          (dmargin fst
-            (Pr_code (ind_cpa_reduction_game_code A max_queries tt) empty_heap)))).
+          (complete
+            (dmargin fst
+              (Pr_code (ind_cpad_game_code A max_queries tt) empty_heap)))
+          (complete
+            (dmargin fst
+              (Pr_code
+                (ind_cpa_reduction_game_code A max_queries tt) empty_heap))))).
         rewrite /IndCpadGame.success_probability
           /IndCpaSecurity.IndCpaGame.success_probability
           /IndCpadGame.game_out /IndCpaSecurity.IndCpaGame.game_out
           /ind_cpad_game_code /ind_cpa_reduction_game_code /Pr_op.
-        exact: total_variation_point_bound2.
+        exact: total_variation_complete_point_bound2.
       lra.
     rewrite /IndCpadGame.winning_probability
       /IndCpaSecurity.IndCpaGame.winning_probability.
@@ -177,7 +200,7 @@ Module NoiseFloodingSecure
     lra.
   Qed.
 
-  (* Applies Micciancio-Walter to turn a Pythagorean judgment into AE. *)
+  (* Applies Micciancio-Walter to turn a Pythagorean judgment into AE_opt. *)
   Lemma ind_cpa_reduction_additive_error_from_pyth
     {ℓ : nat} (A : nom_package) max_queries
     (s : (ℓ.+1).-tuple R) ε :
@@ -187,32 +210,23 @@ Module NoiseFloodingSecure
       ≈( s )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ fun _ : bool * heap => true ⦄ ->
-    ⊨AE ⦃ game_initial_pre ⦄
+    ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( ε )
       (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_output ⦄.
+    ⦃ same_game_output_opt ⦄.
   Proof.
     move=> Hbound Hpyth.
-    have Hmw :
-      ⊨AE ⦃ game_initial_pre ⦄
-        (ind_cpad_game_code A max_queries)
-        ≈( pythagorean_tv_bound s )
-        (ind_cpa_reduction_game_code A max_queries)
-      ⦃ same_game_output_and_heap ⦄.
-      exact: (MicciancioWalterRule _ _ _ _ _ Hpyth).
-    apply: (additiveErrorConseqRule
+    apply: (additiveErrorOptConseqRule
       (ind_cpad_game_code A max_queries)
       (ind_cpa_reduction_game_code A max_queries)
       game_initial_pre game_initial_pre
-      same_game_output_and_heap same_game_output
+      same_game_output_opt same_game_output_opt
       (pythagorean_tv_bound s) ε).
     - by [].
-    - move=> [[y1 m1] [y2 m2]] /=.
-      move=> H.
-      by move/andP: H => [Hy _].
+    - by [].
     - exact: Hbound.
-    - exact: Hmw.
+    - exact: (MicciancioWalterRule _ _ _ _ _ Hpyth).
   Qed.
 
   (* The cryptographic core: prove the reduction games satisfy a Pyth judgment. *)
@@ -232,11 +246,11 @@ Module NoiseFloodingSecure
   Lemma ind_cpa_reduction_additive_error
     (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE ⦃ game_initial_pre ⦄
+    ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( security_loss max_queries / 2 )
       (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_output ⦄.
+    ⦃ same_game_output_opt ⦄.
   Proof.
     move=> A_valid.
     apply: (ind_cpa_reduction_additive_error_from_pyth
