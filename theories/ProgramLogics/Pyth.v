@@ -70,6 +70,23 @@ Qed.
 Definition pythCallErrors (q : nat) (eps : R) : (q.*2).+2.-tuple R :=
   Tuple (pythCallErrors_size q eps).
 
+Definition heap_eq_on (K : Locations) (mem0 mem1 : heap) : Prop :=
+  forall l, fhas K l -> get_heap mem0 l = get_heap mem1 l.
+
+Definition heap_pred_depends_only_on
+  (K : Locations) (p : pred heap) : Prop :=
+  forall mem0 mem1, heap_eq_on K mem0 mem1 -> p mem0 = p mem1.
+
+Definition package_preserves_heap_pred_except
+  (M : Interface) (P : raw_package) (skip : ident)
+  (p : pred heap) : Prop :=
+  forall (o : opsig) (x : src o),
+    fhas M o ->
+    fst o != skip ->
+    ⊨Hoare ⦃ fun in_mem => p in_mem.2 ⦄
+      (fun x => resolve P o x)
+    ⦃ fun out_mem => p out_mem.2 ⦄.
+
 Lemma pythReflRule
   {ℓ : nat}
   {in_t out_t : choice_type}
@@ -288,13 +305,17 @@ Qed.
 
 Lemma pythCompileCallsRule
   (q : nat) (X Y A B : choice_type)
-  (L' L'' : Locations) (M : Interface)
+  (K L L' L'' : Locations) (M : Interface)
   (P' P'' : raw_package) (fn : ident)
   (prog : A -> raw_code B)
   (eps : R)
   (call_invariant : pred heap) :
+  (forall x, ValidCode L M (prog x)) ->
   ValidPackage L' [interface] M P' ->
   ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
   fhas M (mkopsig fn X Y) ->
   ⊨Pyth ⦃ fun inps =>
           let '((xL, memL), (xR, memR)) := inps in
