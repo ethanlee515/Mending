@@ -220,25 +220,6 @@ apply: additiveErrorCompletedOutputHeapTvdEqRule.
   exact: Htv.
 Qed.
 
-
-Lemma pythDnullRule
-  {ℓ : nat}
-  {inL_t inR_t out_t : choice_type}
-  (progL : inL_t -> raw_code out_t)
-  (progR : inR_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (post : pred (out_t * heap))
-  (s : (ℓ.+1).-tuple R) :
-  (forall i : 'I_(ℓ.+1), 0 <= tnth s i) ->
-  (forall memL memR xL xR,
-    pre ((xL, memL), (xR, memR)) ->
-    Pr_code (progL xL) memL =1 dnull) ->
-  (forall memL memR xL xR,
-    pre ((xL, memL), (xR, memR)) ->
-    Pr_code (progR xR) memR =1 dnull) ->
-  ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄.
-Admitted.
-
 Lemma pythAeSeqRule
   {ℓ : nat}
   {inL_t inR_t mid_t out_t : choice_type}
