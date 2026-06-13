@@ -35,7 +35,7 @@ Definition additiveErrorJudgmentOpt
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
     let out1 := Pr_code (progL xL) memL in
     let out2 := Pr_code (progR xR) memR in
-    ∃ d, coupling_with_loss d (complete out1) (complete out2) ∧
+    ∃ d, coupling d (complete out1) (complete out2) ∧
       \P_[ d ] post >= 1 - ε.
 
 Declare Scope AeNotations.
@@ -90,7 +90,7 @@ Lemma additiveErrorCoupleOptRule
   (forall memL memR xL xR Hpre,
     let out1 := Pr_code (progL xL) memL in
     let out2 := Pr_code (progR xR) memR in
-    coupling_with_loss (wit memL memR xL xR Hpre)
+    coupling (wit memL memR xL xR Hpre)
       (complete out1) (complete out2)) ->
   (forall memL memR xL xR Hpre,
     \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->

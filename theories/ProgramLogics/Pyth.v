@@ -33,6 +33,19 @@ Definition complete_output_heap {out_t : choice_type}
     {distr (option (nat * heap)) / R} :=
   complete (dmargin (@pack_output_heap out_t) out).
 
+Lemma complete_dweight {T : choiceType} (D : {distr T / R}) :
+  dweight (complete D) = 1.
+Proof.
+rewrite pr_predT.
+rewrite (psum_option_split (complete D)).
+- rewrite (eq_psum (F2 := D)); last by move=> x; rewrite completeE.
+  rewrite completeE /=.
+  rewrite -pr_predT.
+  by rewrite addrC subrK.
+- move=> x; exact: ge0_mu.
+- exact: summable_mu.
+Qed.
+
 Definition pythJudgment
   {ℓ : nat}
   {inL_t inR_t out_t : choice_type}
@@ -74,6 +87,56 @@ Qed.
 
 Definition pythCallErrors (q : nat) (eps : R) : (q.*2).+2.-tuple R :=
   Tuple (pythCallErrors_size q eps).
+
+Lemma pythReflRule
+  {ℓ : nat}
+  {in_t out_t : choice_type}
+  (prog : in_t -> raw_code out_t)
+  (pre : pred ((in_t * heap) * (in_t * heap)))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  (forall i : 'I_(ℓ.+1), 0 <= tnth s i) ->
+  (forall memL memR xL xR,
+    pre ((xL, memL), (xR, memR)) -> xL = xR /\ memL = memR) ->
+  (forall mem x y,
+    pre ((x, mem), (x, mem)) ->
+    y \in dinsupp (Pr_code (prog x) mem) ->
+    post y) ->
+  ⊨Pyth ⦃ pre ⦄ prog ≈( s ) prog ⦃ post ⦄.
+Proof.
+move=> Hs Hpre_eq Hpost.
+split; first exact: Hs.
+move=> memL memR xL xR Hpre.
+have [Hx Hmem] := Hpre_eq memL memR xL xR Hpre.
+subst xL.
+subst memL.
+set out := Pr_code (prog xR) memR.
+pose lift_final (z : option (nat * heap)) :
+    (ℓ.+1).-tuple (option (nat * heap)) := [tuple z | i < ℓ.+1].
+pose P := dmargin lift_final (complete_output_heap out).
+exists P, P.
+split.
+  apply: pythDist_refl=> //.
+  rewrite /P dmargin_dweight.
+  exact: complete_dweight.
+split.
+  move=> z.
+  rewrite /P __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (complete_output_heap out) z).
+  apply: eq_in_dlet=> // y _ z'.
+  by rewrite dmargin_dunit /lift_final tnth_mktuple.
+split.
+  move=> z.
+  rewrite /P __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (complete_output_heap out) z).
+  apply: eq_in_dlet=> // y _ z'.
+  by rewrite dmargin_dunit /lift_final tnth_mktuple.
+split.
+- move=> y Hy.
+  exact: (Hpost memR xR y Hpre Hy).
+- move=> y Hy.
+  exact: (Hpost memR xR y Hpre Hy).
+Qed.
 
 Lemma pythConseqRule
   {ℓ : nat}
