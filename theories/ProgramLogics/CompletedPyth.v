@@ -329,3 +329,40 @@ split; first exact: HmarginL.
 split; first exact: HmarginR.
 by split.
 Qed.
+
+Lemma completedPythCompileCallsRule
+  (q : nat) (X Y A B : choice_type)
+  (L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (prog : A -> raw_code B)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨CPyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( [tuple eps] )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨CPyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
+      P')
+    ≈( pythCallErrors q eps )
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+Admitted.
