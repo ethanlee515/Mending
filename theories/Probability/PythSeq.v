@@ -35,46 +35,6 @@ Definition completed_output_heap {out_t : choice_type}
     {distr (option (nat * heap)) / R} :=
   complete (dmargin (@pack_output_heap out_t) out).
 
-Lemma psum_option_some_zero
-  {T : choiceType} (S : option T -> R) :
-  S None = 0 ->
-  psum S = psum (fun x => S (Some x)).
-Proof.
-move=> HSnone.
-rewrite (@reindex_psum_onto R (option T) T S
-  [pred x : option T | x != None] (@Some T) (fun x => x)).
-- by [].
-- move=> x Hx.
-  case: x Hx=> [x|] //=.
-  by rewrite HSnone eqxx.
-- by case=> [x|] //=; rewrite eqxx.
-- by move=> x _.
-Qed.
-
-Lemma psum_option_split
-  {T : choiceType} (S : option T -> R) :
-  (forall x, 0 <= S x) ->
-  summable S ->
-  psum S = psum (fun x => S (Some x)) + S None.
-Proof.
-move=> HSge HSsumm.
-pose is_some (x : option T) := if x is Some _ then true else false.
-rewrite (@psumID R (option T) S is_some HSsumm).
-congr (_ + _).
-- rewrite (psum_option_some_zero
-    (fun x : option T => (is_some x)%:R * S x)).
-    apply/eq_psum=> x.
-    by rewrite /is_some mul1r.
-  by rewrite /is_some mul0r.
-- rewrite (psum_finseq (r := [:: None])).
-  + by rewrite big_seq1 /is_some mul1r ger0_norm.
-  + by [].
-  + move=> x.
-    rewrite !inE.
-    case: x=> [x|] //=.
-    by rewrite mul0r eqxx.
-Qed.
-
 Lemma dlet_complete_some
   {T U : choiceType}
   (D : {distr T / R})

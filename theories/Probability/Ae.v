@@ -6,7 +6,7 @@ From mathcomp Require Import reals distr.
 From mathcomp Require Import realseq realsum exp lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
-From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras.
 
 Import GRing.Theory Num.Theory Order.Theory Order.POrderTheory.
 
@@ -67,6 +67,19 @@ Definition complete {T : choiceType} (D : {distr T / R})
 Lemma completeE {T : choiceType} (D : {distr T / R}) x :
   complete D x = complete_mass D x.
 Proof. by []. Qed.
+
+Lemma complete_dweight {T : choiceType} (D : {distr T / R}) :
+  dweight (complete D) = 1.
+Proof.
+rewrite pr_predT.
+rewrite (psum_option_split (complete D)).
+- rewrite (eq_psum (F2 := D)); last by move=> x; rewrite completeE.
+  rewrite completeE /=.
+  rewrite -pr_predT.
+  by rewrite addrC subrK.
+- move=> x; exact: ge0_mu.
+- exact: summable_mu.
+Qed.
 
 Definition coupling_with_loss
   {outL_t outR_t : choiceType}

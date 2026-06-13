@@ -7,7 +7,7 @@ From mathcomp Require Import realseq realsum exp lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 From Mending.NextMessage Require Import Trace.
-From Mending.Probability Require Import Ae.
+From Mending.Probability Require Import Ae OutputHeap.
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph
   choice_type fmap_extra.
@@ -146,6 +146,45 @@ Lemma additiveErrorTvdEqRule
       let '((y_1, m_1'), (y_2, m_2')) := outs in
       (y_1 == y_2) && (m_1' == m_2') ⦄.
 Admitted.
+
+Lemma additiveErrorCompletedOutputHeapTvdEqRule
+  {inL_t inR_t out_t : choice_type}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (ε : R) :
+  0 <= ε ->
+  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
+    total_variation
+      (complete_output_heap (Pr_code (progL xL) memL))
+      (complete_output_heap (Pr_code (progR xR) memR)) <= ε) ->
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+    fun outs =>
+    let '(outL, outR) := outs in
+    outL == outR ⦄.
+Proof.
+move=> Heps Htv.
+have Hae : ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+    fun outs =>
+      let '((yL, memL'), (yR, memR')) := outs in
+      (yL == yR) && (memL' == memR') ⦄.
+  apply: (additiveErrorTvdEqRule progL progR pre ε)=> //.
+  move=> memL memR xL xR Hpre.
+  exact: (le_trans (total_variation_complete_output_heap_ge _ _)
+           (Htv memL memR xL xR Hpre)).
+move: Hae=> [_ Hae].
+split; first exact: Heps.
+move=> memL memR xL xR Hpre.
+have [d [Hd Hprob]] := Hae memL memR xL xR Hpre.
+exists d; split; first exact: Hd.
+apply: (le_trans Hprob).
+apply: subset_pr=> out Hout.
+case: out Hout=> [[outL|] [outR|]] //=.
+case: outL outR=> yL memL' [yR memR'] /= Hout.
+apply/eqP.
+move/andP: Hout=> [/eqP -> /eqP ->].
+by [].
+Qed.
 
 Lemma additiveErrorTvdEqPostRule
   {inL_t inR_t out_t : ord_choiceType}

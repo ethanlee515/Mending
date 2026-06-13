@@ -28,24 +28,6 @@ Import GRing.Theory Num.Theory Order.Theory.
 Local Open Scope package_scope.
 Local Open Scope ring_scope.
 
-Definition complete_output_heap {out_t : choice_type}
-    (out : {distr (out_t * heap) / R}) :
-    {distr (option (nat * heap)) / R} :=
-  complete (dmargin (@pack_output_heap out_t) out).
-
-Lemma complete_dweight {T : choiceType} (D : {distr T / R}) :
-  dweight (complete D) = 1.
-Proof.
-rewrite pr_predT.
-rewrite (psum_option_split (complete D)).
-- rewrite (eq_psum (F2 := D)); last by move=> x; rewrite completeE.
-  rewrite completeE /=.
-  rewrite -pr_predT.
-  by rewrite addrC subrK.
-- move=> x; exact: ge0_mu.
-- exact: summable_mu.
-Qed.
-
 Definition pythJudgment
   {ℓ : nat}
   {inL_t inR_t out_t : choice_type}
@@ -177,72 +159,6 @@ split.
     exact: Hpost (HpostL y Hy).
   - move=> y Hy.
     exact: Hpost (HpostR y Hy).
-Qed.
-
-Lemma total_variation_complete_output_heap_ge
-  {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
-  total_variation P Q <=
-  total_variation (complete_output_heap P) (complete_output_heap Q).
-Proof.
-rewrite (total_variation_pack_output_heap P Q).
-rewrite /complete_output_heap.
-set P' := dmargin _ P.
-set Q' := dmargin _ Q.
-rewrite /total_variation.
-apply: ler_wpM2l.
-  by lra.
-rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
-set S := fun x : option (nat * heap) => `|complete P' x - complete Q' x|.
-have HSnonneg : forall x, 0 <= S x by move=> x; exact: normr_ge0.
-have HSsumm : summable S.
-  apply/summable_abs.
-  apply: summableD; first exact: summable_mu.
-  by apply: summableN; exact: summable_mu.
-have -> : psum (fun x : nat * heap => `|P' x - Q' x|) =
-    psum (fun x : nat * heap => S (Some x)).
-  apply/eq_psum=> x.
-  by rewrite /S !completeE.
-rewrite (psum_option_split S HSnonneg HSsumm).
-by rewrite lerDl.
-Qed.
-
-Lemma additiveErrorCompletedOutputHeapTvdEqRule
-  {inL_t inR_t out_t : choice_type}
-  (progL : inL_t -> raw_code out_t)
-  (progR : inR_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (ε : R) :
-  0 <= ε ->
-  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
-    total_variation
-      (complete_output_heap (Pr_code (progL xL) memL))
-      (complete_output_heap (Pr_code (progR xR) memR)) <= ε) ->
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃
-    fun outs =>
-    let '(outL, outR) := outs in
-    outL == outR ⦄.
-Proof.
-move=> Heps Htv.
-have Hae : ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
-    fun outs =>
-      let '((yL, memL'), (yR, memR')) := outs in
-      (yL == yR) && (memL' == memR') ⦄.
-  apply: (additiveErrorTvdEqRule progL progR pre ε)=> //.
-  move=> memL memR xL xR Hpre.
-  exact: (le_trans (total_variation_complete_output_heap_ge _ _)
-           (Htv memL memR xL xR Hpre)).
-move: Hae=> [_ Hae].
-split; first exact: Heps.
-move=> memL memR xL xR Hpre.
-have [d [Hd Hprob]] := Hae memL memR xL xR Hpre.
-exists d; split; first exact: Hd.
-apply: (le_trans Hprob).
-apply: subset_pr=> out Hout.
-case: out Hout=> [[outL|] [outR|]] //=.
-case: outL outR=> yL memL' [yR memR'] /= Hout.
-apply/eqP.
-move/andP: Hout=> [/eqP -> /eqP ->].
-by [].
 Qed.
 
 Lemma MicciancioWalterRule
