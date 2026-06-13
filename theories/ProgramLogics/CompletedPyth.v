@@ -42,6 +42,7 @@ Definition completedPythJudgment
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred (out_t * heap))
   (s : (ℓ.+1).-tuple R) :=
+  (forall i : 'I_(ℓ.+1), 0 <= tnth s i) /\
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
   exists
   (P Q : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}),
@@ -80,27 +81,31 @@ Lemma completedPythConseqRule
   ⊨CPyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   ⊨CPyth ⦃ pre' ⦄ progL ≈( s' ) progR ⦃ post' ⦄.
 Proof.
-move=> Hpre Hpost Hs Hpyth memL memR xL xR Hpre'.
-have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
-  Hpyth memL memR xL xR (Hpre _ Hpre').
-exists P, Q.
+move=> Hpre Hpost Hs [Hs_nonneg Hpyth].
 split.
-- move: Hdist=> [Heps [Hac [HP [HQ Hcond]]]].
+- move=> i.
+  exact: (le_trans (Hs_nonneg i) (Hs i)).
+- move=> memL memR xL xR Hpre'.
+  have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+    Hpyth memL memR xL xR (Hpre _ Hpre').
+  exists P, Q.
   split.
-    move=> i.
-    exact: (le_trans (Heps i) (Hs i)).
-  split; first exact: Hac.
-  split; first exact: HP.
-  split; first exact: HQ.
-  move=> i a.
-  exact: (le_trans (Hcond i a) (Hs i)).
-split; first exact: HmarginL.
-split; first exact: HmarginR.
-split.
-- move=> y Hy.
-  exact: Hpost (HpostL y Hy).
-- move=> y Hy.
-  exact: Hpost (HpostR y Hy).
+  - move: Hdist=> [Heps [Hac [HP [HQ Hcond]]]].
+    split.
+      move=> i.
+      exact: (le_trans (Heps i) (Hs i)).
+    split; first exact: Hac.
+    split; first exact: HP.
+    split; first exact: HQ.
+    move=> i a.
+    exact: (le_trans (Hcond i a) (Hs i)).
+  split; first exact: HmarginL.
+  split; first exact: HmarginR.
+  split.
+  - move=> y Hy.
+    exact: Hpost (HpostL y Hy).
+  - move=> y Hy.
+    exact: Hpost (HpostR y Hy).
 Qed.
 
 Lemma pythCompletedRule
@@ -192,7 +197,13 @@ Lemma completedPythSeqRule
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
 Proof.
-move=> Hpyth1 Hpyth2 memL memR xL xR Hpre.
+move=> [Hs1 Hpyth1] [Hs2 Hpyth2].
+split.
+- move=> i.
+  apply: (cat_tuple_nonneg s1 s2 i).
+  + exact: Hs1.
+  + exact: Hs2.
+- move=> memL memR xL xR Hpre.
 have [P0 [Q0 [Hdist0 [HmarginL0 [HmarginR0 [HmidL HmidR]]]]]] :=
   Hpyth1 memL memR xL xR Hpre.
 set ML := Pr_code (progL xL) memL.
@@ -221,7 +232,7 @@ have Hcont :
   by exists P, Q.
 have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
   completedPythDist_bind_pyth_kernel ML MR KL KR mid post s1 s2 P0 Q0
-    Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hcont.
+    Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 Hcont.
 exists P, Q.
 rewrite !Pr_code_bind.
 split; first exact: Hdist.
