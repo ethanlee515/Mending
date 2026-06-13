@@ -130,10 +130,10 @@ Lemma completedMicciancioWalterRule
   (s : (ℓ.+1).-tuple R) :
   ⊨CPyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   let delta := pythagorean_tv_bound s in
-  ⊨AE ⦃ pre ⦄ progL ≈( delta ) progR ⦃
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( delta ) progR ⦃
     fun outs =>
-      let '((y_1, m_1'), (y_2, m_2')) := outs in
-      post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2')⦄.
+    let '(outL, outR) := outs in
+    outL == outR ⦄.
 Admitted.
 
 Lemma completedPythDnullRule
