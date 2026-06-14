@@ -387,6 +387,51 @@ Proof.
 by rewrite completedFinalUpdate_final completedFinalUpdate_prefix_ord_max.
 Qed.
 
+Lemma completedFinalUpdate_nonfinal
+  {ℓ : nat}
+  (omega : (ℓ.+1).-tuple (option (nat * heap)))
+  (z : option (nat * heap))
+  (i : 'I_(ℓ.+1)) :
+  (i < @ord_max ℓ)%N ->
+  tnth (completedFinalUpdate omega z) i = tnth omega i.
+Proof.
+move=> Hi.
+rewrite /completedFinalUpdate tnth_mktuple.
+have -> : (i == @ord_max ℓ) = false.
+  apply/eqP=> Himax.
+  by move: Hi; rewrite Himax ltnn.
+by [].
+Qed.
+
+Lemma completedFinalUpdate_prefix_nonfinal
+  {ℓ : nat}
+  (omega : (ℓ.+1).-tuple (option (nat * heap)))
+  (z : option (nat * heap))
+  (i : 'I_(ℓ.+1))
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  (i < @ord_max ℓ)%N ->
+  tuple_prefix_eq i a (completedFinalUpdate omega z) =
+  tuple_prefix_eq i a omega.
+Proof.
+move=> Hi.
+rewrite /tuple_prefix_eq.
+apply/forallP/forallP=> Hprefix j; move: (Hprefix j).
+  rewrite /completedFinalUpdate tnth_mktuple.
+  case Hji: (j < i)%N=> //=.
+  have Hjmax : (j < @ord_max ℓ)%N := ltn_trans Hji Hi.
+  have -> : (j == @ord_max ℓ) = false.
+    apply/eqP=> Hj_eq.
+    by move: Hjmax; rewrite Hj_eq ltnn.
+  by [].
+rewrite /completedFinalUpdate tnth_mktuple.
+case Hji: (j < i)%N=> //=.
+have Hjmax : (j < @ord_max ℓ)%N := ltn_trans Hji Hi.
+have -> : (j == @ord_max ℓ) = false.
+  apply/eqP=> Hj_eq.
+  by move: Hjmax; rewrite Hj_eq ltnn.
+by [].
+Qed.
+
 Lemma completedSemanticBindKernel_dweight1
   {mid_t out_t : choice_type}
   (K : mid_t * heap -> {distr (out_t * heap) / R})
@@ -589,7 +634,59 @@ Lemma completedFinalBindTrace_cond_nonfinal_eq
   conditional_coordinate (completedFinalBindTrace K mid Q0) i a
     =1 conditional_coordinate Q0 i a.
 Proof.
-Admitted.
+move=> Hi.
+have Hjoint :
+  forall P0 x,
+  \P_[completedFinalBindTrace K mid P0]
+    [predI [pred omega | tnth omega i \in pred1 x] &
+      fun omega => tuple_prefix_eq i a omega] =
+  \P_[P0]
+    [predI [pred omega | tnth omega i \in pred1 x] &
+      fun omega => tuple_prefix_eq i a omega].
+  move=> P x.
+  rewrite /completedFinalBindTrace pr_dlet.
+  rewrite [RHS]pr_exp.
+  apply: expectation_ext=> omega.
+  rewrite pr_dlet.
+  rewrite (expectation_ext
+    (completedSemanticBindKernel K mid (tnth omega ord_max))
+    _
+    (fun _ =>
+      ((tnth omega i \in pred1 x) && tuple_prefix_eq i a omega)%:R)).
+    rewrite expectation_const.
+      by rewrite !inE.
+    exact: completedSemanticBindKernel_dweight1.
+  move=> z.
+  rewrite pr_dunit !inE.
+  rewrite completedFinalUpdate_nonfinal //.
+  change (completedFinalUpdate omega z \in [eta tuple_prefix_eq i a])
+    with (tuple_prefix_eq i a (completedFinalUpdate omega z)).
+  rewrite completedFinalUpdate_prefix_nonfinal //.
+have Hprefix :
+  forall P0,
+  \P_[completedFinalBindTrace K mid P0]
+    (fun omega => tuple_prefix_eq i a omega) =
+  \P_[P0] (fun omega => tuple_prefix_eq i a omega).
+  move=> P.
+  rewrite /completedFinalBindTrace pr_dlet.
+  rewrite [RHS]pr_exp.
+  apply: expectation_ext=> omega.
+  rewrite pr_dlet.
+  rewrite (expectation_ext
+    (completedSemanticBindKernel K mid (tnth omega ord_max))
+    _
+    (fun _ => (tuple_prefix_eq i a omega)%:R)).
+    rewrite expectation_const.
+      by [].
+    exact: completedSemanticBindKernel_dweight1.
+  move=> z.
+  rewrite pr_dunit.
+  change (completedFinalUpdate omega z \in [eta tuple_prefix_eq i a])
+    with (tuple_prefix_eq i a (completedFinalUpdate omega z)).
+  by rewrite completedFinalUpdate_prefix_nonfinal //.
+split=> x; rewrite !pr_pred1 !pr_dmargin !pr_dcond /prc;
+  by rewrite Hjoint Hprefix.
+Qed.
 
 Lemma completedFinalBindTrace_cond_final_eq
   {ℓ : nat}
