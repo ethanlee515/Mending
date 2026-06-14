@@ -344,6 +344,49 @@ Definition completedFinalBindTrace
   \dlet_(z <- completedSemanticBindKernel K mid (tnth omega ord_max))
     dunit (completedFinalUpdate omega z).
 
+Lemma completedFinalUpdate_final
+  {ℓ : nat}
+  (omega : (ℓ.+1).-tuple (option (nat * heap)))
+  (z : option (nat * heap)) :
+  tnth (completedFinalUpdate omega z) (@ord_max ℓ) = z.
+Proof. by rewrite /completedFinalUpdate tnth_mktuple eqxx. Qed.
+
+Lemma completedFinalUpdate_prefix_ord_max
+  {ℓ : nat}
+  (omega : (ℓ.+1).-tuple (option (nat * heap)))
+  (z : option (nat * heap))
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  tuple_prefix_eq (@ord_max ℓ) a (completedFinalUpdate omega z) =
+  tuple_prefix_eq (@ord_max ℓ) a omega.
+Proof.
+rewrite /tuple_prefix_eq.
+apply/forallP/forallP=> Hprefix j; move: (Hprefix j).
+  rewrite /completedFinalUpdate tnth_mktuple.
+  case Hj: (j < @ord_max ℓ)%N=> //=.
+  have -> : (j == @ord_max ℓ) = false.
+    apply/eqP=> Hjmax.
+    by move: Hj; rewrite Hjmax ltnn.
+  by [].
+rewrite /completedFinalUpdate tnth_mktuple.
+case Hj: (j < @ord_max ℓ)%N=> //=.
+have -> : (j == @ord_max ℓ) = false.
+  apply/eqP=> Hjmax.
+  by move: Hj; rewrite Hjmax ltnn.
+by [].
+Qed.
+
+Lemma completedFinalUpdate_final_prefix_event
+  {ℓ : nat}
+  (omega : (ℓ.+1).-tuple (option (nat * heap)))
+  (z x : option (nat * heap))
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  (tnth (completedFinalUpdate omega z) (@ord_max ℓ) \in pred1 x) &&
+    tuple_prefix_eq (@ord_max ℓ) a (completedFinalUpdate omega z) =
+  (z \in pred1 x) && tuple_prefix_eq (@ord_max ℓ) a omega.
+Proof.
+by rewrite completedFinalUpdate_final completedFinalUpdate_prefix_ord_max.
+Qed.
+
 Lemma completedSemanticBindKernel_dweight1
   {mid_t out_t : choice_type}
   (K : mid_t * heap -> {distr (out_t * heap) / R})
@@ -357,6 +400,107 @@ case: (decode_output_heap packed)=> [y|]; last exact: dunit_dweight.
 destruct (@idP (mid y)) as [Hy|Hnot].
   exact: complete_dweight.
 exact: dunit_dweight.
+Qed.
+
+Lemma pr_pred1I
+  {T : choiceType}
+  (P : {distr T / R})
+  (p : pred T)
+  (x : T) :
+  \P_[P] [predI pred1 x & p] = (p x)%:R * P x.
+Proof.
+rewrite /pr.
+rewrite (psum_finseq (r := [:: x])).
+- rewrite big_seq1 !inE eqxx -topredE /=.
+  case Hpx: (p x); rewrite ?mul1r ?mul0r.
+    by rewrite ger0_norm ?ge0_mu.
+  by rewrite normr0.
+- by [].
+move=> y.
+rewrite !inE.
+case: (y == x) => //=.
+by rewrite mul0r eqxx.
+Qed.
+
+Lemma expectation_dcond
+  {T : choiceType}
+  (P : {distr T / R})
+  (p : pred T)
+  (f : T -> R) :
+  \E_[dcond P p] f =
+  \E_[P] (fun x => (p x)%:R * f x) / \P_[P] p.
+Proof.
+rewrite /esp.
+rewrite (eq_sum
+  (F2 := fun x => (((p x)%:R * f x) / \P_[P] p) * P x)).
+  rewrite -expectation_scale_right.
+  apply: expectation_ext=> x.
+  by rewrite mulrC.
+move=> x.
+rewrite dcondE /prc pr_pred1I.
+by rewrite !mulrA [f x * (p x)%:R]mulrC -!mulrA [P x * _]mulrC.
+Qed.
+
+Lemma completedFinalBindTrace_prefix_pr
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R})
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  \P_[completedFinalBindTrace K mid P0]
+    (fun omega => tuple_prefix_eq (@ord_max ℓ) a omega) =
+  \P_[P0] (fun omega => tuple_prefix_eq (@ord_max ℓ) a omega).
+Proof.
+pose p := fun omega => tuple_prefix_eq (@ord_max ℓ) a omega.
+rewrite /completedFinalBindTrace pr_dlet.
+rewrite [RHS]pr_exp.
+apply: expectation_ext=> omega.
+rewrite pr_dlet.
+rewrite (expectation_ext
+  (completedSemanticBindKernel K mid (tnth omega ord_max))
+  _
+  (fun _ => (p omega)%:R)).
+  by rewrite expectation_const // completedSemanticBindKernel_dweight1.
+move=> z.
+rewrite pr_dunit /p completedFinalUpdate_prefix_ord_max.
+by case: (tuple_prefix_eq (@ord_max ℓ) a omega).
+Qed.
+
+Lemma completedFinalBindTrace_final_prefix_pr
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R})
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap))
+  (x : option (nat * heap)) :
+  \P_[completedFinalBindTrace K mid P0]
+    [predI [pred omega | tnth omega (@ord_max ℓ) \in pred1 x] &
+      fun omega => tuple_prefix_eq (@ord_max ℓ) a omega] =
+  \E_[P0] (fun omega =>
+    (tuple_prefix_eq (@ord_max ℓ) a omega)%:R *
+    completedSemanticBindKernel K mid (tnth omega (@ord_max ℓ)) x).
+Proof.
+pose p := fun omega => tuple_prefix_eq (@ord_max ℓ) a omega.
+rewrite /completedFinalBindTrace pr_dlet.
+apply: expectation_ext=> omega.
+rewrite pr_dlet.
+rewrite (expectation_ext
+  (completedSemanticBindKernel K mid (tnth omega ord_max))
+  _
+  (fun z => if z == x then (p omega)%:R else 0)).
+  rewrite expectation_indicator_eq.
+  by rewrite mulrC.
+move=> z.
+have Hevent :
+    [predI [pred omega0 | tnth omega0 (@ord_max ℓ) \in pred1 x] & p]
+      (completedFinalUpdate omega z) =
+    ((z == x) && p omega).
+  rewrite /p /= completedFinalUpdate_final_prefix_event.
+  by [].
+rewrite pr_dunit Hevent.
+case Hzx: (z == x); case Hpomega: (p omega)=> //=.
 Qed.
 
 Lemma completedFinalBindTrace_absolute_continuous
@@ -460,7 +604,27 @@ Lemma completedFinalBindTrace_cond_final_eq
   \dlet_(z <- conditional_coordinate P0 (@ord_max ℓ) a)
     completedSemanticBindKernel K mid z.
 Proof.
-Admitted.
+move=> x.
+pose p := fun omega => tuple_prefix_eq (@ord_max ℓ) a omega.
+pose final :
+    (ℓ.+1).-tuple (option (nat * heap)) -> option (nat * heap) :=
+  fun omega => tnth omega (@ord_max ℓ).
+rewrite /conditional_coordinate.
+change (fun omega : (ℓ.+1).-tuple (option (nat * heap)) =>
+  tuple_prefix_eq (@ord_max ℓ) a omega) with p.
+change (fun omega : (ℓ.+1).-tuple (option (nat * heap)) =>
+  tnth omega (@ord_max ℓ)) with final.
+rewrite (dlet_dmargin (dcond P0 p) final
+  (completedSemanticBindKernel K mid) x).
+rewrite !pr_pred1 !pr_dmargin !pr_dcond /prc.
+rewrite (completedFinalBindTrace_final_prefix_pr K mid P0 a x).
+rewrite (completedFinalBindTrace_prefix_pr K mid P0 a).
+rewrite pr_dlet.
+rewrite expectation_dcond.
+congr (_ / _).
+apply: expectation_ext=> omega.
+by rewrite pr_pred1 /p /final.
+Qed.
 
 Lemma completedFinalBindTrace_cond_final_bound
   {ℓ : nat}
