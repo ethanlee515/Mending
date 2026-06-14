@@ -239,6 +239,11 @@ Definition compile_calls_from_trace_step_cont
     (s : suspended_program (A := A)) : raw_code A :=
   let '(status, packed_local_trace) := s in
   let local_trace := unpack_trace packed_local_trace in
+  let resume_from_packed_trace packed_trace :=
+    match continue_from_trace root (unpack_trace packed_trace) with
+    | Some prog' => prog'
+    | None => invalid_trace_code
+    end in
   match status with
   | inl x =>
       match call_from_package (X := X) (Y := Y) p fn x with
@@ -246,13 +251,13 @@ Definition compile_calls_from_trace_step_cont
           y ← body ;;
           compile_calls_from_trace q (X := X) (Y := Y) p fn root
             (rcons (trace_prefix ++ local_trace) (call_entry (pickle y)))
-      | None => invalid_trace_code
+      | None =>
+          packed_trace ← invalid_trace_code (A := packed_trace_t) ;;
+          resume_from_packed_trace packed_trace
       end
   | inr _ =>
-      match continue_from_trace root (trace_prefix ++ local_trace) with
-      | Some prog' => prog'
-      | None => invalid_trace_code
-      end
+      packed_trace ← ret (pack_trace (trace_prefix ++ local_trace)) ;;
+      resume_from_packed_trace packed_trace
   end.
 
 Lemma code_link_resolve_closed_with
@@ -438,8 +443,15 @@ Proof.
 move=> Htrace.
 rewrite (@compile_calls_from_traceS_decompose q X Y A p fn root prog
   trace_prefix Htrace).
-rewrite code_link_bind.
-Admitted.
+rewrite !code_link_bind bind_assoc.
+f_equal.
+apply functional_extensionality=> s.
+rewrite -code_link_bind.
+case: s=> [[x|a] packed_local_trace] /=.
+- case: (call_from_package (X := X) (Y := Y) p fn x)=> [body|] //=.
+  by rewrite bind_assoc.
+- by [].
+Qed.
 
 (** Base-case continuation after the shared search: either no [fn] call remains,
     the packed call input is invalid, or we spend the single call budget and
@@ -583,19 +595,24 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
     have Hpre_unit : (tt == tt) && (memR == memR) && call_invariant memR.
       by rewrite !eqxx.
     exact: (Hseq' memR memR tt tt Hpre_unit).
-  + rewrite /compile_calls_from_trace_step_cont /= /call_from_package.
-    rewrite Hx.
-    have Hbranch :
+  + have Hbranch :
       ⊨Pyth ⦃ fun inps =>
               let '((xL, memL), (xR, memR)) := inps in
               (xL == xR) && (memL == memR) && call_invariant memL ⦄
-        (fun _ : suspended_program (A := B) =>
-          code_link (invalid_trace_code (A := B)) P')
+        (fun _ : suspended_program (A := B) => code_link
+          (compile_calls_from_trace_step_cont 0
+            (X := X) (Y := Y) P' fn root trace_prefix
+            (inl packed_x, packed_local_trace))
+          P')
         ≈( [tuple eps] )
-        (fun _ : suspended_program (A := B) =>
-          code_link (invalid_trace_code (A := B)) P')
+        (fun _ : suspended_program (A := B) => code_link
+          (compile_calls_from_trace_step_cont 0
+            (X := X) (Y := Y) P'' fn root trace_prefix
+            (inl packed_x, packed_local_trace))
+          P')
       ⦃ fun out =>
         let '(_, mem) := out in call_invariant mem ⦄.
+      rewrite /compile_calls_from_trace_step_cont /= /call_from_package Hx.
       apply: pythReflRule.
       * by move=> i; rewrite [i]ord1.
       * move=> memL0 memR0 xL0 xR0 Hpre.
@@ -604,13 +621,19 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
       * move=> mem s out Hpre Hy.
         change (is_true
           (out \in dinsupp
-            (Pr_code (code_link (invalid_trace_code (A := B)) P') mem)))
+            (Pr_code
+              (code_link
+                (x ← invalid_trace_code (A := packed_trace_t) ;;
+                 match continue_from_trace root (unpack_trace x) with
+                 | Some prog' => prog'
+                 | None => invalid_trace_code
+                 end) P') mem)))
           in Hy.
-        rewrite code_link_invalid_trace_code in Hy.
-        rewrite /= in Hy.
-        rewrite /invalid_trace_code in Hy.
-        rewrite Pr_code_sample dlet_null_ext in Hy.
-        by move/dinsuppP: Hy; rewrite dnullE.
+        rewrite code_link_bind code_link_invalid_trace_code in Hy.
+        rewrite Pr_code_bind in Hy.
+        have [mid Hmid _] := @dinsupp_dlet R _ _ _ _ _ Hy.
+        rewrite /= /invalid_trace_code Pr_code_sample dlet_null_ext in Hmid.
+        by move/dinsuppP: Hmid; rewrite dnullE.
     have [_ Hbranch'] := Hbranch.
     pose s_bad : suspended_program (A := B) :=
       (@inl (chInterp packed_input) (chInterp B) packed_x,
@@ -620,6 +643,7 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
     exact: (Hbranch' memR memR s_bad s_bad Hpre_s).
 -
   rewrite /compile_calls_from_trace_step_cont /=.
+  rewrite unpack_pack_trace.
   case Hcont: (continue_from_trace root
       (trace_prefix ++ unpack_trace packed_local_trace))=> [prog'|].
   + have Hbranch :
@@ -775,6 +799,7 @@ Lemma pythCompileCallsFromTraceStepContinuationDoneRule
 Proof.
 move=> Hvalid HP' HKL Hdep HP'_pres Hfn Hcall.
 rewrite /compile_calls_from_trace_step_cont /=.
+rewrite unpack_pack_trace.
 case Hcont: (continue_from_trace root
     (trace_prefix ++ unpack_trace packed_local_trace))=> [prog'|].
 - apply: pythReflRule.
@@ -1517,3 +1542,4 @@ split.
   split; first exact: HmarginR.
   by split.
 Qed.
+
