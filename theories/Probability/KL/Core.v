@@ -79,6 +79,12 @@ Lemma kl_dmargin_injective {T U : choiceType}
   δ_KL (dmargin f P) (dmargin f Q) = δ_KL P Q.
 Admitted.
 
+Lemma kl_dlet_data_processing {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  (forall x, dweight (K x) = 1) ->
+  δ_KL (\dlet_(x <- P) K x) (\dlet_(x <- Q) K x) <= δ_KL P Q.
+Admitted.
+
 Lemma expectation_le_const_on_support {T : choiceType}
     (P : {distr T / R}) (f : T -> R) (c : R) :
   dweight P = 1 ->

@@ -326,6 +326,366 @@ move=> Hmid [packed|].
 - exact: completed_output_heap_bind_none.
 Qed.
 
+Definition completedFinalUpdate
+  {ℓ : nat}
+  (omega : (ℓ.+1).-tuple (option (nat * heap)))
+  (z : option (nat * heap)) :
+    (ℓ.+1).-tuple (option (nat * heap)) :=
+  [tuple if i == ord_max then z else tnth omega i | i < ℓ.+1].
+
+Definition completedFinalBindTrace
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}) :
+    {distr ((ℓ.+1).-tuple (option (nat * heap))) / R} :=
+  \dlet_(omega <- P)
+  \dlet_(z <- completedSemanticBindKernel K mid (tnth omega ord_max))
+    dunit (completedFinalUpdate omega z).
+
+Lemma completedSemanticBindKernel_dweight1
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (z : option (nat * heap)) :
+  dweight (completedSemanticBindKernel K mid z) = 1.
+Proof.
+rewrite /completedSemanticBindKernel.
+case: z=> [packed|]; last exact: dunit_dweight.
+case: (decode_output_heap packed)=> [y|]; last exact: dunit_dweight.
+destruct (@idP (mid y)) as [Hy|Hnot].
+  exact: complete_dweight.
+exact: dunit_dweight.
+Qed.
+
+Lemma completedFinalBindTrace_absolute_continuous
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 Q0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}) :
+  absolute_continuous P0 Q0 ->
+  absolute_continuous
+    (completedFinalBindTrace K mid P0)
+    (completedFinalBindTrace K mid Q0).
+Proof.
+move=> Hac omega' HQomega'0.
+apply/eqP; apply/negP=> HPomega'_nz.
+have HPomega'_supp :
+    omega' \in dinsupp (completedFinalBindTrace K mid P0).
+  by rewrite in_dinsupp; apply/negP.
+rewrite /completedFinalBindTrace in HPomega'_supp.
+have [omega Homega Hinner] :=
+  @dinsupp_dlet R _ _ _ _ _ HPomega'_supp.
+have [z Hz Hunit] := @dinsupp_dlet R _ _ _ _ _ Hinner.
+have Homega' :
+    omega' = completedFinalUpdate omega z.
+  move: Hunit.
+  by rewrite dunit1E pnatr_eq0 eqb0 negbK=> /eqP.
+have HQomega : omega \in dinsupp Q0.
+  rewrite in_dinsupp.
+  apply/negP=> /eqP HQomega0.
+  move: Homega.
+  by rewrite in_dinsupp (Hac omega HQomega0) eqxx.
+have HQomega'_supp :
+    omega' \in dinsupp (completedFinalBindTrace K mid Q0).
+  rewrite /completedFinalBindTrace Homega'.
+  apply: (@dlet_dinsupp R _ _
+    (fun omega0 =>
+      \dlet_(z0 <- completedSemanticBindKernel K mid
+          (tnth omega0 ord_max))
+        dunit (completedFinalUpdate omega0 z0))
+    Q0 omega (completedFinalUpdate omega z) HQomega).
+  apply: (@dlet_dinsupp R _ _
+    (fun z0 => dunit (completedFinalUpdate omega z0))
+    (completedSemanticBindKernel K mid (tnth omega ord_max))
+    z (completedFinalUpdate omega z) Hz).
+  by rewrite dunit1E eqxx oner_neq0.
+move: HQomega'_supp.
+by rewrite in_dinsupp HQomega'0 eqxx.
+Qed.
+
+Lemma completedFinalBindTrace_dweight1
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}) :
+  dweight P0 = 1 ->
+  dweight (completedFinalBindTrace K mid P0) = 1.
+Proof.
+move=> HP0.
+rewrite /completedFinalBindTrace dweight_dlet.
+  rewrite (eq_psum
+    (F2 := fun omega : (ℓ.+1).-tuple (option (nat * heap)) => P0 omega)).
+  by rewrite -pr_predT.
+move=> omega.
+rewrite dweight_dlet.
+rewrite (eq_psum
+  (F2 := fun z => completedSemanticBindKernel K mid
+    (tnth omega ord_max) z)).
+  by rewrite -pr_predT completedSemanticBindKernel_dweight1 mulr1.
+move=> z.
+by rewrite dunit_dweight mulr1.
+Qed.
+
+
+Lemma completedFinalBindTrace_cond_nonfinal_eq
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 Q0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R})
+  (i : 'I_(ℓ.+1))
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  (i < @ord_max ℓ)%N ->
+  conditional_coordinate (completedFinalBindTrace K mid P0) i a
+    =1 conditional_coordinate P0 i a /\
+  conditional_coordinate (completedFinalBindTrace K mid Q0) i a
+    =1 conditional_coordinate Q0 i a.
+Proof.
+Admitted.
+
+Lemma completedFinalBindTrace_cond_final_eq
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (P0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R})
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  conditional_coordinate
+    (completedFinalBindTrace K mid P0) (@ord_max ℓ) a
+  =1
+  \dlet_(z <- conditional_coordinate P0 (@ord_max ℓ) a)
+    completedSemanticBindKernel K mid z.
+Proof.
+Admitted.
+
+Lemma completedFinalBindTrace_cond_final_bound
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R})
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  pythDist P0 Q0 s ->
+  δ_KL
+    (conditional_coordinate
+      (completedFinalBindTrace K mid P0) (@ord_max ℓ) a)
+    (conditional_coordinate
+      (completedFinalBindTrace K mid Q0) (@ord_max ℓ) a)
+  <= tnth s (@ord_max ℓ).
+Proof.
+move=> Hdist.
+case: Hdist=> _ [_ [_ [_ Hcond]]].
+rewrite (kl_ext
+  (conditional_coordinate
+    (completedFinalBindTrace K mid P0) (@ord_max ℓ) a)
+  (\dlet_(z <- conditional_coordinate P0 (@ord_max ℓ) a)
+    completedSemanticBindKernel K mid z)
+  (conditional_coordinate
+    (completedFinalBindTrace K mid Q0) (@ord_max ℓ) a)
+  (\dlet_(z <- conditional_coordinate Q0 (@ord_max ℓ) a)
+    completedSemanticBindKernel K mid z)).
+  apply: (le_trans
+    (kl_dlet_data_processing
+      (conditional_coordinate P0 (@ord_max ℓ) a)
+      (conditional_coordinate Q0 (@ord_max ℓ) a)
+      (completedSemanticBindKernel K mid)
+      (completedSemanticBindKernel_dweight1 K mid))).
+  exact: Hcond.
+- exact: completedFinalBindTrace_cond_final_eq.
+- exact: completedFinalBindTrace_cond_final_eq.
+Qed.
+
+
+Lemma completedFinalBindTrace_cond_bound
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R})
+  (i : 'I_(ℓ.+1))
+  (a : forall j : 'I_(ℓ.+1), option (nat * heap)) :
+  pythDist P0 Q0 s ->
+  δ_KL
+    (conditional_coordinate
+      (completedFinalBindTrace K mid P0) i a)
+    (conditional_coordinate
+      (completedFinalBindTrace K mid Q0) i a)
+  <= tnth s i.
+Proof.
+move=> Hdist.
+case Himax: (i == @ord_max ℓ).
+  have -> : i = @ord_max ℓ by apply/eqP.
+  exact: (completedFinalBindTrace_cond_final_bound K mid s P0 Q0 a Hdist).
+	have Hi : (i < @ord_max ℓ)%N.
+	  rewrite /ord_max /=.
+	  have Hi_le : (i <= ℓ)%N by rewrite -ltnS.
+	  move: Hi_le; rewrite leq_eqVlt; move/orP=> [/eqP Hi_eq|Hi_lt];
+	    last exact: Hi_lt.
+	  have Hi_ord : i = @ord_max ℓ by apply: val_inj; rewrite /= Hi_eq.
+	  by rewrite Hi_ord eqxx in Himax.
+have [HP HQ] := completedFinalBindTrace_cond_nonfinal_eq
+  K mid P0 Q0 i a Hi.
+case: Hdist=> _ [_ [_ [_ Hcond]]].
+rewrite (kl_ext
+  (conditional_coordinate (completedFinalBindTrace K mid P0) i a)
+  (conditional_coordinate P0 i a)
+  (conditional_coordinate (completedFinalBindTrace K mid Q0) i a)
+  (conditional_coordinate Q0 i a) HP HQ).
+exact: Hcond.
+Qed.
+
+Lemma completedFinalBindTrace_pythDist
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}) :
+  pythDist P0 Q0 s ->
+  pythDist
+    (completedFinalBindTrace K mid P0)
+    (completedFinalBindTrace K mid Q0)
+    s.
+Proof.
+move=> Hdist.
+case: Hdist=> Hs [Hac [HP [HQ Hcond]]].
+split; first exact: Hs.
+split.
+  exact: (completedFinalBindTrace_absolute_continuous K mid P0 Q0 Hac).
+split.
+  exact: (completedFinalBindTrace_dweight1 K mid P0 HP).
+split.
+  exact: (completedFinalBindTrace_dweight1 K mid Q0 HQ).
+move=> i a.
+exact: (completedFinalBindTrace_cond_bound K mid s P0 Q0 i a
+  (conj Hs (conj Hac (conj HP (conj HQ Hcond))))).
+Qed.
+
+
+Lemma completedPythDist_bind_common_final_kernel
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (ML MR : {distr (mid_t * heap) / R})
+  (K : mid_t * heap -> {distr (out_t * heap) / R})
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R)
+  (P0 Q0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}) :
+  pythDist P0 Q0 s ->
+  dmargin (fun omega => tnth omega ord_max) P0
+    =1 completed_output_heap ML ->
+  dmargin (fun omega => tnth omega ord_max) Q0
+    =1 completed_output_heap MR ->
+  (forall y, y \in dinsupp ML -> mid y) ->
+  (forall y, y \in dinsupp MR -> mid y) ->
+  (forall y, mid y -> forall x, x \in dinsupp (K y) -> post x) ->
+  exists (P Q : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}),
+    pythDist P Q s /\
+    dmargin (fun omega => tnth omega ord_max) P
+      =1 completed_output_heap (\dlet_(y <- ML) K y) /\
+    dmargin (fun omega => tnth omega ord_max) Q
+      =1 completed_output_heap (\dlet_(y <- MR) K y) /\
+    (forall x, x \in dinsupp (\dlet_(y <- ML) K y) -> post x) /\
+    (forall x, x \in dinsupp (\dlet_(y <- MR) K y) -> post x).
+Proof.
+move=> Hdist HmarginL HmarginR HmidL HmidR Hpost.
+pose P := completedFinalBindTrace K mid P0.
+pose Q := completedFinalBindTrace K mid Q0.
+exists P, Q.
+have Hdist_bind : pythDist P Q s.
+  exact: (completedFinalBindTrace_pythDist K mid s P0 Q0 Hdist).
+have Hmargin_bindL :
+    dmargin (fun omega => tnth omega ord_max) P
+      =1 completed_output_heap (\dlet_(y <- ML) K y).
+  move=> z.
+  pose final (omega : (ℓ.+1).-tuple (option (nat * heap))) :=
+    tnth omega ord_max.
+  rewrite /P /completedFinalBindTrace.
+  rewrite dmargin_dlet.
+  have Hfinal_bind :
+      (\dlet_(omega <- P0)
+        dmargin final
+          (\dlet_(z0 <- completedSemanticBindKernel K mid (tnth omega ord_max))
+            dunit (completedFinalUpdate omega z0)))
+      =1
+      (\dlet_(omega <- P0)
+        (completedSemanticBindKernel K mid (final omega))).
+    apply: eq_in_dlet=> // omega _ z'.
+    rewrite /final dmargin_dlet.
+    rewrite -(dlet_dunit_id
+      (completedSemanticBindKernel K mid (tnth omega ord_max)) z').
+    apply: eq_in_dlet=> // z0 _ z1.
+    rewrite dmargin_dunit /final.
+    by rewrite tnth_mktuple eqxx.
+  rewrite (Hfinal_bind z).
+  rewrite -(dlet_dmargin P0 final (completedSemanticBindKernel K mid) z).
+  rewrite -(eq_in_dlet
+    (mu := completed_output_heap ML)
+    (nu := dmargin final P0)
+    (f := completedSemanticBindKernel K mid)
+    (g := completedSemanticBindKernel K mid)).
+    exact: (completed_output_heap_bind ML K mid HmidL z).
+  - by [].
+  - by move=> x; rewrite -HmarginL.
+have Hmargin_bindR :
+    dmargin (fun omega => tnth omega ord_max) Q
+      =1 completed_output_heap (\dlet_(y <- MR) K y).
+  move=> z.
+  pose final (omega : (ℓ.+1).-tuple (option (nat * heap))) :=
+    tnth omega ord_max.
+  rewrite /Q /completedFinalBindTrace.
+  rewrite dmargin_dlet.
+  have Hfinal_bind :
+      (\dlet_(omega <- Q0)
+        dmargin final
+          (\dlet_(z0 <- completedSemanticBindKernel K mid (tnth omega ord_max))
+            dunit (completedFinalUpdate omega z0)))
+      =1
+      (\dlet_(omega <- Q0)
+        (completedSemanticBindKernel K mid (final omega))).
+    apply: eq_in_dlet=> // omega _ z'.
+    rewrite /final dmargin_dlet.
+    rewrite -(dlet_dunit_id
+      (completedSemanticBindKernel K mid (tnth omega ord_max)) z').
+    apply: eq_in_dlet=> // z0 _ z1.
+    rewrite dmargin_dunit /final.
+    by rewrite tnth_mktuple eqxx.
+  rewrite (Hfinal_bind z).
+  rewrite -(dlet_dmargin Q0 final (completedSemanticBindKernel K mid) z).
+  rewrite -(eq_in_dlet
+    (mu := completed_output_heap MR)
+    (nu := dmargin final Q0)
+    (f := completedSemanticBindKernel K mid)
+    (g := completedSemanticBindKernel K mid)).
+    exact: (completed_output_heap_bind MR K mid HmidR z).
+  - by [].
+  - by move=> x; rewrite -HmarginR.
+have HpostL : forall x, x \in dinsupp (\dlet_(y <- ML) K y) -> post x.
+  move=> x Hx.
+  have [y Hy Hinner] := @dinsupp_dlet R _ _ K ML x Hx.
+  have Hy_mid := HmidL y Hy.
+  have Hx_inner : x \in dinsupp (K y).
+    by rewrite in_dinsupp.
+  exact: (Hpost y Hy_mid x Hx_inner).
+have HpostR : forall x, x \in dinsupp (\dlet_(y <- MR) K y) -> post x.
+  move=> x Hx.
+  have [y Hy Hinner] := @dinsupp_dlet R _ _ K MR x Hx.
+  have Hy_mid := HmidR y Hy.
+  have Hx_inner : x \in dinsupp (K y).
+    by rewrite in_dinsupp.
+  exact: (Hpost y Hy_mid x Hx_inner).
+split; first exact: Hdist_bind.
+split; first exact: Hmargin_bindL.
+split; first exact: Hmargin_bindR.
+by split.
+Qed.
+
 Lemma completedPythKernel_choice
   {ℓ : nat}
   {mid_t out_t : choice_type}

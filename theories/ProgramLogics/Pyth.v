@@ -227,7 +227,29 @@ Lemma pythAeSeqRule
     ≈( s )
     (fun xR => yR ← progR xR ;; cont yR)
   ⦃ post ⦄.
-Admitted.
+Proof.
+move=> [Hs Hpyth] Hhoare.
+split; first exact: Hs.
+move=> memL memR xL xR Hpre.
+have [P0 [Q0 [Hdist0 [HmarginL0 [HmarginR0 [HmidL HmidR]]]]]] :=
+  Hpyth memL memR xL xR Hpre.
+set ML := Pr_code (progL xL) memL.
+set MR := Pr_code (progR xR) memR.
+set K := fun y : mid_t * heap => Pr_code (cont y.1) y.2.
+have Hpost :
+    forall y, mid y -> forall x, x \in dinsupp (K y) -> post x.
+  move=> [y mem] Hy x Hx.
+  exact: (Hhoare y mem Hy x Hx).
+have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+  completedPythDist_bind_common_final_kernel ML MR K mid post s P0 Q0
+    Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hpost.
+exists P, Q.
+rewrite !Pr_code_bind.
+split; first exact: Hdist.
+split; first exact: HmarginL.
+split; first exact: HmarginR.
+by split.
+Qed.
 
 Lemma pythSeqRule
   {ℓ1 ℓ2 : nat}
