@@ -97,6 +97,20 @@ Definition heap_pred_depends_only_on
   (K : Locations) (p : pred heap) : Prop :=
   forall mem0 mem1, heap_eq_on K mem0 mem1 -> p mem0 = p mem1.
 
+Lemma heap_eq_on_set_heap_separate
+  (K L : Locations) (mem : heap) (l : Location) (v : l) :
+  fseparate K L ->
+  fhas L l ->
+  heap_eq_on K mem (set_heap mem l v).
+Proof.
+move=> HKL Hl k Hk.
+rewrite get_set_heap_neq //.
+apply/negP=> /eqP Hkl.
+have Hnotin := notin_has_separate K L k Hk HKL.
+have Hin := fhas_in L l Hl.
+by rewrite Hkl Hin in Hnotin.
+Qed.
+
 Definition package_preserves_heap_pred_except
   (M : Interface) (P : raw_package) (skip : ident)
   (p : pred heap) : Prop :=
@@ -370,6 +384,66 @@ case: root Hvalid Htrace=> //=.
   exact: (IH (k y) (Hk y) Htrace).
 Qed.
 
+Lemma linkedRunUntilNextCallAuxPreservesHeapPred
+  (X Y B : choice_type)
+  (K L L' : Locations) (M : Interface)
+  (P' : raw_package) (fn : ident)
+  (prog : raw_code B) (trace : trace_t)
+  (call_invariant : pred heap) :
+  ValidCode L M prog ->
+  ValidPackage L' [interface] M P' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨Hoare ⦃ fun in_mem => call_invariant in_mem.2 ⦄
+    (fun _ : 'unit => code_link
+      (run_until_next_call_aux prog fn trace) P')
+  ⦃ fun out_mem => call_invariant out_mem.2 ⦄.
+Proof.
+move=> Hvalid HP' HKL Hdep HP'_pres Hfn.
+rewrite /hoareJudgment=> u mem Hinv out.
+change (is_true (call_invariant mem)) in Hinv.
+clear u.
+move: trace mem Hinv out.
+have Hvc := valid_code_from_class L M B prog Hvalid.
+elim: Hvc=> [b|o x k Ho Hk IH|l k Hl Hk IH|l v k Hl Hk IH|op k Hk IH]
+    trace mem Hinv out Hout /=.
+- rewrite Pr_code_ret in Hout.
+  have -> : out = ((inr b, pack_trace trace), mem).
+    exact: (in_dunit Hout).
+  exact: Hinv.
+- move: out Hout.
+  case: o Ho x k Hk IH=> f [S T] Ho x k Hk IH out Hout /=.
+  case Hfid: (f == fn)%bool.
+  + rewrite /run_until_next_call_aux Hfid /code_link /= in Hout.
+    rewrite Pr_code_ret in Hout.
+    have -> : out = ((inl (pickle x), pack_trace trace), mem).
+      exact: (in_dunit Hout).
+    exact: Hinv.
+  + rewrite /run_until_next_call_aux Hfid /code_link /= in Hout.
+    rewrite Pr_code_bind in Hout.
+    have [mid Hmid Hinner] := @dinsupp_dlet R _ _ _ _ _ Hout.
+    have Hneq : (f, (S, T)).1 != fn by rewrite /= Hfid.
+    have Hpres := HP'_pres (f, (S, T)) x Ho Hneq.
+    have Hmid_inv : call_invariant mid.2.
+      exact: (Hpres x mem Hinv mid Hmid).
+    exact: (IH mid.1 (rcons trace (call_entry (pickle mid.1)))
+      mid.2 Hmid_inv out Hinner).
+- rewrite Pr_code_get in Hout.
+  exact: (IH (get_heap mem l) (rcons trace (get_entry (pickle (get_heap mem l))))
+    mem Hinv out Hout).
+- rewrite Pr_code_put in Hout.
+  have Hinv' : call_invariant (set_heap mem l v).
+    move: (Hdep mem (set_heap mem l v)
+      (heap_eq_on_set_heap_separate K L mem l v HKL Hl)).
+    by move=> <-.
+  exact: (IH (rcons trace put_entry) (set_heap mem l v) Hinv' out Hout).
+- rewrite Pr_code_sample in Hout.
+  have [a _ Hinner] := @dinsupp_dlet R _ _ _ _ _ Hout.
+  exact: (IH a (rcons trace (sample_entry (pickle a))) mem Hinv out Hinner).
+Qed.
+
 Lemma linkedRunUntilNextCallPreservesHeapPred
   (X Y B : choice_type)
   (K L L' : Locations) (M : Interface)
@@ -385,7 +459,12 @@ Lemma linkedRunUntilNextCallPreservesHeapPred
   ⊨Hoare ⦃ fun in_mem => call_invariant in_mem.2 ⦄
     (fun _ : 'unit => code_link (run_until_next_call prog fn) P')
   ⦃ fun out_mem => call_invariant out_mem.2 ⦄.
-Admitted.
+Proof.
+move=> Hvalid HP' HKL Hdep HP'_pres Hfn.
+rewrite /run_until_next_call.
+exact: (linkedRunUntilNextCallAuxPreservesHeapPred X Y B K L L' M P'
+  fn prog nil call_invariant Hvalid HP' HKL Hdep HP'_pres Hfn).
+Qed.
 
 Lemma pythCompileCallsFromTraceBaseRule
   (X Y B : choice_type)
