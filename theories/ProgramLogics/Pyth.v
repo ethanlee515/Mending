@@ -507,6 +507,788 @@ Lemma pythCompileCallsFromTraceBaseRule
     call_invariant mem ⦄.
 Admitted.
 
+Lemma pythCompileCallsFromTraceInvalidRule
+  (q : nat) (X Y B : choice_type)
+  (K L L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (root : raw_code B) (trace_prefix : trace_t)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidCode L M root ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  continue_from_trace root trace_prefix = None ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨PythC ⦃ fun mems =>
+          let '(memL, memR) := mems in
+          (memL == memR) && call_invariant memL ⦄
+    (code_link
+      (compile_calls_from_trace q.+1 (X := X) (Y := Y) P' fn
+        root trace_prefix)
+      P')
+    ≈( pythCallErrors q eps )
+    (code_link
+      (compile_calls_from_trace q.+1 (X := X) (Y := Y) P'' fn
+        root trace_prefix)
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hcall.
+have [Heps_nonneg _] := Hcall.
+have Heps : 0 <= eps.
+  exact: (Heps_nonneg ord0).
+rewrite /pythClosedJudgment.
+rewrite /compile_calls_from_trace /= Htrace.
+apply: pythReflRule.
+- exact: (pythCallErrors_nonneg q eps Heps).
+- move=> memL memR [] [] Hpre.
+  move/andP: Hpre=> [/eqP -> _].
+  by split.
+- move=> mem [] y Hpre Hy.
+  rewrite /= /invalid_trace_code Pr_code_sample dlet_null_ext in Hy.
+  by move/dinsuppP: Hy; rewrite dnullE.
+Qed.
+
+Definition compile_calls_from_trace_step_cont
+    (q : nat) {X Y A : choice_type}
+    (p : raw_package) (fn : ident)
+    (root : raw_code A) (trace_prefix : trace_t)
+    (s : suspended_program (A := A)) : raw_code A :=
+  let '(status, packed_local_trace) := s in
+  let local_trace := unpack_trace packed_local_trace in
+  match status with
+  | inl x =>
+      match call_from_package (X := X) (Y := Y) p fn x with
+      | Some body =>
+          y ← body ;;
+          compile_calls_from_trace q (X := X) (Y := Y) p fn root
+            (rcons (trace_prefix ++ local_trace) (call_entry (pickle y)))
+      | None => invalid_trace_code
+      end
+  | inr _ =>
+      match continue_from_trace root (trace_prefix ++ local_trace) with
+      | Some prog' => prog'
+      | None => invalid_trace_code
+      end
+  end.
+
+Lemma code_link_resolve_closed_with
+    (X Y : choice_type) (L : Locations) (M : Interface)
+    (p P_link : raw_package) (fn : ident) (x : X) :
+  ValidPackage L [interface] M p ->
+  fhas M (mkopsig fn X Y) ->
+  code_link (resolve p (mkopsig fn X Y) x) P_link =
+  resolve p (mkopsig fn X Y) x.
+Proof.
+move=> Hp Hfn.
+apply: code_link_closed.
+exact: (@valid_resolve L [interface] M p (mkopsig fn X Y) x Hp Hfn).
+Qed.
+
+Lemma pythCallAtRule
+  (X Y : choice_type)
+  (P' P'' : raw_package) (fn : ident)
+  (eps : R) (call_invariant : pred heap) (x : X) :
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((_, memL), (_, memR)) := inps in
+          (memL == memR) && call_invariant memL ⦄
+    (fun _ : 'unit => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun _ : 'unit => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> [Hs Hpyth].
+split; first exact: Hs.
+move=> memL memR [] [] Hpre.
+have Hpre_call :
+    (let '((xL, memL0), (xR, memR0)) :=
+        ((x, memL), (x, memR)) in
+      (xL == xR) && (memL0 == memR0) && call_invariant memL0).
+  move/andP: Hpre=> [Hmem Hinv].
+  by rewrite eqxx Hmem Hinv.
+exact: (Hpyth memL memR x x Hpre_call).
+Qed.
+
+(** The left half of a call coupling is an ordinary invariant-preservation
+    Hoare fact for the implementation package. *)
+Lemma pythCallLeftHoare
+  (X Y : choice_type)
+  (P' P'' : raw_package) (fn : ident)
+  (eps : R) (call_invariant : pred heap) (x : X) :
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨Hoare ⦃ fun in_mem => call_invariant in_mem.2 ⦄
+    (fun _ : 'unit => resolve P' (mkopsig fn X Y) x)
+  ⦃ fun out_mem => call_invariant out_mem.2 ⦄.
+Proof.
+move=> [_ Hpyth].
+rewrite /hoareJudgment=> u mem Hinv out Hout /=.
+case: u Hinv Hout=> Hinv Hout.
+have Hpre :
+    (let '((xL, memL), (xR, memR)) := ((x, mem), (x, mem)) in
+      (xL == xR) && (memL == memR) && call_invariant memL).
+  by rewrite !eqxx Hinv.
+have [P [Q [_ [_ [_ [HpostL _]]]]]] := Hpyth mem mem x x Hpre.
+case: out Hout=> y mem' Hout.
+exact: (HpostL (y, mem') Hout).
+Qed.
+
+(** General preservation for linked residual code.  The only interesting case
+    is an operation with identifier [fn], where [pythCallLeftHoare] supplies
+    the missing package-preservation fact. *)
+Lemma linkedCodePreservesHeapPred
+  (X Y A : choice_type)
+  (K L L' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (prog : raw_code A)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidCode L M prog ->
+  ValidPackage L' [interface] M P' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨Hoare ⦃ fun in_mem => call_invariant in_mem.2 ⦄
+    (fun _ : 'unit => code_link prog P')
+  ⦃ fun out_mem => call_invariant out_mem.2 ⦄.
+Admitted.
+
+(** Peel one compiled-call step after a valid trace prefix.  The shared
+    [run_until_next_call] part is exposed as the first bind. *)
+Lemma codeLinkCompileCallsFromTraceS_decompose
+    (q : nat) (X Y A : choice_type)
+    (p P_link : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix : trace_t) :
+  continue_from_trace root trace_prefix = Some prog ->
+  code_link
+    (@compile_calls_from_trace q.+1 X Y A p fn root trace_prefix)
+    P_link =
+  bind (code_link (run_until_next_call prog fn) P_link)
+    (fun s =>
+      code_link
+        (compile_calls_from_trace_step_cont q (X := X) (Y := Y) p fn
+          root trace_prefix s)
+        P_link).
+Proof.
+move=> Htrace.
+rewrite (@compile_calls_from_traceS_decompose q X Y A p fn root prog
+  trace_prefix Htrace).
+rewrite code_link_bind.
+Admitted.
+
+(** Searching for the next [fn] call is identical on both sides.  It costs the
+    leading zero coordinate and only needs to preserve the call invariant. *)
+Lemma pythLinkedRunUntilNextCallRule
+  (X Y B : choice_type)
+  (K L L' : Locations) (M : Interface)
+  (P' : raw_package) (fn : ident)
+  (prog : raw_code B)
+  (call_invariant : pred heap) :
+  ValidCode L M prog ->
+  ValidPackage L' [interface] M P' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨PythC ⦃ fun mems =>
+          let '(memL, memR) := mems in
+          (memL == memR) && call_invariant memL ⦄
+    (code_link (run_until_next_call prog fn) P')
+    ≈( [tuple 0] )
+    (code_link (run_until_next_call prog fn) P')
+  ⦃ fun out =>
+    let '(_, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> Hvalid HP' HKL Hdep HP'_pres Hfn.
+rewrite /pythClosedJudgment.
+apply: pythReflRule.
+- by move=> i; rewrite [i]ord1.
+- move=> memL memR [] [] Hpre.
+  move/andP: Hpre=> [/eqP -> _].
+  by split.
+- move=> mem [] y Hpre Hy.
+  have Hhoare := linkedRunUntilNextCallPreservesHeapPred X Y B K L L' M
+    P' fn prog call_invariant Hvalid HP' HKL Hdep HP'_pres Hfn.
+  move/andP: Hpre=> [_ Hinv].
+  have Hy_inv := Hhoare tt mem Hinv y Hy.
+  by move: Hy Hy_inv; case: y=> [[status tr] mem'] /=.
+Qed.
+
+(* TODO: Re-evaluate whether these three continuation cases should stay as
+   standalone lemmas, or whether the easy branches are clearer inline. *)
+
+(** After the shared search, the program finished before another [fn] call.
+    The continuation no longer depends on whether calls are compiled via [P'] or [P'']. *)
+Lemma pythCompileCallsFromTraceStepContinuationDoneRule
+  (q : nat) (X Y B : choice_type)
+  (K L L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (root prog : raw_code B) (trace_prefix : trace_t)
+  (packed_local_trace : packed_trace_t) (b : B)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidCode L M root ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  continue_from_trace root trace_prefix = Some prog ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun _ : 'unit => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P' fn root trace_prefix
+        (inr b, packed_local_trace))
+      P')
+    ≈( cat_tuple [tuple eps] (pythCallErrors q eps) )
+    (fun _ : 'unit => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P'' fn root trace_prefix
+        (inr b, packed_local_trace))
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hcall.
+rewrite /compile_calls_from_trace_step_cont /=.
+case Hcont: (continue_from_trace root
+    (trace_prefix ++ unpack_trace packed_local_trace))=> [prog'|].
+- apply: pythReflRule.
+  + move=> i.
+    have Heps : 0 <= eps := proj1 Hcall ord0.
+    apply: (cat_tuple_nonneg [tuple eps] (pythCallErrors q eps) i).
+    * move=> j.
+      by rewrite [j]ord1.
+    * exact: (pythCallErrors_nonneg q eps Heps).
+  + move=> memL memR [] [] Hpre.
+    split; first done.
+    by move/andP: Hpre=> [/eqP -> _].
+  + move=> mem [] out Hpre Hy.
+    have Hvalid_prog' :
+        ValidCode L M prog'.
+      exact: (continue_from_trace_valid L M root prog'
+        (trace_prefix ++ unpack_trace packed_local_trace) Hvalid Hcont).
+    have Hhoare := linkedCodePreservesHeapPred X Y B K L L' M P' P''
+      fn prog' eps call_invariant Hvalid_prog' HP' HKL Hdep HP'_pres Hfn
+      Hcall.
+    move/andP: Hpre=> [_ Hinv].
+    case: out Hy=> y mem' Hy.
+    exact: (Hhoare tt mem Hinv (y, mem') Hy).
+- apply: pythReflRule.
+  + move=> i.
+    have Heps : 0 <= eps := proj1 Hcall ord0.
+    apply: (cat_tuple_nonneg [tuple eps] (pythCallErrors q eps) i).
+    * move=> j.
+      by rewrite [j]ord1.
+    * exact: (pythCallErrors_nonneg q eps Heps).
+  + move=> memL memR [] [] Hpre.
+    split; first done.
+    by move/andP: Hpre=> [/eqP -> _].
+  + move=> mem [] y Hpre Hy.
+    rewrite /= /invalid_trace_code Pr_code_sample dlet_null_ext in Hy.
+    by move/dinsuppP: Hy; rewrite dnullE.
+Qed.
+
+(** The suspended call payload could fail to unpickle as an [X].  Then both
+    continuations are the empty invalid-trace program. *)
+Lemma pythCompileCallsFromTraceStepContinuationBadCallRule
+  (q : nat) (X Y B : choice_type)
+  (K L L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (root prog : raw_code B) (trace_prefix : trace_t)
+  (packed_local_trace : packed_trace_t) (packed_x : packed_input)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidCode L M root ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  continue_from_trace root trace_prefix = Some prog ->
+  unpickle packed_x = (None : option X) ->
+  0 <= eps ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun _ : 'unit => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P' fn root trace_prefix
+        (inl packed_x, packed_local_trace))
+      P')
+    ≈( cat_tuple [tuple eps] (pythCallErrors q eps) )
+    (fun _ : 'unit => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P'' fn root trace_prefix
+        (inl packed_x, packed_local_trace))
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hx Heps.
+rewrite /compile_calls_from_trace_step_cont /= /call_from_package Hx.
+apply: pythReflRule.
+- move=> i.
+  apply: (cat_tuple_nonneg [tuple eps] (pythCallErrors q eps) i).
+  + move=> j.
+    by rewrite [j]ord1.
+  + exact: (pythCallErrors_nonneg q eps Heps).
+- move=> memL memR [] [] Hpre.
+  split; first done.
+  by move/andP: Hpre=> [/eqP -> _].
+- move=> mem [] y Hpre Hy.
+  rewrite /= /invalid_trace_code Pr_code_sample dlet_null_ext in Hy.
+  by move/dinsuppP: Hy; rewrite dnullE.
+Qed.
+
+(** The real recursive branch: spend [eps] on the package call, then invoke the
+    IH at the trace extended with the returned call value. *)
+Lemma pythCompileCallsFromTraceStepContinuationTailRule
+  (q : nat) (X Y B : choice_type)
+  (P' P'' : raw_package) (fn : ident)
+  (root : raw_code B) (trace_prefix local_trace : trace_t)
+  (eps : R)
+  (call_invariant : pred heap) :
+  (forall trace_prefix',
+    ⊨PythC ⦃ fun mems =>
+            let '(memL, memR) := mems in
+            (memL == memR) && call_invariant memL ⦄
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P' fn
+          root trace_prefix')
+        P')
+      ≈( pythCallErrors q eps )
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P'' fn
+          root trace_prefix')
+        P')
+    ⦃ fun out =>
+      let '(y, mem) := out in
+      call_invariant mem ⦄) ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((yL, memL), (yR, memR)) := inps in
+          (yL == yR) && (memL == memR) && call_invariant memL ⦄
+    (fun y : Y => code_link
+      (compile_calls_from_trace q.+1 (X := X) (Y := Y) P' fn root
+        (rcons (trace_prefix ++ local_trace) (call_entry (pickle y))))
+      P')
+    ≈( pythCallErrors q eps )
+    (fun y : Y => code_link
+      (compile_calls_from_trace q.+1 (X := X) (Y := Y) P'' fn root
+        (rcons (trace_prefix ++ local_trace) (call_entry (pickle y))))
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> HIH.
+split.
+  move=> i.
+  have [Hs _] := HIH nil.
+  exact: Hs i.
+move=> memL memR yL yR Hpre.
+move/andP: Hpre=> [/andP [/eqP -> /eqP ->] Hinv].
+have [_ Htail] := HIH
+  (rcons (trace_prefix ++ local_trace) (call_entry (pickle (yR : Y)))).
+have Hpre_unit : (memR == memR) && call_invariant memR.
+  by rewrite eqxx Hinv.
+exact: (Htail memR memR tt tt Hpre_unit).
+Qed.
+
+Lemma pythCompileCallsFromTraceStepContinuationCallRule
+  (q : nat) (X Y B : choice_type)
+  (K L L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (root prog : raw_code B) (trace_prefix : trace_t)
+  (packed_local_trace : packed_trace_t) (packed_x : packed_input) (x : X)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidCode L M root ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  continue_from_trace root trace_prefix = Some prog ->
+  unpickle packed_x = Some x ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  (forall trace_prefix',
+    ⊨PythC ⦃ fun mems =>
+            let '(memL, memR) := mems in
+            (memL == memR) && call_invariant memL ⦄
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P' fn
+          root trace_prefix')
+        P')
+      ≈( pythCallErrors q eps )
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P'' fn
+          root trace_prefix')
+        P')
+    ⦃ fun out =>
+      let '(y, mem) := out in
+      call_invariant mem ⦄) ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun _ : 'unit => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P' fn root trace_prefix
+        (inl packed_x, packed_local_trace))
+      P')
+    ≈( cat_tuple [tuple eps] (pythCallErrors q eps) )
+    (fun _ : 'unit => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P'' fn root trace_prefix
+        (inl packed_x, packed_local_trace))
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hx Hcall HIH.
+rewrite /compile_calls_from_trace_step_cont /=.
+rewrite /call_from_package Hx.
+rewrite !code_link_bind.
+rewrite (code_link_resolve_closed_with X Y L' M P' P' fn x HP' Hfn).
+rewrite (code_link_resolve_closed_with X Y L'' M P'' P' fn x HP'' Hfn).
+eapply (@pythSeqRule 0 (q.*2).+1 'unit 'unit Y B
+  (fun _ : 'unit => resolve P' (mkopsig fn X Y) x)
+  (fun _ : 'unit => resolve P'' (mkopsig fn X Y) x)
+  (fun y => code_link
+    (compile_calls_from_trace q.+1 (X := X) (Y := Y) P' fn root
+      (rcons (trace_prefix ++ unpack_trace packed_local_trace)
+        (call_entry (pickle y))))
+    P')
+  (fun y => code_link
+    (compile_calls_from_trace q.+1 (X := X) (Y := Y) P'' fn root
+      (rcons (trace_prefix ++ unpack_trace packed_local_trace)
+        (call_entry (pickle y))))
+    P')
+  (fun inps =>
+    let '((_, memL), (_, memR)) := inps in
+    (memL == memR) && call_invariant memL)
+  (fun out =>
+    let '(_, mem) := out in call_invariant mem)
+  (fun out =>
+    let '(_, mem) := out in call_invariant mem)
+  [tuple eps]
+  (pythCallErrors q eps)).
+- exact: (pythCallAtRule X Y P' P'' fn eps call_invariant x Hcall).
+- exact: (pythCompileCallsFromTraceStepContinuationTailRule q X Y B P'
+    P'' fn root trace_prefix (unpack_trace packed_local_trace) eps
+    call_invariant HIH).
+Qed.
+
+(** Continuation case split after [run_until_next_call]: finished, bad packed
+    call input, or a real call followed by the inductive hypothesis. *)
+Lemma pythCompileCallsFromTraceStepContinuationRule
+  (q : nat) (X Y B : choice_type)
+  (K L L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (root prog : raw_code B) (trace_prefix : trace_t)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidCode L M root ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  continue_from_trace root trace_prefix = Some prog ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  (forall trace_prefix',
+    ⊨PythC ⦃ fun mems =>
+            let '(memL, memR) := mems in
+            (memL == memR) && call_invariant memL ⦄
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P' fn
+          root trace_prefix')
+        P')
+      ≈( pythCallErrors q eps )
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P'' fn
+          root trace_prefix')
+        P')
+    ⦃ fun out =>
+      let '(y, mem) := out in
+      call_invariant mem ⦄) ->
+  ⊨Pyth ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun s => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P' fn root trace_prefix s)
+      P')
+    ≈( cat_tuple [tuple eps] (pythCallErrors q eps) )
+    (fun s => code_link
+      (compile_calls_from_trace_step_cont q.+1
+        (X := X) (Y := Y) P'' fn root trace_prefix s)
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hcall HIH.
+have Heps : 0 <= eps := proj1 Hcall ord0.
+split.
+  move=> i.
+  apply: (cat_tuple_nonneg [tuple eps] (pythCallErrors q eps) i).
+  - move=> j.
+    by rewrite [j]ord1.
+  - exact: (pythCallErrors_nonneg q eps Heps).
+move=> memL memR sL sR Hpre.
+move/andP: Hpre=> [/andP [/eqP Hs /eqP Hmem] Hinv].
+subst sR.
+subst memL.
+case: sL=> [[packed_x|b] packed_local_trace] /=.
+-
+  case Hx: (unpickle packed_x : option X)=> [x|].
+  + have Hbranch :=
+      pythCompileCallsFromTraceStepContinuationCallRule q X Y B K L L' L''
+        M P' P'' fn root prog trace_prefix packed_local_trace packed_x x eps
+        call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hx
+        Hcall HIH.
+    have [_ Hbranch'] := Hbranch.
+    have Hpre_unit : (tt == tt) && (memR == memR) && call_invariant memR.
+      by rewrite !eqxx.
+    exact: (Hbranch' memR memR tt tt Hpre_unit).
+  + have Hbranch :=
+      pythCompileCallsFromTraceStepContinuationBadCallRule q X Y B K L L'
+        L'' M P' P'' fn root prog trace_prefix packed_local_trace packed_x
+        eps call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hx
+        Heps.
+    have [_ Hbranch'] := Hbranch.
+    have Hpre_unit : (tt == tt) && (memR == memR) && call_invariant memR.
+      by rewrite !eqxx.
+    exact: (Hbranch' memR memR tt tt Hpre_unit).
+-
+  have Hbranch :=
+    pythCompileCallsFromTraceStepContinuationDoneRule q X Y B K L L' L''
+      M P' P'' fn root prog trace_prefix packed_local_trace b eps
+      call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hcall.
+  have [_ Hbranch'] := Hbranch.
+  have Hpre_unit : (tt == tt) && (memR == memR) && call_invariant memR.
+    by rewrite !eqxx.
+  exact: (Hbranch' memR memR tt tt Hpre_unit).
+Qed.
+
+(** Closed sequencing is just [pythSeqRule] with the unit inputs hidden by
+    [pythClosedJudgment]. *)
+Lemma pythClosedSeqRule
+  {ℓ1 ℓ2 : nat}
+  {mid_t out_t : choice_type}
+  (progL progR : raw_code mid_t)
+  (contL contR : mid_t -> raw_code out_t)
+  (pre : pred (heap * heap))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R) :
+  ⊨PythC ⦃ pre ⦄ progL ≈( s1 ) progR ⦃ mid ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s2 ) contR ⦃ post ⦄ ->
+  ⊨PythC ⦃ pre ⦄
+    (yL ← progL ;; contL yL)
+    ≈( cat_tuple s1 s2 )
+    (yR ← progR ;; contR yR)
+  ⦃ post ⦄.
+Proof.
+move=> Hfirst Hsecond.
+rewrite /pythClosedJudgment.
+exact: (pythSeqRule
+  (fun _ : 'unit => progL)
+  (fun _ : 'unit => progR)
+  contL contR
+  (fun inps =>
+    let '((_, memL), (_, memR)) := inps in pre (memL, memR))
+  mid post s1 s2 Hfirst Hsecond).
+Qed.
+
+Lemma pythCompileCallsFromTraceStepValidRule
+  (q : nat) (X Y B : choice_type)
+  (K L L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (root prog : raw_code B) (trace_prefix : trace_t)
+  (eps : R)
+  (call_invariant : pred heap) :
+  ValidCode L M root ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  continue_from_trace root trace_prefix = Some prog ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  (forall trace_prefix',
+    ⊨PythC ⦃ fun mems =>
+            let '(memL, memR) := mems in
+            (memL == memR) && call_invariant memL ⦄
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P' fn
+          root trace_prefix')
+        P')
+      ≈( pythCallErrors q eps )
+      (code_link
+        (compile_calls_from_trace q.+1 (X := X) (Y := Y) P'' fn
+          root trace_prefix')
+        P')
+    ⦃ fun out =>
+      let '(y, mem) := out in
+      call_invariant mem ⦄) ->
+  ⊨PythC ⦃ fun mems =>
+          let '(memL, memR) := mems in
+          (memL == memR) && call_invariant memL ⦄
+    (code_link
+      (compile_calls_from_trace q.+2 (X := X) (Y := Y) P' fn
+        root trace_prefix)
+      P')
+    ≈( pythCallErrors q.+1 eps )
+    (code_link
+      (compile_calls_from_trace q.+2 (X := X) (Y := Y) P'' fn
+        root trace_prefix)
+      P')
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Htrace Hcall HIH.
+have Hprog_valid : ValidCode L M prog.
+  exact: (continue_from_trace_valid L M root prog trace_prefix Hvalid Htrace).
+rewrite /pythClosedJudgment.
+rewrite (pythCallErrorsS q eps).
+rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P' P'
+  fn root prog trace_prefix Htrace).
+rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P'' P'
+  fn root prog trace_prefix Htrace).
+eapply (@pythClosedSeqRule 0 (q.*2).+2
+  (suspended_program (A := B)) B
+  (code_link (run_until_next_call prog fn) P')
+  (code_link (run_until_next_call prog fn) P')
+  (fun s => code_link
+    (compile_calls_from_trace_step_cont q.+1
+      (X := X) (Y := Y) P' fn root trace_prefix s)
+    P')
+  (fun s => code_link
+    (compile_calls_from_trace_step_cont q.+1
+      (X := X) (Y := Y) P'' fn root trace_prefix s)
+    P')
+  (fun mems =>
+    let '(memL, memR) := mems in
+    (memL == memR) && call_invariant memL)
+  (fun out =>
+    let '(_, mem) := out in call_invariant mem)
+  (fun out =>
+    let '(_, mem) := out in call_invariant mem)
+  [tuple 0]
+  (cat_tuple [tuple eps] (pythCallErrors q eps))).
+- exact: (pythLinkedRunUntilNextCallRule X Y B K L L' M P' fn prog
+    call_invariant Hprog_valid HP' HKL Hdep HP'_pres Hfn).
+- exact: (pythCompileCallsFromTraceStepContinuationRule q X Y B K L L' L''
+    M P' P'' fn root prog trace_prefix eps call_invariant Hvalid HP'
+    HP'' HKL Hdep HP'_pres Hfn Htrace Hcall HIH).
+Qed.
+
 Lemma pythCompileCallsFromTraceStepRule
   (q : nat) (X Y B : choice_type)
   (K L L' L'' : Locations) (M : Interface)
@@ -562,7 +1344,16 @@ Lemma pythCompileCallsFromTraceStepRule
   ⦃ fun out =>
     let '(y, mem) := out in
     call_invariant mem ⦄.
-Admitted.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall HIH.
+case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
+- exact: (pythCompileCallsFromTraceStepValidRule q X Y B K L L' L'' M
+    P' P'' fn root prog trace_prefix eps call_invariant Hvalid HP' HP''
+    HKL Hdep HP'_pres Hfn Htrace Hcall HIH).
+- exact: (pythCompileCallsFromTraceInvalidRule q.+1 X Y B K L L' L'' M
+    P' P'' fn root trace_prefix eps call_invariant Hvalid HP' HP''
+    HKL Hdep HP'_pres Hfn Htrace Hcall).
+Qed.
 
 Lemma pythCompileCallsFromTraceRule
   (q : nat) (X Y B : choice_type)
