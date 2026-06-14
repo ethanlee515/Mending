@@ -103,6 +103,44 @@ rewrite kl_self.
 exact: Heps i.
 Qed.
 
+Lemma pythCallErrors_size (q : nat) (eps : R) :
+  size (flatten (nseq q.+1 [:: 0; eps])) == (q.*2).+2.
+Proof.
+by rewrite size_flatten /shape map_nseq sumn_nseq /= mul2n.
+Qed.
+
+Definition pythCallErrors (q : nat) (eps : R) : (q.*2).+2.-tuple R :=
+  Tuple (pythCallErrors_size q eps).
+
+Lemma pythCallErrors_nonneg (q : nat) (eps : R) :
+  0 <= eps ->
+  forall i : 'I_(q.*2).+2, 0 <= tnth (pythCallErrors q eps) i.
+Proof.
+move=> Heps i.
+rewrite (tnth_nth 0).
+rewrite /pythCallErrors /=.
+move: i.
+elim: q=> [|q IH] i.
+- by case: i=> [[|[|n]]].
+- case: i=> [[|[|n]]] Hi //=.
+  exact: (IH (Ordinal _)).
+Qed.
+
+Lemma pythCallErrors0 (eps : R) :
+  pythCallErrors 0 eps = cat_tuple [tuple 0] [tuple eps].
+Proof.
+apply/val_inj=> /=.
+by rewrite /pythCallErrors /=.
+Qed.
+
+Lemma pythCallErrorsS (q : nat) (eps : R) :
+  pythCallErrors q.+1 eps =
+  cat_tuple [tuple 0] (cat_tuple [tuple eps] (pythCallErrors q eps)).
+Proof.
+apply/val_inj=> /=.
+by rewrite /pythCallErrors /=.
+Qed.
+
 Lemma pythDist_total_variation
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
