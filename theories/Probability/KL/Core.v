@@ -1,13 +1,15 @@
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_boot all_order all_algebra all_reals distr.
-From mathcomp Require Import realseq realsum exp.
+From mathcomp Require Import realseq realsum exp interval_inference convex.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
+From mathcomp.algebra_tactics Require Import ring.
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.
 
 Local Open Scope ring_scope.
+Local Open Scope convex_scope.
 
 Section KL_Core.
 
@@ -79,11 +81,217 @@ Lemma kl_dmargin_injective {T U : choiceType}
   δ_KL (dmargin f P) (dmargin f Q) = δ_KL P Q.
 Admitted.
 
+Lemma dmargin_absolute_continuous {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  absolute_continuous (dmargin f P) (dmargin f Q).
+Proof.
+move=> Hac y.
+rewrite !dmargin_psumE=> HQy0.
+apply: psum_eq0=> x.
+case Hfx : (f x == y); last by rewrite mul0r.
+rewrite mul1r.
+have Hfiber_summable : summable (fun x => (f x == y)%:R * Q x).
+  exact: summable_condl.
+have HQx0 : Q x = 0.
+  have := eq0_psum Hfiber_summable HQy0 x.
+  by rewrite Hfx mul1r.
+by rewrite (Hac x HQx0).
+Qed.
+
+Lemma log_sum_inequality_partition {T U : choiceType}
+    (f : T -> U) (p q : T -> R) :
+  (forall x, 0 <= p x) ->
+  (forall x, 0 <= q x) ->
+  summable p ->
+  summable q ->
+  (forall x, q x = 0 -> p x = 0) ->
+  sum (fun y =>
+    psum (fun x => (f x == y)%:R * p x) *
+      ln (psum (fun x => (f x == y)%:R * p x) /
+          psum (fun x => (f x == y)%:R * q x))) <=
+  sum (fun x => p x * ln (p x / q x)).
+Admitted.
+
+Lemma ln_weighted_average (a b c d : R) :
+  0 < a -> 0 < b -> 0 < c -> 0 < d ->
+  (a / (a + c)) * ln (b / a) +
+  (c / (a + c)) * ln (d / c) <=
+  ln ((b + d) / (a + c)).
+Proof.
+move=> Ha Hb Hc Hd.
+have Hac : 0 < a + c by rewrite addr_gt0.
+have Ht_le1 : a / (a + c) <= 1.
+  by rewrite (@ler_pdivrMr R (a + c) 1 a Hac) mul1r lerDl ltW.
+pose t : {i01 R} := Itv01 (divr_ge0 (ltW Ha) (ltW Hac)) Ht_le1.
+have HtE : t%:num = a / (a + c) by [].
+have HtCE : unstable.onem t%:num = c / (a + c).
+  rewrite /unstable.onem HtE.
+  rewrite -{1}(divff (lt0r_neq0 Hac)) -mulrBl.
+  congr (_ / _).
+  ring.
+have Havg :
+    (b / a : R^o) <| t |> (d / c : R^o) = (b + d) / (a + c).
+  rewrite convRE HtE HtCE.
+  rewrite [a / _]mulrC [c / _]mulrC -!mulrA.
+  rewrite [a * (b / a)]mulrC [c * (d / c)]mulrC.
+  rewrite !divfK ?lt0r_neq0 //.
+  rewrite -mulrDr.
+  by rewrite mulrC.
+have Hconc := @concave_ln R t (b / a : R^o) (d / c : R^o)
+  (divr_gt0 Hb Ha) (divr_gt0 Hd Hc).
+by rewrite convRE HtE HtCE Havg in Hconc.
+Qed.
+
+Lemma log_sum_inequality2_pos (a b c d : R) :
+  0 < a -> 0 < b -> 0 < c -> 0 < d ->
+  (a + c) * ln ((a + c) / (b + d)) <=
+  a * ln (a / b) + c * ln (c / d).
+Proof.
+move=> Ha Hb Hc Hd.
+have Hac : 0 < a + c by rewrite addr_gt0.
+have Hbd : 0 < b + d by rewrite addr_gt0.
+have Havg := ln_weighted_average a b c d Ha Hb Hc Hd.
+have Hneg :
+    - ln ((b + d) / (a + c)) <=
+    - ((a / (a + c)) * ln (b / a) +
+       (c / (a + c)) * ln (d / c)).
+  by rewrite lerN2.
+have Hscaled :
+    (a + c) * (- ln ((b + d) / (a + c))) <=
+    (a + c) *
+      (- ((a / (a + c)) * ln (b / a) +
+          (c / (a + c)) * ln (d / c))).
+  by apply: ler_wpM2l; rewrite // ltW.
+have Hleft :
+  (a + c) * ln ((a + c) / (b + d)) =
+  (a + c) * (- ln ((b + d) / (a + c))).
+  rewrite !ln_div ?addr_gt0 //.
+  ring.
+rewrite Hleft.
+apply: (le_trans Hscaled).
+rewrite !ln_div ?divr_gt0 //.
+rewrite mulrN mulrDr opprD !mulrA.
+rewrite [(a + c) * a]mulrC [(a + c) * c]mulrC.
+rewrite -[a * (a + c) / (a + c)]mulrA divff ?lt0r_neq0 // mulr1.
+rewrite -[c * (a + c) / (a + c)]mulrA divff ?lt0r_neq0 // mulr1.
+rewrite le_eqVlt.
+apply/orP; left; apply/eqP.
+ring.
+Qed.
+
+Lemma sum_seq_ge0 {T : eqType} (s : seq T) (a : T -> R) :
+  (forall x, x \in s -> 0 <= a x) ->
+  0 <= \sum_(x <- s) a x.
+Proof.
+elim: s=> [|x s IH] Ha; first by rewrite big_nil.
+rewrite big_cons.
+apply: ler_wpDl; first exact: Ha x (mem_head _ _).
+apply: IH=> y Hy.
+apply: Ha.
+by rewrite inE Hy orbT.
+Qed.
+
+Lemma sum_seq_gt0 {T : eqType} (s : seq T) (a : T -> R) :
+  s != [::] ->
+  (forall x, x \in s -> 0 < a x) ->
+  0 < \sum_(x <- s) a x.
+Proof.
+case: s=> [|x s] // _ Ha.
+rewrite big_cons.
+apply: ltr_pwDl; first exact: Ha x (mem_head _ _).
+apply: sum_seq_ge0=> y Hy.
+apply: ltW; apply: Ha.
+by rewrite inE Hy orbT.
+Qed.
+
+Lemma log_sum_inequality_seq_pos {T : eqType} (s : seq T) (p q : T -> R) :
+  s != [::] ->
+  (forall x, x \in s -> 0 < p x) ->
+  (forall x, x \in s -> 0 < q x) ->
+  (\sum_(x <- s) p x) *
+    ln ((\sum_(x <- s) p x) / (\sum_(x <- s) q x)) <=
+  \sum_(x <- s) p x * ln (p x / q x).
+Proof.
+elim: s=> [|x s IH] //.
+case: s IH=> [|y s] IH _ Hp Hq.
+  by rewrite !big_cons !big_nil !addr0.
+rewrite !big_cons.
+set sp := \sum_(z <- y :: s) p z.
+set sq := \sum_(z <- y :: s) q z.
+have Hpx : 0 < p x by exact: Hp x (mem_head _ _).
+have Hqx : 0 < q x by exact: Hq x (mem_head _ _).
+have Hsp : 0 < sp.
+  apply: sum_seq_gt0=> // z Hz.
+  apply: Hp.
+  by rewrite inE Hz orbT.
+have Hsq : 0 < sq.
+  apply: sum_seq_gt0=> // z Hz.
+  apply: Hq.
+  by rewrite inE Hz orbT.
+have Hbin := log_sum_inequality2_pos (p x) (q x) sp sq
+  Hpx Hqx Hsp Hsq.
+have Htail : sp * ln (sp / sq) <=
+    \sum_(z <- y :: s) p z * ln (p z / q z).
+  apply: IH=> // z Hz.
+  - apply: Hp.
+    by rewrite inE Hz orbT.
+  - apply: Hq.
+    by rewrite inE Hz orbT.
+rewrite -/sp -/sq.
+have HspE : sp = p y + \sum_(z <- s) p z by rewrite /sp big_cons.
+have HsqE : sq = q y + \sum_(z <- s) q z by rewrite /sq big_cons.
+have HtailE :
+    \sum_(z <- y :: s) p z * ln (p z / q z) =
+    p y * ln (p y / q y) + \sum_(z <- s) p z * ln (p z / q z).
+  by rewrite big_cons.
+rewrite -HspE -HsqE -HtailE.
+apply: (le_trans Hbin).
+by apply: lerD; [exact: lexx | exact: Htail].
+Qed.
+
+Lemma kl_dmargin_log_sum_inequality {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  sum (fun y =>
+    dmargin f P y * ln (dmargin f P y / dmargin f Q y)) <=
+  sum (fun x => P x * ln (P x / Q x)).
+Proof.
+move=> Hac.
+rewrite (eq_sum (F2 := fun y =>
+  psum (fun x => (f x == y)%:R * P x) *
+    ln (psum (fun x => (f x == y)%:R * P x) /
+        psum (fun x => (f x == y)%:R * Q x)))); last first.
+  by move=> y; rewrite !dmargin_psumE.
+pose p := fun x : T => P x.
+pose q := fun x : T => Q x.
+change (sum (fun y : U =>
+  psum (fun x => (f x == y)%:R * p x) *
+    ln (psum (fun x => (f x == y)%:R * p x) /
+        psum (fun x => (f x == y)%:R * q x))) <=
+  sum (fun x => p x * ln (p x / q x))).
+apply: (log_sum_inequality_partition f p q).
+- exact: ge0_mu.
+- exact: ge0_mu.
+- exact: summable_mu.
+- exact: summable_mu.
+- exact: Hac.
+Qed.
+
 Lemma kl_dmargin_data_processing {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :
   absolute_continuous P Q ->
   δ_KL (dmargin f P) (dmargin f Q) <= δ_KL P Q.
-Admitted.
+Proof.
+move=> Hac.
+rewrite /δ_KL /esp.
+rewrite (eq_sum (F2 := fun y =>
+  dmargin f P y * ln (dmargin f P y / dmargin f Q y))); last first.
+  by move=> y; rewrite mulrC.
+rewrite (eq_sum (F2 := fun x => P x * ln (P x / Q x))); last first.
+  by move=> x; rewrite mulrC.
+exact: kl_dmargin_log_sum_inequality.
+Qed.
 
 Lemma dlet_joint_same_kernelE {T U : choiceType}
     (P : {distr T / R}) (K : T -> {distr U / R}) (x : T) (y : U) :
