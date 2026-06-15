@@ -79,11 +79,104 @@ Lemma kl_dmargin_injective {T U : choiceType}
   δ_KL (dmargin f P) (dmargin f Q) = δ_KL P Q.
 Admitted.
 
-Lemma kl_dlet_data_processing {T U : choiceType}
+Lemma kl_dmargin_data_processing {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  δ_KL (dmargin f P) (dmargin f Q) <= δ_KL P Q.
+Admitted.
+
+Lemma dlet_joint_same_kernelE {T U : choiceType}
+    (P : {distr T / R}) (K : T -> {distr U / R}) (x : T) (y : U) :
+  (\dlet_(x' <- P) \dlet_(y' <- K x') dunit (x', y')) (x, y) =
+  P x * K x y.
+Proof.
+rewrite dletE.
+rewrite (psum_finseq (r := [:: x])).
+- rewrite big_seq1.
+  rewrite dletE.
+  rewrite (psum_finseq (r := [:: y])).
+  + by rewrite big_seq1 dunit1E eqxx mulr1 !ger0_norm
+      ?mulr_ge0 ?ge0_mu.
+  + by [].
+  + move=> y'.
+    rewrite !inE dunit1E xpair_eqE eqxx /=.
+    case Hy : (y' == y); first by rewrite (eqP Hy).
+    by rewrite mulr0 eqxx.
+- by [].
+move=> x'.
+rewrite !inE.
+case Hx : (x' == x)=> //.
+move=> Hnz.
+have Hinner0 :
+    (\dlet_(y' <- K x') dunit (x', y')) (x, y) = 0.
+  apply: dlet_eq0=> y' _.
+  by rewrite xpair_eqE Hx.
+by move: Hnz; rewrite Hinner0 mulr0 eqxx.
+Qed.
+
+Lemma kl_joint_same_kernel {T U : choiceType}
     (P Q : {distr T / R}) (K : T -> {distr U / R}) :
   (forall x, dweight (K x) = 1) ->
-  δ_KL (\dlet_(x <- P) K x) (\dlet_(x <- Q) K x) <= δ_KL P Q.
+  δ_KL
+    (\dlet_(x <- P) \dlet_(y <- K x) dunit (x, y))
+    (\dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y)) =
+  δ_KL P Q.
 Admitted.
+
+Lemma dlet_joint_same_kernel_absolute_continuous {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  absolute_continuous P Q ->
+  absolute_continuous
+    (\dlet_(x <- P) \dlet_(y <- K x) dunit (x, y))
+    (\dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y)).
+Proof.
+move=> Hac [x y].
+rewrite !dlet_joint_same_kernelE.
+move=> HQxy0.
+case Kxy0: (K x y == 0).
+  by rewrite (eqP Kxy0) mulr0.
+have HQx0 : Q x = 0.
+  apply/eqP.
+  move/eqP: HQxy0.
+  by rewrite mulf_eq0 Kxy0 orbF.
+by rewrite (Hac x HQx0) mul0r.
+Qed.
+
+Lemma kl_dlet_data_processing {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  absolute_continuous P Q ->
+  (forall x, dweight (K x) = 1) ->
+  δ_KL (\dlet_(x <- P) K x) (\dlet_(x <- Q) K x) <= δ_KL P Q.
+Proof.
+move=> Hac HK.
+pose JP : {distr (T * U) / R} :=
+  \dlet_(x <- P) \dlet_(y <- K x) dunit (x, y).
+pose JQ : {distr (T * U) / R} :=
+  \dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y).
+have HPsnd :
+    dmargin (fun xy : T * U => xy.2) JP =1 \dlet_(x <- P) K x.
+  move=> y.
+  rewrite /JP __deprecated__dmargin_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (K x) z).
+  apply: eq_in_dlet=> // u _ z'.
+  by rewrite dmargin_dunit.
+have HQsnd :
+    dmargin (fun xy : T * U => xy.2) JQ =1 \dlet_(x <- Q) K x.
+  move=> y.
+  rewrite /JQ __deprecated__dmargin_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (K x) z).
+  apply: eq_in_dlet=> // u _ z'.
+  by rewrite dmargin_dunit.
+rewrite -(kl_ext _ _ _ _ HPsnd HQsnd).
+apply: (le_trans (kl_dmargin_data_processing
+  (fun xy : T * U => xy.2) JP JQ _)).
+by apply: dlet_joint_same_kernel_absolute_continuous.
+by rewrite /JP /JQ kl_joint_same_kernel.
+Qed.
 
 Lemma expectation_le_const_on_support {T : choiceType}
     (P : {distr T / R}) (f : T -> R) (c : R) :

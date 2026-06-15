@@ -740,7 +740,7 @@ Lemma completedFinalBindTrace_cond_final_bound
   <= tnth s (@ord_max ℓ).
 Proof.
 move=> Hdist.
-case: Hdist=> _ [_ [_ [_ Hcond]]].
+case: Hdist=> _ [Hac [_ [_ Hcond]]].
 rewrite (kl_ext
   (conditional_coordinate
     (completedFinalBindTrace K mid P0) (@ord_max ℓ) a)
@@ -755,6 +755,7 @@ rewrite (kl_ext
       (conditional_coordinate P0 (@ord_max ℓ) a)
       (conditional_coordinate Q0 (@ord_max ℓ) a)
       (completedSemanticBindKernel K mid)
+      (conditional_coordinate_absolute_continuous P0 Q0 (@ord_max ℓ) a Hac)
       (completedSemanticBindKernel_dweight1 K mid))).
   exact: Hcond.
 - exact: completedFinalBindTrace_cond_final_eq.

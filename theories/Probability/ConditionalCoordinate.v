@@ -7,6 +7,7 @@ From mathcomp Require Import reals distr.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
+From Mending.Probability.KL Require Import Core.
 
 Import GRing.Theory Num.Theory Order.Theory.
 Local Open Scope ring_scope.
@@ -51,5 +52,17 @@ rewrite pr_pred1 dnullE.
 rewrite /conditional_coordinate pr_dmargin pr_dcond /prc Hzero.
 by rewrite invr0 mulr0.
 Qed.
+
+Lemma conditional_coordinate_absolute_continuous
+  {n : nat}
+  {A : choiceType}
+  (P Q : {distr (n.-tuple A) / R})
+  (i : 'I_n)
+  (a : forall j : 'I_n, A) :
+  absolute_continuous P Q ->
+  absolute_continuous
+    (conditional_coordinate P i a)
+    (conditional_coordinate Q i a).
+Admitted.
 
 End ConditionalCoordinate.
