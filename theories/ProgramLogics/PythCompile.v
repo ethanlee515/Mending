@@ -1225,6 +1225,10 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
 - have Hprog_valid : ValidCode L M prog.
     exact: (continue_from_trace_valid L M root prog trace_prefix Hvalid Htrace).
   rewrite (pythCallErrors0 eps).
+  have -> :
+      [tuple 0; eps; 0] =
+      cat_tuple [tuple 0] (cat_tuple [tuple eps] [tuple 0])
+    by apply/val_inj.
   rewrite (codeLinkCompileCallsFromTraceS_decompose 0 X Y B P' P'
     fn root prog trace_prefix Htrace).
   rewrite (codeLinkCompileCallsFromTraceS_decompose 0 X Y B P'' P'
@@ -1257,16 +1261,9 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
 - rewrite /pythClosedJudgment.
   rewrite /compile_calls_from_trace /= Htrace.
   apply: pythReflRule.
-  + rewrite (pythCallErrors0 eps).
-    move=> i.
-    apply: (cat_tuple_nonneg [tuple 0]
-      (cat_tuple [tuple eps] [tuple 0]) i).
-    * by move=> j; rewrite [j]ord1.
-    * move=> k.
-      apply: (cat_tuple_nonneg [tuple eps] [tuple 0] k).
-      + have [Heps_nonneg _] := Hcall.
-        by move=> j; rewrite [j]ord1; exact: (Heps_nonneg ord0).
-      + by move=> j; rewrite [j]ord1.
+  + have [Heps_nonneg _] := Hcall.
+    have Heps : 0 <= eps := Heps_nonneg ord0.
+    by move=> i; case: i=> [[|[|[|n]]]].
   + move=> memL memR [] [] Hpre.
     move/andP: Hpre=> [/eqP -> _].
     by split.
@@ -1337,6 +1334,10 @@ have Hprog_valid : ValidCode L M prog.
   exact: (continue_from_trace_valid L M root prog trace_prefix Hvalid Htrace).
 rewrite /pythClosedJudgment.
 rewrite (pythCallErrorsS q eps).
+have -> :
+    cat_tuple [tuple 0; eps] (pythCallErrors q eps) =
+    cat_tuple [tuple 0] (cat_tuple [tuple eps] (pythCallErrors q eps))
+  by apply/val_inj.
 rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P' P'
   fn root prog trace_prefix Htrace).
 rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P'' P'
