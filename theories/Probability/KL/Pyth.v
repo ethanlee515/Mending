@@ -154,6 +154,21 @@ Lemma pythDist_final_total_variation
   total_variation (dmargin (fun omega => tnth omega ord_max) P)
     (dmargin (fun omega => tnth omega ord_max) Q) <=
     pythagorean_tv_bound eps.
-Admitted.
+Proof.
+move=> [Heps [Hac [HP [HQ Hcond]]]].
+pose final := fun omega : n.+1.-tuple A => tnth omega ord_max.
+have HPfinal : dweight (dmargin final P) = 1 by rewrite dmargin_dweight.
+have HQfinal : dweight (dmargin final Q) = 1 by rewrite dmargin_dweight.
+have Hpin := pinsker (dmargin final P) (dmargin final Q)
+  (dmargin_absolute_continuous final P Q Hac)
+  HPfinal HQfinal.
+apply: (le_trans Hpin).
+rewrite /pythagorean_tv_bound /tuple_sum.
+apply: ler_wsqrtr.
+have Hdata := kl_dmargin_data_processing final P Q Hac.
+have Hchain := iterated_kl_chain_bound P Q eps Heps Hac HP HQ Hcond.
+have Hkl := le_trans Hdata Hchain.
+lra.
+Qed.
 
 End PythagoreanDistributionJudgments.

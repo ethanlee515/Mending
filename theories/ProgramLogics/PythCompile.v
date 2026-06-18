@@ -1530,3 +1530,49 @@ split.
   split; first exact: HmarginR.
   by split.
 Qed.
+
+Lemma compileRule
+  (q : nat) (X Y A B : choice_type)
+  (K L L' L'' : Locations) (M : Interface)
+  (P' P'' : raw_package) (fn : ident)
+  (prog : A -> raw_code B)
+  (eps : R)
+  (call_invariant : pred heap) :
+  (forall x, ValidCode L M (prog x)) ->
+  ValidPackage L' [interface] M P' ->
+  ValidPackage L'' [interface] M P'' ->
+  fseparate K L ->
+  heap_pred_depends_only_on K call_invariant ->
+  package_preserves_heap_pred_except M P' fn call_invariant ->
+  fhas M (mkopsig fn X Y) ->
+  ⊨Pyth1 ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => resolve P' (mkopsig fn X Y) x)
+    ≈( eps )
+    (fun x => resolve P'' (mkopsig fn X Y) x)
+  ⦃ fun out =>
+    let '(y, mem) := out in
+    call_invariant mem ⦄ ->
+  let delta := pythagorean_tv_bound (pythCallErrors q eps) in
+  ⊨AE_opt ⦃ fun inps =>
+          let '((xL, memL), (xR, memR)) := inps in
+          (xL == xR) && (memL == memR) &&
+          call_invariant memL ⦄
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
+      P')
+    ≈( delta )
+    (fun x => code_link
+      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
+      P')
+  ⦃ fun outs =>
+    let '(outL, outR) := outs in
+    outL == outR ⦄.
+Proof.
+move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall.
+exact: (MicciancioWalterRule _ _ _ _ _
+  (pythCompileCallsRule q X Y A B K L L' L'' M P' P'' fn prog eps
+    call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall)).
+Qed.
