@@ -40,12 +40,105 @@ Lemma decode_output_heap_pack {out_t : choice_type} (x : out_t * heap) :
   decode_output_heap (pack_output_heap x) = Some x.
 Proof. by case: x=> y mem; rewrite /decode_output_heap /pack_output_heap pickleK. Qed.
 
+Definition canonical_decode_output_heap {out_t : choice_type}
+    (x : nat * heap) : option (out_t * heap) :=
+  match decode_output_heap x with
+  | Some y => if pack_output_heap y == x then Some y else None
+  | None => None
+  end.
+
+Lemma canonical_decode_output_heap_pack {out_t : choice_type}
+    (x : out_t * heap) :
+  canonical_decode_output_heap (pack_output_heap x) = Some x.
+Proof.
+by rewrite /canonical_decode_output_heap decode_output_heap_pack eqxx.
+Qed.
+
+Lemma canonical_decode_output_heapK {out_t : choice_type}
+    (x : nat * heap) (y : out_t * heap) :
+  canonical_decode_output_heap x = Some y -> pack_output_heap y = x.
+Proof.
+rewrite /canonical_decode_output_heap.
+case: (decode_output_heap x)=> [z|] //=.
+case Hpack: (pack_output_heap z == x)=> //=.
+case=> <-.
+exact/eqP.
+Qed.
+
+Lemma pack_output_heap_inj {out_t : choice_type} :
+  injective (@pack_output_heap out_t).
+Proof.
+case=> x mem [y mem'] /=.
+rewrite /pack_output_heap /=.
+case=> Hpickle Hmem.
+have -> : x = y by exact: (pcan_inj pickleK Hpickle).
+by rewrite Hmem.
+Qed.
+
+Lemma dmargin_pack_output_heapE
+    {out_t : choice_type} (P : {distr (out_t * heap) / R})
+    (x : nat * heap) :
+  dmargin (@pack_output_heap out_t) P x =
+    match canonical_decode_output_heap x with
+    | Some y => P y
+    | None => 0
+    end.
+Proof.
+rewrite dmargin_psumE.
+case Hdecode: (canonical_decode_output_heap x)=> [y|].
+- rewrite (psum_finseq (r := [:: y])).
+  + rewrite big_seq1.
+    have -> : pack_output_heap y == x.
+      by apply/eqP; exact: canonical_decode_output_heapK Hdecode.
+    by rewrite mul1r ger0_norm ?ge0_mu.
+  + by [].
+  move=> z.
+  rewrite !inE.
+  case Hpack: (pack_output_heap z == x); last by rewrite mul0r eqxx.
+  move/eqP: Hpack=> Hpack _.
+  have Hz : z = y.
+    have Hy : pack_output_heap y = x :=
+      canonical_decode_output_heapK x y Hdecode.
+    apply: pack_output_heap_inj.
+    by rewrite Hpack -Hy.
+  by rewrite Hz eqxx.
+- apply/psum_eq0=> z.
+  case Hpack: (pack_output_heap z == x); last by rewrite mul0r.
+  move/eqP: Hpack=> Hpack.
+  move: Hdecode.
+  by rewrite -Hpack canonical_decode_output_heap_pack.
+Qed.
+
 Lemma total_variation_pack_output_heap
     {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
   total_variation P Q =
   total_variation (dmargin (@pack_output_heap out_t) P)
                   (dmargin (@pack_output_heap out_t) Q).
-Admitted.
+Proof.
+rewrite /total_variation.
+congr (_ * _).
+rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
+pose S := fun x =>
+    `|dmargin (@pack_output_heap out_t) P x -
+      dmargin (@pack_output_heap out_t) Q x|.
+pose Img : pred (nat * heap)%type :=
+  [pred x | @canonical_decode_output_heap out_t x != None].
+rewrite (@reindex_psum_onto R (nat * heap)%type (out_t * heap)%type
+  S Img (@pack_output_heap out_t) (@canonical_decode_output_heap out_t)).
+- apply/eq_psum=> x.
+  by rewrite /S !dmargin_pack_output_heapE canonical_decode_output_heap_pack.
+- move=> x Hx.
+  rewrite /Img inE.
+  case Hdecode: (@canonical_decode_output_heap out_t x)=> [y|] //=.
+  move: Hx.
+  by rewrite /S !dmargin_pack_output_heapE Hdecode subrr normr0 eqxx.
+- move=> x.
+  rewrite inE.
+  case Hdecode: (canonical_decode_output_heap x)=> [y|] //= _.
+  by rewrite (canonical_decode_output_heapK x y Hdecode).
+- move=> x _.
+  by rewrite canonical_decode_output_heap_pack.
+Qed.
 
 Definition complete_output_heap {out_t : choice_type}
     (out : {distr (out_t * heap) / R}) :
