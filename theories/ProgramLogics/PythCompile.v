@@ -488,7 +488,7 @@ Lemma pythCompileCallsFromTraceStepContinuationBaseRule
       (compile_calls_from_trace_step_cont 0
         (X := X) (Y := Y) P' fn root trace_prefix s)
       P')
-    ≈( [tuple eps] )
+    ≈( cat_tuple [tuple eps] [tuple 0] )
     (fun s => code_link
       (compile_calls_from_trace_step_cont 0
         (X := X) (Y := Y) P'' fn root trace_prefix s)
@@ -500,7 +500,9 @@ Proof.
 move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall.
 have Heps : 0 <= eps := proj1 Hcall ord0.
 split.
-  by move=> i; rewrite [i]ord1.
+  move=> i.
+  apply: (cat_tuple_nonneg [tuple eps] [tuple 0] i);
+    by move=> j; rewrite [j]ord1.
 move=> memL memR sL sR Hpre.
 move/andP: Hpre=> [/andP [/eqP Hs /eqP Hmem] Hinv].
 subst sR.
@@ -604,7 +606,7 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
             (X := X) (Y := Y) P' fn root trace_prefix
             (inl packed_x, packed_local_trace))
           P')
-        ≈( [tuple eps] )
+        ≈( cat_tuple [tuple eps] [tuple 0] )
         (fun _ : suspended_program (A := B) => code_link
           (compile_calls_from_trace_step_cont 0
             (X := X) (Y := Y) P'' fn root trace_prefix
@@ -614,7 +616,9 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
         let '(_, mem) := out in call_invariant mem ⦄.
       rewrite /compile_calls_from_trace_step_cont /= /call_from_package Hx.
       apply: pythReflRule.
-      * by move=> i; rewrite [i]ord1.
+      * move=> i.
+        apply: (cat_tuple_nonneg [tuple eps] [tuple 0] i);
+          by move=> j; rewrite [j]ord1.
       * move=> memL0 memR0 xL0 xR0 Hpre.
         move/andP: Hpre=> [/andP [/eqP -> /eqP ->] _].
         by split.
@@ -651,12 +655,14 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
               let '((xL, memL), (xR, memR)) := inps in
               (xL == xR) && (memL == memR) && call_invariant memL ⦄
         (fun _ : suspended_program (A := B) => code_link prog' P')
-        ≈( [tuple eps] )
+        ≈( cat_tuple [tuple eps] [tuple 0] )
         (fun _ : suspended_program (A := B) => code_link prog' P')
       ⦃ fun out =>
         let '(_, mem) := out in call_invariant mem ⦄.
       apply: pythReflRule.
-      * by move=> i; rewrite [i]ord1.
+      * move=> i.
+        apply: (cat_tuple_nonneg [tuple eps] [tuple 0] i);
+          by move=> j; rewrite [j]ord1.
       * move=> memL0 memR0 xL0 xR0 Hpre.
         move/andP: Hpre=> [/andP [/eqP -> /eqP ->] _].
         by split.
@@ -683,13 +689,15 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
               (xL == xR) && (memL == memR) && call_invariant memL ⦄
         (fun _ : suspended_program (A := B) =>
           code_link (invalid_trace_code (A := B)) P')
-        ≈( [tuple eps] )
+        ≈( cat_tuple [tuple eps] [tuple 0] )
         (fun _ : suspended_program (A := B) =>
           code_link (invalid_trace_code (A := B)) P')
       ⦃ fun out =>
         let '(_, mem) := out in call_invariant mem ⦄.
       apply: pythReflRule.
-      * by move=> i; rewrite [i]ord1.
+      * move=> i.
+        apply: (cat_tuple_nonneg [tuple eps] [tuple 0] i);
+          by move=> j; rewrite [j]ord1.
       * move=> memL0 memR0 xL0 xR0 Hpre.
         move/andP: Hpre=> [/andP [/eqP -> /eqP ->] _].
         by split.
@@ -1006,7 +1014,7 @@ rewrite /call_from_package Hx.
 rewrite !code_link_bind.
 rewrite (code_link_resolve_closed_with X Y L' M P' P' fn x HP' Hfn).
 rewrite (code_link_resolve_closed_with X Y L'' M P'' P' fn x HP'' Hfn).
-eapply (@pythSeqRule 0 (q.*2).+1 'unit 'unit Y B
+eapply (@pythSeqRule 0 (q.*2).+2 'unit 'unit Y B
   (fun _ : 'unit => resolve P' (mkopsig fn X Y) x)
   (fun _ : 'unit => resolve P'' (mkopsig fn X Y) x)
   (fun y => code_link
@@ -1221,7 +1229,7 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
     fn root prog trace_prefix Htrace).
   rewrite (codeLinkCompileCallsFromTraceS_decompose 0 X Y B P'' P'
     fn root prog trace_prefix Htrace).
-  eapply (@pythClosedSeqRule 0 0
+  eapply (@pythClosedSeqRule 0 1
     (suspended_program (A := B)) B
     (code_link (run_until_next_call prog fn) P')
     (code_link (run_until_next_call prog fn) P')
@@ -1240,7 +1248,7 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
       let '(_, mem) := out in call_invariant mem)
     (fun out =>
       let '(_, mem) := out in call_invariant mem)
-    [tuple 0] [tuple eps]).
+    [tuple 0] (cat_tuple [tuple eps] [tuple 0])).
   + exact: (pythLinkedRunUntilNextCallRule X Y B K L L' M P' fn prog
       call_invariant Hprog_valid HP' HKL Hdep HP'_pres Hfn).
   + exact: (pythCompileCallsFromTraceStepContinuationBaseRule X Y B K L L'
@@ -1251,10 +1259,14 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
   apply: pythReflRule.
   + rewrite (pythCallErrors0 eps).
     move=> i.
-    apply: (cat_tuple_nonneg [tuple 0] [tuple eps] i).
+    apply: (cat_tuple_nonneg [tuple 0]
+      (cat_tuple [tuple eps] [tuple 0]) i).
     * by move=> j; rewrite [j]ord1.
-    * have [Heps_nonneg _] := Hcall.
-      by move=> j; rewrite [j]ord1; exact: (Heps_nonneg ord0).
+    * move=> k.
+      apply: (cat_tuple_nonneg [tuple eps] [tuple 0] k).
+      + have [Heps_nonneg _] := Hcall.
+        by move=> j; rewrite [j]ord1; exact: (Heps_nonneg ord0).
+      + by move=> j; rewrite [j]ord1.
   + move=> memL memR [] [] Hpre.
     move/andP: Hpre=> [/eqP -> _].
     by split.
@@ -1329,7 +1341,7 @@ rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P' P'
   fn root prog trace_prefix Htrace).
 rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P'' P'
   fn root prog trace_prefix Htrace).
-eapply (@pythClosedSeqRule 0 (q.*2).+2
+eapply (@pythClosedSeqRule 0 (q.*2).+3
   (suspended_program (A := B)) B
   (code_link (run_until_next_call prog fn) P')
   (code_link (run_until_next_call prog fn) P')
