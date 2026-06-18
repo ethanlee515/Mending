@@ -50,6 +50,7 @@ have Hin := fhas_in L l Hl.
 by rewrite Hkl Hin in Hnotin.
 Qed.
 
+
 Definition package_preserves_heap_pred_except
   (M : Interface) (P : raw_package) (skip : ident)
   (p : pred heap) : Prop :=
@@ -718,45 +719,6 @@ case: sL=> [[packed_x|b] packed_local_trace] /=.
     exact: (Hbranch' memR memR s_done s_done Hpre_s).
 Qed.
 
-(** Searching for the next [fn] call is identical on both sides.  It costs the
-    leading zero coordinate and only needs to preserve the call invariant. *)
-Lemma pythLinkedRunUntilNextCallRule
-  (X Y B : choice_type)
-  (K L L' : Locations) (M : Interface)
-  (P' : raw_package) (fn : ident)
-  (prog : raw_code B)
-  (call_invariant : pred heap) :
-  ValidCode L M prog ->
-  ValidPackage L' [interface] M P' ->
-  fseparate K L ->
-  heap_pred_depends_only_on K call_invariant ->
-  package_preserves_heap_pred_except M P' fn call_invariant ->
-  fhas M (mkopsig fn X Y) ->
-  ⊨PythC ⦃ fun mems =>
-          let '(memL, memR) := mems in
-          (memL == memR) && call_invariant memL ⦄
-    (code_link (run_until_next_call prog fn) P')
-    ≈( [tuple 0] )
-    (code_link (run_until_next_call prog fn) P')
-  ⦃ fun out =>
-    let '(_, mem) := out in
-    call_invariant mem ⦄.
-Proof.
-move=> Hvalid HP' HKL Hdep HP'_pres Hfn.
-rewrite /pythClosedJudgment.
-apply: pythReflRule.
-- by move=> i; rewrite [i]ord1.
-- move=> memL memR [] [] Hpre.
-  move/andP: Hpre=> [/eqP -> _].
-  by split.
-- move=> mem [] y Hpre Hy.
-  have Hhoare := linkedRunUntilNextCallPreservesHeapPred X Y B K L L' M
-    P' fn prog call_invariant Hvalid HP' HKL Hdep HP'_pres Hfn.
-  move/andP: Hpre=> [_ Hinv].
-  have Hy_inv := Hhoare tt mem Hinv y Hy.
-  by move: Hy Hy_inv; case: y=> [[status tr] mem'] /=.
-Qed.
-
 (* TODO: Re-evaluate whether these three continuation cases should stay as
    standalone lemmas, or whether the easy branches are clearer inline. *)
 
@@ -1233,9 +1195,8 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
     fn root prog trace_prefix Htrace).
   rewrite (codeLinkCompileCallsFromTraceS_decompose 0 X Y B P'' P'
     fn root prog trace_prefix Htrace).
-  eapply (@pythClosedSeqRule 0 1
+  eapply (@pythClosedHoareSeqRule 1
     (suspended_program (A := B)) B
-    (code_link (run_until_next_call prog fn) P')
     (code_link (run_until_next_call prog fn) P')
     (fun s => code_link
       (compile_calls_from_trace_step_cont 0
@@ -1245,6 +1206,7 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
       (compile_calls_from_trace_step_cont 0
         (X := X) (Y := Y) P'' fn root trace_prefix s)
       P')
+    call_invariant
     (fun mems =>
       let '(memL, memR) := mems in
       (memL == memR) && call_invariant memL)
@@ -1252,9 +1214,16 @@ case Htrace: (continue_from_trace root trace_prefix)=> [prog|].
       let '(_, mem) := out in call_invariant mem)
     (fun out =>
       let '(_, mem) := out in call_invariant mem)
-    [tuple 0] (cat_tuple [tuple eps] [tuple 0])).
-  + exact: (pythLinkedRunUntilNextCallRule X Y B K L L' M P' fn prog
-      call_invariant Hprog_valid HP' HKL Hdep HP'_pres Hfn).
+    (cat_tuple [tuple eps] [tuple 0])).
+  + move=> memL memR Hpre.
+    move/andP: Hpre=> [/eqP -> Hinv].
+    by split.
+  + have Hrun := linkedRunUntilNextCallPreservesHeapPred X Y B K L L' M
+      P' fn prog call_invariant Hprog_valid HP' HKL Hdep HP'_pres Hfn.
+    rewrite /hoareJudgment=> u mem Hinv out Hout.
+    have Hout_inv := Hrun u mem Hinv out Hout.
+    clear Hout.
+    by case: out Hout_inv=> [[status trace] mem'].
   + exact: (pythCompileCallsFromTraceStepContinuationBaseRule X Y B K L L'
       L'' M P' P'' fn root trace_prefix eps call_invariant Hvalid HP'
       HP'' HKL Hdep HP'_pres Hfn Hcall).
@@ -1342,9 +1311,8 @@ rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P' P'
   fn root prog trace_prefix Htrace).
 rewrite (codeLinkCompileCallsFromTraceS_decompose q.+1 X Y B P'' P'
   fn root prog trace_prefix Htrace).
-eapply (@pythClosedSeqRule 0 (q.*2).+3
+eapply (@pythClosedHoareSeqRule (q.*2).+3
   (suspended_program (A := B)) B
-  (code_link (run_until_next_call prog fn) P')
   (code_link (run_until_next_call prog fn) P')
   (fun s => code_link
     (compile_calls_from_trace_step_cont q.+1
@@ -1354,6 +1322,7 @@ eapply (@pythClosedSeqRule 0 (q.*2).+3
     (compile_calls_from_trace_step_cont q.+1
       (X := X) (Y := Y) P'' fn root trace_prefix s)
     P')
+  call_invariant
   (fun mems =>
     let '(memL, memR) := mems in
     (memL == memR) && call_invariant memL)
@@ -1361,10 +1330,16 @@ eapply (@pythClosedSeqRule 0 (q.*2).+3
     let '(_, mem) := out in call_invariant mem)
   (fun out =>
     let '(_, mem) := out in call_invariant mem)
-  [tuple 0]
   (cat_tuple [tuple eps] (pythCallErrors q eps))).
-- exact: (pythLinkedRunUntilNextCallRule X Y B K L L' M P' fn prog
-    call_invariant Hprog_valid HP' HKL Hdep HP'_pres Hfn).
+- move=> memL memR Hpre.
+  move/andP: Hpre=> [/eqP -> Hinv].
+  by split.
+- have Hrun := linkedRunUntilNextCallPreservesHeapPred X Y B K L L' M
+    P' fn prog call_invariant Hprog_valid HP' HKL Hdep HP'_pres Hfn.
+  rewrite /hoareJudgment=> u mem Hinv out Hout.
+  have Hout_inv := Hrun u mem Hinv out Hout.
+  clear Hout.
+  by case: out Hout_inv=> [[status trace] mem'].
 - exact: (pythCompileCallsFromTraceStepContinuationRule q X Y B K L L' L''
     M P' P'' fn root prog trace_prefix eps call_invariant Hvalid HP'
     HP'' HKL Hdep HP'_pres Hfn Htrace Hcall HIH).
@@ -1555,4 +1530,3 @@ split.
   split; first exact: HmarginR.
   by split.
 Qed.
-

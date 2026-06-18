@@ -308,3 +308,80 @@ apply: pythReflRule.
   move/andP: Hpre=> [_ Hmid].
   exact: (Hhoare x mem Hmid y Hy).
 Qed.
+
+Lemma pythHoareSeqRule
+  {ℓ : nat}
+  {in_t mid_t out_t : choice_type}
+  (prog : in_t -> raw_code mid_t)
+  (contL : mid_t -> raw_code out_t)
+  (contR : mid_t -> raw_code out_t)
+  (pre0 : pred (in_t * heap))
+  (pre : pred ((in_t * heap) * (in_t * heap)))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  (forall memL memR xL xR,
+    pre ((xL, memL), (xR, memR)) ->
+      xL = xR /\ memL = memR /\ pre0 (xL, memL)) ->
+  ⊨Hoare ⦃ pre0 ⦄ prog ⦃ mid ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
+  ⊨Pyth ⦃ pre ⦄
+    (fun x => y ← prog x ;; contL y)
+    ≈( cat_tuple [tuple 0] s )
+    (fun x => y ← prog x ;; contR y)
+  ⦃ post ⦄.
+Proof.
+move=> Hpre_eq Hhoare Hpyth.
+apply: (pythSeqRule prog prog contL contR pre mid post [tuple 0] s _ Hpyth).
+apply: pythReflRule.
+- by move=> i; rewrite [i]ord1.
+- move=> memL memR xL xR Hpre.
+  have [Hx [Hmem _]] := Hpre_eq memL memR xL xR Hpre.
+  by split.
+- move=> mem x y Hpre Hy.
+  have [_ [_ Hpre0]] := Hpre_eq mem mem x x Hpre.
+  exact: (Hhoare x mem Hpre0 y Hy).
+Qed.
+
+Lemma pythClosedHoareSeqRule
+  {ℓ : nat}
+  {mid_t out_t : choice_type}
+  (prog : raw_code mid_t)
+  (contL : mid_t -> raw_code out_t)
+  (contR : mid_t -> raw_code out_t)
+  (pre0 : pred heap)
+  (pre : pred (heap * heap))
+  (mid : pred (mid_t * heap))
+  (post : pred (out_t * heap))
+  (s : (ℓ.+1).-tuple R) :
+  (forall memL memR, pre (memL, memR) -> memL = memR /\ pre0 memL) ->
+  ⊨Hoare ⦃ fun in_mem => pre0 in_mem.2 ⦄
+    (fun _ : 'unit => prog) ⦃ mid ⦄ ->
+  ⊨Pyth ⦃
+    fun xs =>
+      let '((xL, memL), (xR, memR)) := xs in
+      (xL == xR) && (memL == memR) && mid (xL, memL)
+  ⦄ contL ≈( s ) contR ⦃ post ⦄ ->
+  ⊨PythC ⦃ pre ⦄
+    (y ← prog ;; contL y)
+    ≈( cat_tuple [tuple 0] s )
+    (y ← prog ;; contR y)
+  ⦃ post ⦄.
+Proof.
+move=> Hpre_eq Hhoare Hpyth.
+rewrite /pythClosedJudgment.
+apply: (pythHoareSeqRule
+  (fun _ : 'unit => prog) contL contR
+  (fun in_mem => pre0 in_mem.2)
+  (fun inps =>
+    let '((_, memL), (_, memR)) := inps in pre (memL, memR))
+  mid post s _ Hhoare Hpyth).
+move=> memL memR [] [] Hpre.
+have [Hmem Hpre0] := Hpre_eq memL memR Hpre.
+split; first done.
+by split.
+Qed.
