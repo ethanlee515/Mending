@@ -420,6 +420,39 @@ Lemma kl_nonnegative {T : choiceType} (P Q : {distr T / R}) :
   absolute_continuous P Q ->
   dweight P = 1 ->
   0 <= δ_KL P Q.
-Admitted.
+Proof.
+move=> Hac HP.
+have Hlogsum :=
+  log_sum_inequality_partition (fun _ : T => tt) P Q
+    (fun x => ge0_mu P x) (fun x => ge0_mu Q x)
+    (summable_mu P) (summable_mu Q) Hac.
+rewrite /δ_KL /esp.
+rewrite (eq_sum (F2 := fun x => P x * ln (P x / Q x))); last first.
+  by move=> x; rewrite mulrC.
+apply: (le_trans _ Hlogsum).
+rewrite (sum_seq1 tt).
+- rewrite !eqxx.
+  have -> : psum (fun x : T => true%:R * P x) = psum P.
+    by apply/eq_psum=> x; rewrite /= mul1r.
+  have -> : psum (fun x : T => true%:R * Q x) = psum Q.
+    by apply/eq_psum=> x; rewrite /= mul1r.
+  rewrite -!pr_predT HP.
+  have HQpos : 0 < dweight Q.
+    have [x Hx] := dweight1_dinsupp P HP.
+    have HPx_neq : P x != 0 by rewrite -in_dinsupp.
+    have HPx_pos : 0 < P x by rewrite lt_def ge0_mu HPx_neq.
+    have HQx_pos : 0 < Q x := absolute_continuous_positive P Q x Hac HPx_pos.
+    apply: (lt_le_trans HQx_pos _).
+    rewrite pr_predT.
+    by rewrite -(ger0_norm (ge0_mu Q x)); exact: ger1_psum.
+  have HQle1 : dweight Q <= 1 by rewrite pr_predT; exact: le1_mu.
+  have Hratio_ge1 : 1 <= 1 / dweight Q.
+    rewrite -[1 <= _](@ler_pM2r R (dweight Q)).
+      rewrite !mul1r mulVr ?mulr1 ?unitfE ?lt0r_neq0 //.
+      exact: HQpos.
+  by rewrite mul1r ln_ge0.
+- move=> y Hnz.
+  by case: y Hnz.
+Qed.
 
 End KL_Core.
