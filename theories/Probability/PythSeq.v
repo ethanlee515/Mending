@@ -872,18 +872,18 @@ Lemma completedFinalBindTrace_pythDist
     s.
 Proof.
 move=> Hdist.
-case: Hdist=> Hs [HP [HQ [Hcond_fin Hcond]]].
+case: Hdist=> Hs [HP [HQ Hcond]].
 have Hdist : pythDist P0 Q0 s.
   by split; first exact: Hs; split; first exact: HP;
-     split; first exact: HQ; split.
+     split; first exact: HQ.
 split; first exact: Hs.
 split.
   exact: (completedFinalBindTrace_dweight1 K mid P0 HP).
 split.
   exact: (completedFinalBindTrace_dweight1 K mid Q0 HQ).
+move=> i a.
 split.
   exact: (completedFinalBindTrace_cond_finite_kl K mid s P0 Q0 Hdist).
-move=> i a.
 exact: (completedFinalBindTrace_cond_bound K mid s P0 Q0 i a
   Hdist).
 Qed.
@@ -1559,10 +1559,10 @@ Lemma completedTraceBind_suffix_bound_valid_mid
 Proof.
 move=> Hbind Hdist0 HK Homega Hdecode.
 have Hac0 := pythDist_absolute_continuous P0 Q0 s1 Hdist0.
-move: Hdist0=> [Hs1 [HP0mass [HQ0mass [Hcond0_fin Hcond0]]]].
+move: Hdist0=> [Hs1 [HP0mass [HQ0mass Hcond0]]].
 have Hdist0 : pythDist P0 Q0 s1.
   by split; first exact: Hs1; split; first exact: HP0mass;
-     split; first exact: HQ0mass; split.
+     split; first exact: HQ0mass.
 case HP0z: (P0 (catTuplePrefix a) == 0).
   have Hs2 : forall j : 'I_(ℓ2.+1), 0 <= tnth s2 j.
     by case: (HK y)=> Hs2 _.
@@ -2035,10 +2035,10 @@ Lemma completedTraceBind_pythDist
   pythDist P Q (cat_tuple s1 s2).
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK.
-move: Hdist0=> [Hs1 [HP0 [HQ0 [Hcond0_fin Hcond0]]]].
+move: Hdist0=> [Hs1 [HP0 [HQ0 Hcond0]]].
 have Hdist0 : pythDist P0 Q0 s1.
   by split; first exact: Hs1; split; first exact: HP0;
-     split; first exact: HQ0; split.
+     split; first exact: HQ0.
 split.
 - move=> i.
   apply: (cat_tuple_nonneg s1 s2 i).
@@ -2050,12 +2050,12 @@ split.
 split.
 - exact: (completedTraceBind_dweightR
     mid s1 s2 P0 Q0 K P Q Hbind Hdist0 HK).
+move=> i a.
 split.
 - exact: (completedTraceBind_cond_finite_kl
     ML MR KL KR mid s1 s2 P0 Q0 K P Q
-    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK).
-- move=> i a.
-  exact: (completedTraceBind_cond_bound
+    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK i a).
+- exact: (completedTraceBind_cond_bound
     ML MR KL KR mid s1 s2 P0 Q0 K P Q i a
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK).
 Qed.

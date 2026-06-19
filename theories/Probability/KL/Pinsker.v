@@ -177,12 +177,13 @@ Lemma total_variation_chi2_bound {T : choiceType} (P Q : {distr T / R}) :
 Admitted.
 
 Lemma pinsker {T : choiceType} (P Q : {distr T / R}) :
-  absolute_continuous P Q ->
+  finite_kl P Q ->
   dweight P = 1 ->
   dweight Q = 1 ->
   total_variation P Q <= Num.sqrt (δ_KL P Q / 2).
 Proof.
-move=> Hac HP HQ.
+move=> Hfin HP HQ.
+have Hac := finite_kl_absolute_continuous P Q Hfin.
 have Hchi :
     sum (fun x : T =>
       Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) <=

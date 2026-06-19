@@ -454,6 +454,12 @@ Lemma finite_kl_dlet_same_kernel {T U : choiceType}
    [dlet_joint_same_kernel_absolute_continuous] plus marginalization. *)
 Admitted.
 
+Lemma finite_kl_dmargin {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  finite_kl P Q ->
+  finite_kl (dmargin f P) (dmargin f Q).
+Admitted.
+
 Lemma expectation_le_const_on_support {T : choiceType}
     (P : {distr T / R}) (f : T -> R) (c : R) :
   dweight P = 1 ->
