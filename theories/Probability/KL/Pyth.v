@@ -23,7 +23,7 @@ Theorem pythagorean_probability_preservation
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
   (forall i : 'I_n, 0 <= tnth eps i) ->
-  absolute_continuous P Q ->
+  finite_kl P Q ->
   dweight P = 1 ->
   dweight Q = 1 ->
   (forall (i : 'I_n) (a : forall j : 'I_n, A),
@@ -32,7 +32,8 @@ Theorem pythagorean_probability_preservation
       tnth eps i) ->
   total_variation P Q <= Num.sqrt ((\sum_(i < n) tnth eps i) / 2).
 Proof.
-move=> Heps Hac HP HQ Hcond.
+move=> Heps Hfin HP HQ Hcond.
+have Hac := finite_kl_absolute_continuous P Q Hfin.
 have Hpin := pinsker P Q Hac HP HQ.
 apply: (le_trans Hpin).
 apply: ler_wsqrtr.
@@ -46,7 +47,7 @@ Corollary pythagorean_probability_preservation_sup_pinsker
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : R) :
   0 <= eps ->
-  absolute_continuous P Q ->
+  finite_kl P Q ->
   dweight P = 1 ->
   dweight Q = 1 ->
   (forall (i : 'I_n) (a : forall j : 'I_n, A),
@@ -77,13 +78,52 @@ Definition pythDist
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) : Prop :=
   (forall i : 'I_n, 0 <= tnth eps i) /\
-  absolute_continuous P Q /\
+  finite_kl P Q /\
   dweight P = 1 /\
   dweight Q = 1 /\
+  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+    finite_kl
+      (conditional_coordinate P i a)
+      (conditional_coordinate Q i a)) /\
   forall (i : 'I_n) (a : forall j : 'I_n, A),
     δ_KL (conditional_coordinate P i a)
          (conditional_coordinate Q i a) <=
       tnth eps i.
+
+Lemma pythDist_finite_kl
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  pythDist P Q eps -> finite_kl P Q.
+Proof. by case=> _ [Hfin _]. Qed.
+
+Lemma pythDist_absolute_continuous
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  pythDist P Q eps -> absolute_continuous P Q.
+Proof.
+move=> Hdist.
+exact: (finite_kl_absolute_continuous P Q (pythDist_finite_kl P Q eps Hdist)).
+Qed.
+
+Lemma pythDist_cond_finite_kl
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  pythDist P Q eps ->
+  forall (i : 'I_n) (a : forall j : 'I_n, A),
+    finite_kl
+      (conditional_coordinate P i a)
+      (conditional_coordinate Q i a).
+Proof. by case=> _ [_ [_ [_ [Hfin _]]]]. Qed.
+
+Lemma pythDist_cond_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  pythDist P Q eps ->
+  forall (i : 'I_n) (a : forall j : 'I_n, A),
+    δ_KL (conditional_coordinate P i a)
+         (conditional_coordinate Q i a) <=
+      tnth eps i.
+Proof. by case=> _ [_ [_ [_ [_ Hcond]]]]. Qed.
 
 Lemma pythDist_refl
   {n : nat} {A : choiceType}
@@ -94,10 +134,11 @@ Lemma pythDist_refl
 Proof.
 move=> Heps HP.
 split; first exact: Heps.
+split; first exact: finite_kl_refl.
+split; first exact: HP.
+split; first exact: HP.
 split.
-  by move=> x ->.
-split; first exact: HP.
-split; first exact: HP.
+  by move=> i a; exact: finite_kl_refl.
 move=> i a.
 rewrite kl_self.
 exact: Heps i.
@@ -178,9 +219,9 @@ Lemma pythDist_total_variation
   pythDist P Q eps ->
   total_variation P Q <= Num.sqrt ((\sum_(i < n) tnth eps i) / 2).
 Proof.
-move=> [Heps [Hac [HP [HQ Hcond]]]].
+move=> [Heps [Hfin [HP [HQ [_ Hcond]]]]].
 exact: (pythagorean_probability_preservation P Q eps
-          Heps Hac HP HQ Hcond).
+          Heps Hfin HP HQ Hcond).
 Qed.
 
 Lemma pythDist_final_total_variation
@@ -191,7 +232,8 @@ Lemma pythDist_final_total_variation
     (dmargin (fun omega => tnth omega ord_max) Q) <=
     pythagorean_tv_bound eps.
 Proof.
-move=> [Heps [Hac [HP [HQ Hcond]]]].
+move=> [Heps [Hfin [HP [HQ [_ Hcond]]]]].
+have Hac := finite_kl_absolute_continuous P Q Hfin.
 pose final := fun omega : n.+1.-tuple A => tnth omega ord_max.
 have HPfinal : dweight (dmargin final P) = 1 by rewrite dmargin_dweight.
 have HQfinal : dweight (dmargin final Q) = 1 by rewrite dmargin_dweight.

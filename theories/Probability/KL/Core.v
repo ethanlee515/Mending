@@ -21,6 +21,53 @@ Definition δ_KL {T : choiceType} (P Q : {distr T / R}) : R :=
 Definition absolute_continuous {T : choiceType} (P Q : {distr T / R}) : Prop :=
   forall x, Q x = 0 -> P x = 0.
 
+(* Division and [ln] are totalized, so summability alone would not rule out
+   support-mismatch cases where [Q x = 0] and [P x > 0]. *)
+Definition finite_kl {T : choiceType} (P Q : {distr T / R}) : Prop :=
+  absolute_continuous P Q /\
+  summable (fun x => P x * ln (P x / Q x)).
+
+Lemma finite_kl_absolute_continuous {T : choiceType}
+    (P Q : {distr T / R}) :
+  finite_kl P Q -> absolute_continuous P Q.
+Proof. by case. Qed.
+
+Lemma finite_kl_summable {T : choiceType}
+    (P Q : {distr T / R}) :
+  finite_kl P Q -> summable (fun x => P x * ln (P x / Q x)).
+Proof. by case. Qed.
+
+Lemma finite_kl_refl {T : choiceType} (P : {distr T / R}) :
+  finite_kl P P.
+Proof.
+split; first by move=> x ->.
+apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+move=> x.
+case Px0: (P x == 0).
+  by rewrite (eqP Px0) mul0r.
+have HPx : P x != 0 by rewrite Px0.
+have -> : P x / P x = 1 by rewrite divff ?unitfE ?HPx.
+by rewrite ln1 mulr0.
+Qed.
+
+Lemma finite_kl_ext {T : choiceType}
+    (P P' Q Q' : {distr T / R}) :
+  P =1 P' ->
+  Q =1 Q' ->
+  finite_kl P Q ->
+  finite_kl P' Q'.
+Proof.
+move=> HP HQ [Hac Hsumm].
+split.
+- move=> x HQx0.
+  rewrite -HP.
+  apply: Hac.
+  by rewrite HQ.
+- apply: (eq_summable (S1 := fun x => P x * ln (P x / Q x))).
+    by move=> x; rewrite -HP -HQ.
+  exact: Hsumm.
+Qed.
+
 Lemma mass1_kl_left {T : choiceType} (P Q : {distr T / R}) :
   dweight P = 1 ->
   δ_KL P Q =
