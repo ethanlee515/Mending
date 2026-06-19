@@ -299,15 +299,41 @@ have Ha : tuple_prefix i (tnth x) = a.
 by rewrite /coordinate_log_contribution Ha.
 Qed.
 
-Lemma point_mass_le_prefix_coordinate_mass
+Lemma prefix_coordinate_pr_factor
     {n : nat} {A : choiceType}
     (P : {distr (n.-tuple A) / R})
-    (i : 'I_n) (a : i.-tuple A) (x : n.-tuple A) :
-  tuple_prefix_eq a x ->
-  P x <=
-  \P_[P] (fun y => tuple_prefix_eq a y) *
-  conditional_coordinate P a (tnth x i).
-Admitted.
+    (i : 'I_n) (a : i.-tuple A) (b : A) :
+  \P_[P] (fun x => tuple_prefix_eq a x && (tnth x i == b)) =
+  \P_[P] (fun x => tuple_prefix_eq a x) *
+  conditional_coordinate P a b.
+Proof.
+case Hpref0 : (\P_[P] (fun x => tuple_prefix_eq a x) == 0).
+  move/eqP: Hpref0=> Hpref0.
+  rewrite Hpref0 mul0r.
+  rewrite /pr.
+  apply/psum_eq0=> x.
+  case Hev : (tuple_prefix_eq a x && (tnth x i == b)).
+    have Hprefix : x \in [eta tuple_prefix_eq a].
+      by move/andP: Hev=> [].
+    have Hpx0 : P x = 0 := pr_eq0 Hpref0 Hprefix.
+    by rewrite mul1r Hpx0.
+  by rewrite mul0r.
+rewrite /conditional_coordinate.
+rewrite (pr_pred1
+  (dmargin (fun omega : n.-tuple A => tnth omega i)
+    (dcond P (fun omega : n.-tuple A => tuple_prefix_eq a omega))) b).
+rewrite pr_dmargin pr_dcond /prc.
+set p0 := \P_[P] [eta tuple_prefix_eq a].
+set q0 := \P_[P]
+  [predI [pred x0 | tnth x0 i \in pred1 b] & [eta tuple_prefix_eq a]].
+have Hp0nz : p0 != 0 by rewrite /p0 Hpref0.
+rewrite mulrC -mulrA mulVr ?mulr1 ?unitfE //.
+rewrite /pr.
+apply/eq_psum=> x.
+rewrite !inE -!topredE /=.
+case: (tuple_prefix_eq a x); case: (tnth x i == b);
+  rewrite ?mul0r ?mul1r //.
+Qed.
 
 Lemma finite_sum_coordinate_log_contribution_partition_coordinate
     {n : nat} {A : choiceType}
@@ -334,15 +360,33 @@ Lemma finite_sum_selected_prefix_coordinate_mass_le
     {n : nat} {A : choiceType}
     (P : {distr (n.-tuple A) / R})
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) (b : A) :
+  uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b)) P x <=
   \P_[P] (fun x => tuple_prefix_eq a x) *
   conditional_coordinate P a b.
-Admitted.
+Proof.
+move=> Huniq.
+set E := fun x : n.-tuple A => tuple_prefix_eq a x && (tnth x i == b).
+rewrite -prefix_coordinate_pr_factor /pr -/E.
+suff Hpoint :
+    \sum_(x <- J | E x) P x <=
+    \sum_(x <- J | E x) `| (E x)%:R * P x | by
+  apply: (le_trans Hpoint _); rewrite -big_filter;
+  exact: (gerfinseq_psum
+    (S := fun x => (E x)%:R * P x)
+    (r := filter E J) (filter_uniq _ Huniq) (summable_pr E P)).
+apply: ler_sum=> x Hx.
+move: Hx.
+rewrite /E.
+case: (tuple_prefix_eq a x && (tnth x i == b))=> //= Hx.
+  by rewrite mul1r ger0_norm ?ge0_mu.
+Qed.
 
 Lemma finite_sum_prefix_coordinate_fiber_log_bound
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R})
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) (b : A) :
+  uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b))
     `|fpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
@@ -352,7 +396,25 @@ Lemma finite_sum_prefix_coordinate_fiber_log_bound
       (conditional_coordinate P a b *
        ln (conditional_coordinate P a b /
            conditional_coordinate Q a b))) b|.
-Admitted.
+Proof.
+move=> Huniq.
+set l := ln (conditional_coordinate P a b / conditional_coordinate Q a b).
+set r := \P_[P] (fun x => tuple_prefix_eq a x) *
+  conditional_coordinate P a b.
+rewrite (eq_bigr (fun x => `|fpos (fun _ : unit => P x * l) tt|));
+  last first.
+  move=> x /andP[Hprefix /eqP Hb].
+  rewrite /fpos /= /l.
+  rewrite (coordinate_log_contribution_prefix P Q i a x Hprefix).
+  by rewrite Hb.
+apply: (le_trans
+  (finite_sum_fpos_scaled_le
+    J (fun x => tuple_prefix_eq a x && (tnth x i == b))
+    (fun x => P x) r l (fun x => ge0_mu P x)
+    (finite_sum_selected_prefix_coordinate_mass_le P i J a b Huniq))).
+rewrite /r /l.
+by rewrite -mulrA.
+Qed.
 
 Lemma finite_sum_coordinate_log_contribution_prefix_coordinate_group_bound
     {n : nat} {A : choiceType}
@@ -374,7 +436,7 @@ move=> Huniq.
 apply: (le_trans
   (finite_sum_coordinate_log_contribution_partition_coordinate P Q i J a Huniq)).
 apply: ler_sum=> b _.
-exact: finite_sum_prefix_coordinate_fiber_log_bound.
+exact: (finite_sum_prefix_coordinate_fiber_log_bound P Q i J a b Huniq).
 Qed.
 
 Lemma finite_sum_coordinate_log_contribution_prefix_bound
