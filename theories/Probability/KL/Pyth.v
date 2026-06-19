@@ -675,7 +675,7 @@ Lemma iterated_kl_chain_bound_from_pointwise
   (forall i : 'I_n, 0 <= tnth eps i) ->
   dweight P = 1 ->
   dweight Q = 1 ->
-  absolute_continuous P Q ->
+  finite_kl P Q ->
   (forall x : n.-tuple A,
     P x * ln (P x / Q x) =
     \sum_(i < n) P x * coordinate_log_contribution P Q x i) ->
@@ -691,15 +691,16 @@ Lemma iterated_kl_chain_bound_via_pointwise
   (forall i : 'I_n, 0 <= tnth eps i) ->
   dweight P = 1 ->
   dweight Q = 1 ->
-  absolute_continuous P Q ->
+  finite_kl P Q ->
   (forall (i : 'I_n) (a : i.-tuple A),
     δ_KL (conditional_coordinate P a)
          (conditional_coordinate Q a) <= tnth eps i) ->
   δ_KL P Q <= \sum_(i < n) tnth eps i.
 Proof.
-move=> Heps HP HQ Hac Hcond.
+move=> Heps HP HQ Hfin Hcond.
+have Hac : absolute_continuous P Q := finite_kl_absolute_continuous P Q Hfin.
 apply: (iterated_kl_chain_bound_from_pointwise P Q eps
-  Heps HP HQ Hac _ Hcond).
+  Heps HP HQ Hfin _ Hcond).
 exact: (kl_integrand_chain_decomp_pointwise P Q Hac).
 Qed.
 
@@ -844,6 +845,43 @@ have Hsumpoint :
       tnth eps i * pref_mass a.
   apply: ler_sum=> a _.
   exact: Hpoint.
+apply: (le_trans Hsumpoint).
+rewrite -mulr_sumr.
+apply: (le_trans (ler_wpM2l Heps_i
+  (finite_sum_prefix_event_mass_le1 P i
+    (undup [seq tuple_prefix i (tnth x) | x <- J]) (undup_uniq _)))).
+by rewrite mulr1.
+Qed.
+
+Lemma prefix_coordinate_weighted_kl_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R)
+    (i : 'I_n) (J : seq (n.-tuple A)) :
+  0 <= tnth eps i ->
+  (forall a : i.-tuple A,
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
+  \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
+    \P_[P] (fun x => tuple_prefix_eq a x) *
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+  tnth eps i.
+Proof.
+move=> Heps_i Hcond.
+pose pref_mass (a : i.-tuple A) :=
+  \P_[P] (fun x => tuple_prefix_eq a x).
+have Hsumpoint :
+    \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
+      pref_mass a *
+      δ_KL (conditional_coordinate P a)
+           (conditional_coordinate Q a) <=
+    \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
+      tnth eps i * pref_mass a.
+  apply: ler_sum=> a _.
+  rewrite [tnth eps i * _]mulrC.
+  apply: ler_wpM2l; first exact: ge0_pr.
+  exact: Hcond.
 apply: (le_trans Hsumpoint).
 rewrite -mulr_sumr.
 apply: (le_trans (ler_wpM2l Heps_i
@@ -1007,7 +1045,7 @@ apply: (le_trans Hpin).
 apply: ler_wsqrtr.
 have Hkl :
     δ_KL P Q <= \sum_(i < n) tnth eps i :=
-  iterated_kl_chain_bound P Q eps Heps Hac HP HQ Hcond.
+  iterated_kl_chain_bound P Q eps Heps HfinPQ HP HQ Hcond.
 lra.
 Qed.
 
@@ -1251,7 +1289,7 @@ apply: (le_trans Hpin).
 rewrite /pythagorean_tv_bound /tuple_sum.
 apply: ler_wsqrtr.
 have Hdata := kl_dmargin_data_processing final P Q Hac.
-have Hchain := iterated_kl_chain_bound P Q eps Heps Hac HP HQ Hcond.
+have Hchain := iterated_kl_chain_bound P Q eps Heps HfinPQ HP HQ Hcond.
 have Hkl := le_trans Hdata Hchain.
 lra.
 Qed.

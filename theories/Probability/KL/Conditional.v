@@ -153,7 +153,7 @@ Lemma iterated_kl_chain_bound
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
   (forall i : 'I_n, 0 <= tnth eps i) ->
-  absolute_continuous P Q ->
+  finite_kl P Q ->
   dweight P = 1 ->
   dweight Q = 1 ->
   (forall (i : 'I_n) (a : i.-tuple A),
