@@ -24,10 +24,10 @@ Lemma coordinate_finite_kl_absolute_continuous
     (P Q : {distr (n.-tuple A) / R}) :
   dweight P = 1 ->
   dweight Q = 1 ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+  (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a)) ->
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
   absolute_continuous P Q.
 Admitted.
 
@@ -36,10 +36,10 @@ Lemma summable_kl_from_coordinate_finite_kl
     (P Q : {distr (n.-tuple A) / R}) :
   dweight P = 1 ->
   dweight Q = 1 ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+  (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a)) ->
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
   summable (fun x => P x * ln (P x / Q x)).
 Admitted.
 
@@ -48,10 +48,10 @@ Lemma coordinate_finite_kl_finite_kl
     (P Q : {distr (n.-tuple A) / R}) :
   dweight P = 1 ->
   dweight Q = 1 ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+  (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a)) ->
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
   finite_kl P Q.
 Proof.
 move=> HP HQ Hfin.
@@ -66,13 +66,13 @@ Theorem pythagorean_probability_preservation
   (forall i : 'I_n, 0 <= tnth eps i) ->
   dweight P = 1 ->
   dweight Q = 1 ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+  (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a)) ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
       tnth eps i) ->
   total_variation P Q <= Num.sqrt ((\sum_(i < n) tnth eps i) / 2).
 Proof.
@@ -96,22 +96,22 @@ Corollary pythagorean_probability_preservation_sup_pinsker
   0 <= eps ->
   dweight P = 1 ->
   dweight Q = 1 ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+  (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a)) ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <= eps) ->
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <= eps) ->
   total_variation P Q <= Num.sqrt ((n%:R * eps) / 2).
 Proof.
 move=> Heps HP HQ Hfin Hcond.
 pose eps_tuple : n.-tuple R := [tuple eps | i < n].
 have Heps_tuple : forall i : 'I_n, 0 <= tnth eps_tuple i.
   by move=> i; rewrite /eps_tuple tnth_mktuple.
-have Hcond_tuple : forall (i : 'I_n) (a : forall j : 'I_n, A),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
+have Hcond_tuple : forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
       tnth eps_tuple i.
   by move=> i a; rewrite /eps_tuple tnth_mktuple; apply: Hcond.
 have Htv :=
@@ -130,12 +130,12 @@ Definition pythDist
   (forall i : 'I_n, 0 <= tnth eps i) /\
   dweight P = 1 /\
   dweight Q = 1 /\
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+  (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a) /\
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a) /\
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
       tnth eps i).
 
 Lemma pythDist_absolute_continuous
@@ -144,10 +144,10 @@ Lemma pythDist_absolute_continuous
   pythDist P Q eps -> absolute_continuous P Q.
 Proof.
 move=> [_ [HP [HQ Hcond]]].
-have Hfin : forall (i : 'I_n) (a : forall j : 'I_n, A),
+have Hfin : forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a).
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a).
   by move=> i a; have [Hfin _] := Hcond i a.
 exact: (coordinate_finite_kl_absolute_continuous P Q HP HQ Hfin).
 Qed.
@@ -156,10 +156,10 @@ Lemma pythDist_cond_finite_kl
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
   pythDist P Q eps ->
-  forall (i : 'I_n) (a : forall j : 'I_n, A),
+  forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a).
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a).
 Proof.
 move=> [_ [_ [_ Hcond]]] i a.
 by have [Hfin _] := Hcond i a.
@@ -169,9 +169,9 @@ Lemma pythDist_cond_bound
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
   pythDist P Q eps ->
-  forall (i : 'I_n) (a : forall j : 'I_n, A),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
+  forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
       tnth eps i.
 Proof.
 move=> [_ [_ [_ Hcond]]] i a.
@@ -273,14 +273,14 @@ Lemma pythDist_total_variation
 Proof.
 move=> Hdist.
 case: Hdist=> Heps [HP [HQ Hcond_all]].
-have Hfin : forall (i : 'I_n) (a : forall j : 'I_n, A),
+have Hfin : forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a).
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a).
   by move=> i a; have [Hfin _] := Hcond_all i a.
-have Hcond : forall (i : 'I_n) (a : forall j : 'I_n, A),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
+have Hcond : forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
       tnth eps i.
   by move=> i a; have [_ Hle] := Hcond_all i a.
 exact: (pythagorean_probability_preservation P Q eps
@@ -298,14 +298,14 @@ Proof.
 move=> Hdist.
 have Hac := pythDist_absolute_continuous P Q eps Hdist.
 case: Hdist=> Heps [HP [HQ Hcond_all]].
-have Hfin : forall (i : 'I_n.+1) (a : forall j : 'I_n.+1, A),
+have Hfin : forall (i : 'I_n.+1) (a : i.-tuple A),
     finite_kl
-      (conditional_coordinate P i a)
-      (conditional_coordinate Q i a).
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a).
   by move=> i a; have [Hfin _] := Hcond_all i a.
-have Hcond : forall (i : 'I_n.+1) (a : forall j : 'I_n.+1, A),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <=
+have Hcond : forall (i : 'I_n.+1) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
       tnth eps i.
   by move=> i a; have [_ Hle] := Hcond_all i a.
 pose final := fun omega : n.+1.-tuple A => tnth omega ord_max.

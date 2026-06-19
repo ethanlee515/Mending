@@ -17,10 +17,10 @@ Section ConditionalCoordinate.
 Context {R : realType}.
 
 Definition conditional_coordinate {n : nat} {A : choiceType}
-    (P : {distr (n.-tuple A) / R}) (i : 'I_n)
-    (a : forall j : 'I_n, A) : {distr A / R} :=
+    (P : {distr (n.-tuple A) / R}) {i : 'I_n}
+    (a : i.-tuple A) : {distr A / R} :=
   dmargin (fun omega : n.-tuple A => tnth omega i)
-    (dcond P (fun omega : n.-tuple A => tuple_prefix_eq i a omega)).
+    (dcond P (fun omega : n.-tuple A => tuple_prefix_eq a omega)).
 
 (* Rewrites conditional-coordinate distances along pointwise-equal distributions. *)
 Lemma conditional_coordinate_dist_ext
@@ -28,9 +28,9 @@ Lemma conditional_coordinate_dist_ext
   {A : choiceType}
   (P Q : {distr (n.-tuple A) / R})
   (i : 'I_n)
-  (a : forall j : 'I_n, A) :
+  (a : i.-tuple A) :
   P =1 Q ->
-  conditional_coordinate P i a =1 conditional_coordinate Q i a.
+  conditional_coordinate P a =1 conditional_coordinate Q a.
 Proof.
 move=> HP.
 apply: dmargin_ext.
@@ -43,9 +43,9 @@ Lemma conditional_coordinate_zero_prefix
   {A : choiceType}
   (P : {distr (n.-tuple A) / R})
   (i : 'I_n)
-  (a : forall j : 'I_n, A) :
-  \P_[P] (fun omega => tuple_prefix_eq i a omega) = 0 ->
-  conditional_coordinate P i a =1 dnull.
+  (a : i.-tuple A) :
+  \P_[P] (fun omega => tuple_prefix_eq a omega) = 0 ->
+  conditional_coordinate P a =1 dnull.
 Proof.
 move=> Hzero x.
 rewrite pr_pred1 dnullE.
@@ -58,11 +58,11 @@ Lemma conditional_coordinate_absolute_continuous
   {A : choiceType}
   (P Q : {distr (n.-tuple A) / R})
   (i : 'I_n)
-  (a : forall j : 'I_n, A) :
+  (a : i.-tuple A) :
   absolute_continuous P Q ->
   absolute_continuous
-    (conditional_coordinate P i a)
-    (conditional_coordinate Q i a).
+    (conditional_coordinate P a)
+    (conditional_coordinate Q a).
 Admitted.
 
 End ConditionalCoordinate.

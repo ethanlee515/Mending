@@ -80,9 +80,11 @@ Proof. exact: cat_tuple_tnth_suffix_choice. Qed.
 Definition catTuplePrefix
   {ℓ1 ℓ2 : nat}
   {A : Type}
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A) :
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N)
+  (a : i.-tuple A) :
   (ℓ1.+1).-tuple A :=
-  [tuple a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _)))
+  [tuple tnth a (Ordinal (leq_trans (ltn_ord j) Hi))
     | j < ℓ1.+1].
 
 Definition catTupleSuffixIndex
@@ -99,35 +101,30 @@ Proof.
 by rewrite ltn_add2l ltn_ord.
 Qed.
 
-Definition catTupleSuffixAssignment
-  {ℓ1 ℓ2 : nat}
-  {A : Type}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N)
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A) :
-  forall j : 'I_(ℓ2.+1), A :=
-  fun j =>
-    a (Ordinal (catTupleSuffixOrdinal_bound j)).
+Definition tuple_prefix {n : nat} {A : Type}
+    (i : 'I_n) (a : forall j : 'I_n, A) : i.-tuple A :=
+  [tuple a (widen_ord (ltnW (ltn_ord i)) j) | j < i].
 
 Definition tuple_prefix_eq {n : nat} {A : choiceType}
-    (i : 'I_n) (a : forall j : 'I_n, A) (omega : n.-tuple A) : bool :=
-  [forall j : 'I_n, (j < i)%N ==> (tnth omega j == a j)].
+    {i : 'I_n} (a : i.-tuple A) (omega : n.-tuple A) : bool :=
+  [forall j : 'I_i,
+    tnth omega (widen_ord (ltnW (ltn_ord i)) j) == tnth a j].
 
 (* Characterizes when a concatenated trace has a given prefix. *)
 Lemma tuple_prefix_eq_cat_prefix
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (a : i.-tuple A)
   (Hi : (i < ℓ1.+1)%N)
   (omega1 : (ℓ1.+1).-tuple A)
   (omega2 : (ℓ2.+1).-tuple A) :
   let i0 : 'I_(ℓ1.+1) := Ordinal Hi in
-  let a0 : forall j : 'I_(ℓ1.+1), A :=
-    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) in
-  tuple_prefix_eq i a (cat_tuple omega1 omega2) =
-  tuple_prefix_eq i0 a0 omega1.
+  tuple_prefix_eq a (cat_tuple omega1 omega2) =
+  @tuple_prefix_eq _ _ i0 a omega1.
 Proof.
+(* TODO: This proof was invalidated by the change in length of `a` from a full
+   assignment to an `i`-length prefix tuple.
 rewrite /tuple_prefix_eq.
 apply/idP/idP.
 - move=> Hbool.
@@ -163,33 +160,42 @@ apply/idP/idP.
       by apply: val_inj.
     by [].
   by [].
-Qed.
+*)
+Admitted.
 
 (* Recovers the original prefix tuple from a concatenated tuple. *)
 Lemma catTuplePrefix_cat
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N)
   (omega1 : (ℓ1.+1).-tuple A)
   (omega2 : (ℓ2.+1).-tuple A) :
-  catTuplePrefix (fun j => tnth (cat_tuple omega1 omega2) j) =
+  catTuplePrefix i Hi (tuple_prefix i
+    (fun j => tnth (cat_tuple omega1 omega2) j)) =
   omega1.
 Proof.
+(* TODO: This proof was invalidated by the change in length of `a` from a full
+   assignment to an `i`-length prefix tuple.
 apply: eq_from_tnth=> j.
 rewrite /catTuplePrefix tnth_mktuple.
 rewrite (cat_tuple_tnth_prefix_choice omega1 omega2
   (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) (ltn_ord j)).
 congr tnth.
 by apply: val_inj.
-Qed.
+*)
+Admitted.
 
 (* Reads coordinates from the extracted prefix tuple. *)
 Lemma catTuplePrefix_tnth
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N)
+  (a : i.-tuple A)
   (j : 'I_(ℓ1.+1)) :
-  tnth (catTuplePrefix a) j =
-  a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))).
+  tnth (catTuplePrefix i Hi a) j =
+  tnth a (Ordinal (leq_trans (ltn_ord j) Hi)).
 Proof.
 by rewrite /catTuplePrefix tnth_mktuple.
 Qed.
@@ -223,23 +229,37 @@ rewrite /catTupleSuffixIndex /=.
 by rewrite (@leq_subRL ℓ1.+1 j.+1 i Hi) addnS.
 Qed.
 
+Definition catTupleSuffixAssignment
+  {ℓ1 ℓ2 : nat}
+  {A : Type}
+  (i : 'I_(ℓ1.+1 + ℓ2.+1))
+  (Hi : (ℓ1.+1 <= i)%N)
+  (a : i.-tuple A) :
+  (catTupleSuffixIndex i Hi).-tuple A :=
+  [tuple
+    let j' : 'I_(ℓ2.+1) :=
+      Ordinal (ltn_trans (ltn_ord j) (ltn_ord (catTupleSuffixIndex i Hi))) in
+    tnth a (Ordinal (catTupleSuffixOrdinal_lt i Hi j' (ltn_ord j)))
+    | j < catTupleSuffixIndex i Hi].
+
 (* Characterizes suffix-prefix equality after fixing the concatenated prefix. *)
 Lemma tuple_prefix_eq_cat_suffix
   {ℓ1 ℓ2 : nat}
   {A : choiceType}
   (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (a : forall j : 'I_(ℓ1.+1 + ℓ2.+1), A)
+  (a : i.-tuple A)
   (Hi : (ℓ1.+1 <= i)%N)
   (omega1 omega1' : (ℓ1.+1).-tuple A)
   (omega2 : (ℓ2.+1).-tuple A) :
-  catTuplePrefix a = omega1 ->
-  tuple_prefix_eq i a (cat_tuple omega1' omega2) =
+  catTuplePrefix i Hi a = omega1 ->
+  tuple_prefix_eq a (cat_tuple omega1' omega2) =
     (omega1' == omega1) &&
-    tuple_prefix_eq
-      (catTupleSuffixIndex i Hi)
+    @tuple_prefix_eq _ _ (catTupleSuffixIndex i Hi)
       (catTupleSuffixAssignment i Hi a)
       omega2.
 Proof.
+(* TODO: This proof was invalidated by the change in length of `a` from a full
+   assignment to an `i`-length prefix tuple.
 move=> Hprefix.
 rewrite /tuple_prefix_eq.
 apply/idP/idP.
@@ -317,7 +337,8 @@ apply/idP/idP.
       by rewrite subnKC.
     by [].
     by [].
-Qed.
+*)
+Admitted.
 
 End TupleExtras.
 

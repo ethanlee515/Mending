@@ -156,9 +156,9 @@ Lemma iterated_kl_chain_bound
   absolute_continuous P Q ->
   dweight P = 1 ->
   dweight Q = 1 ->
-  (forall (i : 'I_n) (a : forall j : 'I_n, A),
-    δ_KL (conditional_coordinate P i a)
-         (conditional_coordinate Q i a) <= tnth eps i) ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <= tnth eps i) ->
   δ_KL P Q <= \sum_(i < n) tnth eps i.
 Admitted.
 
