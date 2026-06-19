@@ -1555,7 +1555,6 @@ Lemma compileRule
   ⦃ fun out =>
     let '(y, mem) := out in
     call_invariant mem ⦄ ->
-  let delta := pythagorean_tv_bound (pythCallErrors q eps) in
   ⊨AE_opt ⦃ fun inps =>
           let '((xL, memL), (xR, memR)) := inps in
           (xL == xR) && (memL == memR) &&
@@ -1563,7 +1562,7 @@ Lemma compileRule
     (fun x => code_link
       (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
       P')
-    ≈( delta )
+    ≈( Num.sqrt ((q.+1%:R * eps) / 2) )
     (fun x => code_link
       (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
       P')
@@ -1572,6 +1571,7 @@ Lemma compileRule
     outL == outR ⦄.
 Proof.
 move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall.
+rewrite -pythagorean_tv_bound_pythCallErrors.
 exact: (MicciancioWalterRule _ _ _ _ _
   (pythCompileCallsRule q X Y A B K L L' L'' M P' P'' fn prog eps
     call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall)).

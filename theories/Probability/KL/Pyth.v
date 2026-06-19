@@ -136,6 +136,42 @@ Proof.
 by [].
 Qed.
 
+Lemma tuple_sum_pythCallErrors (q : nat) (eps : R) :
+  tuple_sum (pythCallErrors q eps) = q.+1%:R * eps.
+Proof.
+elim: q=> [|q IH].
+- rewrite /tuple_sum /= !big_ord_recl big_ord0 /=.
+  by rewrite !(tnth_nth 0) /= !addr0 !add0r mul1r.
+- rewrite /tuple_sum /= big_ord_recl /= big_ord_recl /=.
+  rewrite !(tnth_nth 0) /=.
+  have Htail :
+      \sum_(i < q.+1.*2.+1)
+        tnth (cat_tuple [tuple 0; eps] (pythCallErrors q eps))
+          (lift ord0 (lift ord0 i)) =
+      tuple_sum (pythCallErrors q eps).
+    rewrite /tuple_sum.
+    apply: eq_bigr=> i _.
+    have Hi : (1.+1 <= lift ord0 (lift ord0 i))%N by [].
+    rewrite (cat_tuple_tnth_suffix [tuple 0; eps] (pythCallErrors q eps)
+      (lift ord0 (lift ord0 i)) Hi).
+    have -> :
+        @Ordinal (q.*2.+3) (lift ord0 (lift ord0 i) - 2)
+          (@cat_tuple_suffix_bound 1 (q.*2.+2)
+            (lift ord0 (lift ord0 i)) Hi) = i.
+      apply: val_inj.
+      by rewrite /= /bump !leq0n !add1n !subSS subn0.
+    by [].
+  rewrite Htail IH add0r.
+  by rewrite -[q.+2%:R]natr1 mulrDl mul1r addrC.
+Qed.
+
+Lemma pythagorean_tv_bound_pythCallErrors (q : nat) (eps : R) :
+  pythagorean_tv_bound (pythCallErrors q eps) =
+  Num.sqrt ((q.+1%:R * eps) / 2).
+Proof.
+by rewrite /pythagorean_tv_bound tuple_sum_pythCallErrors.
+Qed.
+
 Lemma pythDist_total_variation
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
