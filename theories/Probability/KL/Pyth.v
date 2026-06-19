@@ -31,6 +31,18 @@ Lemma coordinate_finite_kl_absolute_continuous
   absolute_continuous P Q.
 Admitted.
 
+Lemma summable_kl_from_coordinate_finite_kl
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) :
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  (forall (i : 'I_n) (a : forall j : 'I_n, A),
+    finite_kl
+      (conditional_coordinate P i a)
+      (conditional_coordinate Q i a)) ->
+  summable (fun x => P x * ln (P x / Q x)).
+Admitted.
+
 Lemma coordinate_finite_kl_finite_kl
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) :
@@ -41,7 +53,12 @@ Lemma coordinate_finite_kl_finite_kl
       (conditional_coordinate P i a)
       (conditional_coordinate Q i a)) ->
   finite_kl P Q.
-Admitted.
+Proof.
+move=> HP HQ Hfin.
+split.
+- exact: (coordinate_finite_kl_absolute_continuous P Q HP HQ Hfin).
+- exact: (summable_kl_from_coordinate_finite_kl P Q HP HQ Hfin).
+Qed.
 
 Theorem pythagorean_probability_preservation
     {n : nat} {A : choiceType}

@@ -1,10 +1,11 @@
-Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
+Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format,-notation-incompatible-prefix".
 From mathcomp Require Import all_boot all_order all_algebra all_reals distr.
-From mathcomp Require Import realseq realsum exp interval_inference convex.
-Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
+From mathcomp Require Import realseq realsum exp interval_inference convex xfinmap.
+From mathcomp Require Import lra.
+Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format,notation-incompatible-prefix".
 From mathcomp.algebra_tactics Require Import ring.
 
-From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.
 
@@ -131,6 +132,173 @@ rewrite lt_def ge0_mu andbT.
 apply/negP=> /eqP HQx0.
 have HPx0 := Hac x HQx0.
 by rewrite HPx0 ltxx in HPx.
+Qed.
+
+Lemma kl_integrand_geNq (p q : R) :
+  0 <= p ->
+  0 <= q ->
+  (q = 0 -> p = 0) ->
+  - q <= p * ln (p / q).
+Proof.
+move=> Hp Hq Hac.
+case q0: (q == 0).
+  move/eqP: q0=> qE.
+  have pE := Hac qE.
+  by rewrite qE pE mul0r oppr0.
+case p0: (p == 0).
+  rewrite (eqP p0) mul0r.
+  by rewrite oppr_le0.
+have Hqpos : 0 < q by rewrite lt_def Hq q0.
+have Hppos : 0 < p by rewrite lt_def Hp p0.
+pose r := p / q.
+have Hrpos : 0 < r by rewrite /r divr_gt0.
+have Hinvpos : 0 < r^-1 by rewrite invr_gt0.
+have Harg : -1 < r^-1 - 1 by lra.
+have Hln := le_ln1Dx Harg.
+have Hsum : 1 + (r^-1 - 1) = r^-1 by ring.
+rewrite Hsum in Hln.
+rewrite lnV in Hln; last by rewrite qualifE.
+have Hmul := ler_wpM2l (ltW Hrpos) Hln.
+rewrite mulrN mulrBr mulrV ?unitfE ?lt0r_neq0 // mulr1 in Hmul.
+have Hrminus : r - 1 <= r * ln r by lra.
+have Hbasic : -1 <= r * ln r by lra.
+have HpE : p = q * r by rewrite /r mulrC divfK ?lt0r_neq0.
+change (- q <= p * ln r).
+rewrite HpE -mulrA -mulrN1.
+by apply: ler_wpM2l; [exact: ltW Hqpos | exact: Hbasic].
+Qed.
+
+Lemma kl_integrand_fneg_le_q (p q : R) :
+  0 <= p ->
+  0 <= q ->
+  (q = 0 -> p = 0) ->
+  `|Num.min 0 (p * ln (p / q))| <= q.
+Proof.
+move=> Hp Hq Hac.
+have Hlower := kl_integrand_geNq p q Hp Hq Hac.
+case: (leP 0 (p * ln (p / q)))=> Hkl.
+  by rewrite normr0.
+rewrite ltr0_norm //.
+by rewrite -lerN2 opprK.
+Qed.
+
+Lemma summable_fneg_kl_integrand {T : choiceType}
+    (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  summable (fneg (fun x => P x * ln (P x / Q x))).
+Proof.
+move=> Hac.
+apply: (le_summable (F2 := Q)); last exact: summable_mu.
+move=> x; apply/andP; split; first exact: ge0_fneg.
+rewrite /fneg.
+exact: (kl_integrand_fneg_le_q (P x) (Q x)
+  (ge0_mu P x) (ge0_mu Q x) (Hac x)).
+Qed.
+
+Lemma summable_fiber_psum {T U : choiceType}
+    (f : T -> U) (S : T -> R) :
+  (forall x, 0 <= S x) ->
+  summable S ->
+  summable (fun y => psum (fun x => (f x == y)%:R * S x)).
+Proof.
+move=> HS smS.
+apply/summable_seqP; exists (psum S); first exact: ge0_psum.
+move=> J uqJ.
+rewrite (eq_bigr (fun y => psum (fun x => (f x == y)%:R * S x)));
+  last by move=> y _; rewrite ger0_norm ?ge0_psum.
+rewrite (@psum_bigop R T U (fun y x => (f x == y)%:R * S x) predT J).
+- apply: le_psum; last exact: smS.
+  move=> x; apply/andP; split.
+  + apply: sumr_ge0=> y _.
+    by rewrite mulr_ge0 ?HS ?ler0n.
+  + case HfxJ : (f x \in J).
+    * rewrite (bigD1_seq (f x) HfxJ uqJ) /= eqxx mul1r.
+      rewrite big1 ?addr0 // => y.
+      by rewrite eq_sym=> /negbTE ->; rewrite mul0r.
+    * rewrite big_seq_cond big1 ?mul0r // => y /andP[Hy _].
+      case Hfy : (f x == y); last by rewrite mul0r.
+      by move: HfxJ; rewrite (eqP Hfy) Hy.
+- by move=> y x; rewrite mulr_ge0 ?HS ?ler0n.
+- by move=> y; exact: (@summable_condl R T S (fun x => f x == y) smS).
+Qed.
+
+Lemma summable_from_fpos_fneg {T : choiceType} (F : T -> R) :
+  summable (fpos F) ->
+  summable (fneg F) ->
+  summable F.
+Proof.
+move=> Hpos Hneg.
+apply: (eq_summable (S1 := fun x => fpos F x - fneg F x)).
+  by move=> x; rewrite fposBfneg.
+apply: summableD; first exact: Hpos.
+exact: summableN.
+Qed.
+
+Lemma summable_kernel_weighted_pair_nonneg {T U : choiceType}
+    (S : T -> R) (K : T -> {distr U / R}) :
+  (forall x, 0 <= S x) ->
+  summable S ->
+  summable (fun xy : T * U => K xy.1 xy.2 * S xy.1).
+Proof.
+move=> HS smS.
+exists (psum S)=> J.
+rewrite (@big_fset_seq R 0 +%R (T * U)%type J
+  (fun xy : T * U => `|K xy.1 xy.2 * S xy.1|)).
+rewrite (@partition_big_imfset R 0 +%R _ _ fst J
+  (fun xy : T * U => `|K xy.1 xy.2 * S xy.1|)).
+pose X := [fset xy.1 | xy in J]%fset.
+have HX := gerfin_psum X smS.
+rewrite (@big_fset_seq R 0 +%R T X (fun x => `|S x|)) in HX.
+apply: (le_trans _ HX).
+apply: ler_sum=> x _.
+rewrite ger0_norm ?HS //.
+set F := [fset xy in J | xy.1 == x]%fset.
+have Hfiber :
+    \sum_(xy <- J | xy.1 == x) `|K xy.1 xy.2 * S xy.1| =
+    \sum_(xy <- F) K x xy.2 * S x.
+  rewrite /F big_fset /=.
+  apply: eq_bigr=> xy /eqP Hx.
+  by rewrite Hx ger0_norm ?mulr_ge0 ?ge0_mu ?HS.
+have Hmass : \sum_(xy <- F) K x xy.2 <= 1.
+  have Huniq : uniq [seq xy.2 | xy <- enum_fset F].
+    rewrite map_inj_in_uniq ?uniq_fset_keys //.
+    move=> [x1 y1] [x2 y2].
+    rewrite /F !in_fset /=.
+    move=> /andP[_ /eqP Hx1] /andP[_ /eqP Hx2] Hy.
+    congr (_, _).
+      move: Hx1 Hx2=> /= Hx1 Hx2.
+      by rewrite Hx1 Hx2.
+    exact: Hy.
+  rewrite -(big_map snd predT (fun y => K x y)).
+  apply: (le_trans _ (le1_mu (K x))).
+  apply: (le_trans _ (gerfinseq_psum Huniq (summable_mu (K x)))).
+  apply/ler_sum=> y _.
+  by rewrite ger0_norm ?ge0_mu.
+rewrite Hfiber.
+rewrite -(@big_fset_seq R 0 +%R (T * U)%type F
+  (fun xy => K x xy.2 * S x)).
+rewrite -mulr_suml.
+rewrite -(@big_fset_seq R 0 +%R (T * U)%type F
+  (fun xy => K x xy.2)) in Hmass.
+apply: (le_trans (ler_wpM2r (HS x) Hmass)).
+by rewrite mul1r.
+Qed.
+
+Lemma summable_kernel_weighted_pair {T U : choiceType}
+    (F : T -> R) (K : T -> {distr U / R}) :
+  summable F ->
+  summable (fun xy : T * U => K xy.1 xy.2 * F xy.1).
+Proof.
+move=> smF.
+apply/summable_abs.
+apply: (eq_summable
+  (S1 := fun xy : T * U => K xy.1 xy.2 * `|F xy.1|)).
+  move=> xy.
+  by rewrite normrM ger0_norm ?ge0_mu.
+apply: (@summable_kernel_weighted_pair_nonneg T U
+  (fun x => `|F x|) K).
+- move=> x; exact: normr_ge0.
+- exact: (proj2 (summable_abs F) smF).
 Qed.
 
 Lemma kl_dmargin_injective {T U : choiceType}
@@ -351,6 +519,49 @@ rewrite (eq_sum (F2 := fun x => P x * ln (P x / Q x))); last first.
 exact: kl_dmargin_log_sum_inequality.
 Qed.
 
+Lemma kl_dmargin_fpos_le_fiber_fpos {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  absolute_continuous P Q ->
+  forall y,
+    fpos (fun y =>
+      dmargin f P y * ln (dmargin f P y / dmargin f Q y)) y <=
+    psum (fun x =>
+      (f x == y)%:R * fpos (fun x => P x * ln (P x / Q x)) x).
+Admitted.
+
+Lemma summable_fpos_kl_dmargin {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  finite_kl P Q ->
+  summable (fpos (fun y =>
+    dmargin f P y * ln (dmargin f P y / dmargin f Q y))).
+Proof.
+move=> Hfin.
+have Hsrc := finite_kl_summable P Q Hfin.
+apply: (le_summable
+  (F2 := fun y => psum (fun x =>
+    (f x == y)%:R * fpos (fun x => P x * ln (P x / Q x)) x))).
+  move=> y; apply/andP; split; first exact: ge0_fpos.
+  exact: (kl_dmargin_fpos_le_fiber_fpos f P Q
+    (finite_kl_absolute_continuous P Q Hfin) y).
+apply: summable_fiber_psum.
+- exact: ge0_fpos.
+- exact: (summable_fpos Hsrc).
+Qed.
+
+Lemma summable_kl_dmargin {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  finite_kl P Q ->
+  summable (fun y =>
+    dmargin f P y * ln (dmargin f P y / dmargin f Q y)).
+Proof.
+move=> Hfin.
+apply: summable_from_fpos_fneg.
+- exact: summable_fpos_kl_dmargin.
+- apply: summable_fneg_kl_integrand.
+  exact: (dmargin_absolute_continuous f P Q
+    (finite_kl_absolute_continuous P Q Hfin)).
+Qed.
+
 Lemma dlet_joint_same_kernelE {T U : choiceType}
     (P : {distr T / R}) (K : T -> {distr U / R}) (x : T) (y : U) :
   (\dlet_(x' <- P) \dlet_(y' <- K x') dunit (x', y')) (x, y) =
@@ -408,6 +619,67 @@ have HQx0 : Q x = 0.
 by rewrite (Hac x HQx0) mul0r.
 Qed.
 
+Lemma kl_joint_same_kernel_integrandE {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) (xy : T * U) :
+  finite_kl P Q ->
+  ((\dlet_(x <- P) \dlet_(y <- K x) dunit (x, y)) xy *
+      ln ((\dlet_(x <- P) \dlet_(y <- K x) dunit (x, y)) xy /
+          (\dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y)) xy)) =
+  K xy.1 xy.2 * (P xy.1 * ln (P xy.1 / Q xy.1)).
+Proof.
+move=> Hfin.
+case: xy=> x y /=.
+rewrite !dlet_joint_same_kernelE.
+case Kxy0: (K x y == 0).
+  by rewrite (eqP Kxy0) !mulr0 !mul0r.
+case Qx0: (Q x == 0).
+  have Px0 := finite_kl_absolute_continuous P Q Hfin x (eqP Qx0).
+  by rewrite (eqP Qx0) Px0 !mul0r !mulr0.
+have Kxy_pos : 0 < K x y by rewrite lt_def ge0_mu Kxy0.
+have ratioE : P x * K x y / (Q x * K x y) = P x / Q x.
+  rewrite [P x * K x y]mulrC [Q x * K x y]mulrC.
+  exact: divr_cancel_left_pos.
+rewrite ratioE.
+by rewrite !mulrA [P x * K x y]mulrC.
+Qed.
+
+Lemma dlet_same_kernel_absolute_continuous {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  absolute_continuous P Q ->
+  absolute_continuous (\dlet_(x <- P) K x) (\dlet_(x <- Q) K x).
+Proof.
+move=> Hac.
+pose JP : {distr (T * U) / R} :=
+  \dlet_(x <- P) \dlet_(y <- K x) dunit (x, y).
+pose JQ : {distr (T * U) / R} :=
+  \dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y).
+have Hjoint : absolute_continuous JP JQ.
+  exact: dlet_joint_same_kernel_absolute_continuous.
+have Hmargin := dmargin_absolute_continuous (fun xy : T * U => xy.2) JP JQ Hjoint.
+have HPsnd :
+    dmargin (fun xy : T * U => xy.2) JP =1 \dlet_(x <- P) K x.
+  move=> y.
+  rewrite /JP __deprecated__dmargin_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (K x) z).
+  apply: eq_in_dlet=> // u _ z'.
+  by rewrite dmargin_dunit.
+have HQsnd :
+    dmargin (fun xy : T * U => xy.2) JQ =1 \dlet_(x <- Q) K x.
+  move=> y.
+  rewrite /JQ __deprecated__dmargin_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (K x) z).
+  apply: eq_in_dlet=> // u _ z'.
+  by rewrite dmargin_dunit.
+move=> y HQy0.
+rewrite -HPsnd.
+apply: Hmargin.
+by rewrite HQsnd.
+Qed.
+
 Lemma kl_dlet_data_processing {T U : choiceType}
     (P Q : {distr T / R}) (K : T -> {distr U / R}) :
   absolute_continuous P Q ->
@@ -444,21 +716,107 @@ by apply: dlet_joint_same_kernel_absolute_continuous.
 by rewrite /JP /JQ kl_joint_same_kernel.
 Qed.
 
+Lemma summable_kl_joint_same_kernel {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  finite_kl P Q ->
+  (forall x, dweight (K x) = 1) ->
+  summable (fun xy =>
+    (\dlet_(x <- P) \dlet_(y <- K x) dunit (x, y)) xy *
+      ln ((\dlet_(x <- P) \dlet_(y <- K x) dunit (x, y)) xy /
+          (\dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y)) xy)).
+Proof.
+move=> Hfin _.
+apply: (eq_summable
+  (S1 := fun xy : T * U =>
+    K xy.1 xy.2 * (P xy.1 * ln (P xy.1 / Q xy.1)))).
+  move=> xy.
+  by rewrite -kl_joint_same_kernel_integrandE.
+apply: (@summable_kernel_weighted_pair T U
+  (fun x => P x * ln (P x / Q x)) K).
+exact: (finite_kl_summable P Q Hfin).
+Qed.
+
+Lemma finite_kl_joint_same_kernel {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  finite_kl P Q ->
+  (forall x, dweight (K x) = 1) ->
+  finite_kl
+    (\dlet_(x <- P) \dlet_(y <- K x) dunit (x, y))
+    (\dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y)).
+Proof.
+move=> Hfin HK.
+split.
+- exact: (dlet_joint_same_kernel_absolute_continuous P Q K
+    (finite_kl_absolute_continuous P Q Hfin)).
+- exact: (summable_kl_joint_same_kernel P Q K Hfin HK).
+Qed.
+
+Lemma summable_kl_dlet_same_kernel {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  finite_kl P Q ->
+  (forall x, dweight (K x) = 1) ->
+  summable (fun y =>
+    (\dlet_(x <- P) K x) y *
+      ln ((\dlet_(x <- P) K x) y / (\dlet_(x <- Q) K x) y)).
+Proof.
+move=> Hfin HK.
+pose JP : {distr (T * U) / R} :=
+  \dlet_(x <- P) \dlet_(y <- K x) dunit (x, y).
+pose JQ : {distr (T * U) / R} :=
+  \dlet_(x <- Q) \dlet_(y <- K x) dunit (x, y).
+have Hjointfin : finite_kl JP JQ.
+  exact: (finite_kl_joint_same_kernel P Q K Hfin HK).
+have Hsumm := summable_kl_dmargin (fun xy : T * U => xy.2) JP JQ Hjointfin.
+have HPsnd :
+    dmargin (fun xy : T * U => xy.2) JP =1 \dlet_(x <- P) K x.
+  move=> y.
+  rewrite /JP __deprecated__dmargin_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (K x) z).
+  apply: eq_in_dlet=> // u _ z'.
+  by rewrite dmargin_dunit.
+have HQsnd :
+    dmargin (fun xy : T * U => xy.2) JQ =1 \dlet_(x <- Q) K x.
+  move=> y.
+  rewrite /JQ __deprecated__dmargin_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  rewrite -(dlet_dunit_id (K x) z).
+  apply: eq_in_dlet=> // u _ z'.
+  by rewrite dmargin_dunit.
+apply: (eq_summable (S1 := fun y =>
+  dmargin (fun xy : T * U => xy.2) JP y *
+    ln (dmargin (fun xy : T * U => xy.2) JP y /
+        dmargin (fun xy : T * U => xy.2) JQ y))).
+  by move=> y; rewrite HPsnd HQsnd.
+exact: Hsumm.
+Qed.
+
 Lemma finite_kl_dlet_same_kernel {T U : choiceType}
     (P Q : {distr T / R}) (K : T -> {distr U / R}) :
   finite_kl P Q ->
   (forall x, dweight (K x) = 1) ->
   finite_kl (\dlet_(x <- P) K x) (\dlet_(x <- Q) K x).
-(* TODO: prove the summability half of data processing for the totalized
-   real-valued KL integrand. The absolute-continuity half follows from
-   [dlet_joint_same_kernel_absolute_continuous] plus marginalization. *)
-Admitted.
+Proof.
+move=> Hfin HK.
+split.
+- exact: (dlet_same_kernel_absolute_continuous
+    P Q K (finite_kl_absolute_continuous P Q Hfin)).
+- exact: (summable_kl_dlet_same_kernel P Q K Hfin HK).
+Qed.
 
 Lemma finite_kl_dmargin {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :
   finite_kl P Q ->
   finite_kl (dmargin f P) (dmargin f Q).
-Admitted.
+Proof.
+move=> Hfin.
+split.
+- exact: (dmargin_absolute_continuous f P Q
+    (finite_kl_absolute_continuous P Q Hfin)).
+- exact: (summable_kl_dmargin f P Q Hfin).
+Qed.
 
 Lemma expectation_le_const_on_support {T : choiceType}
     (P : {distr T / R}) (f : T -> R) (c : R) :
