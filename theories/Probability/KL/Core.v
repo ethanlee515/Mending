@@ -68,6 +68,17 @@ split.
   exact: Hsumm.
 Qed.
 
+Lemma finite_kl_left_dnull {T : choiceType} (P Q : {distr T / R}) :
+  P =1 dnull ->
+  finite_kl P Q.
+Proof.
+move=> HP.
+split.
+- by move=> x _; rewrite HP dnullE.
+- apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+  by move=> x; rewrite HP dnullE mul0r.
+Qed.
+
 Lemma mass1_kl_left {T : choiceType} (P Q : {distr T / R}) :
   dweight P = 1 ->
   δ_KL P Q =
@@ -432,6 +443,16 @@ apply: (le_trans (kl_dmargin_data_processing
 by apply: dlet_joint_same_kernel_absolute_continuous.
 by rewrite /JP /JQ kl_joint_same_kernel.
 Qed.
+
+Lemma finite_kl_dlet_same_kernel {T U : choiceType}
+    (P Q : {distr T / R}) (K : T -> {distr U / R}) :
+  finite_kl P Q ->
+  (forall x, dweight (K x) = 1) ->
+  finite_kl (\dlet_(x <- P) K x) (\dlet_(x <- Q) K x).
+(* TODO: prove the summability half of data processing for the totalized
+   real-valued KL integrand. The absolute-continuity half follows from
+   [dlet_joint_same_kernel_absolute_continuous] plus marginalization. *)
+Admitted.
 
 Lemma expectation_le_const_on_support {T : choiceType}
     (P : {distr T / R}) (f : T -> R) (c : R) :

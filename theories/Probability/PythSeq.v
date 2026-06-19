@@ -740,7 +740,7 @@ Lemma completedFinalBindTrace_cond_final_bound
   <= tnth s (@ord_max ℓ).
 Proof.
 move=> Hdist.
-have Hac := pythDist_absolute_continuous P0 Q0 s Hdist.
+have Hfin := pythDist_cond_finite_kl P0 Q0 s Hdist (@ord_max ℓ) a.
 have Hcond := pythDist_cond_bound P0 Q0 s Hdist.
 rewrite (kl_ext
   (conditional_coordinate
@@ -756,7 +756,7 @@ rewrite (kl_ext
       (conditional_coordinate P0 (@ord_max ℓ) a)
       (conditional_coordinate Q0 (@ord_max ℓ) a)
       (completedSemanticBindKernel K mid)
-      (conditional_coordinate_absolute_continuous P0 Q0 (@ord_max ℓ) a Hac)
+      (finite_kl_absolute_continuous _ _ Hfin)
       (completedSemanticBindKernel_dweight1 K mid))).
   exact: Hcond.
 - exact: completedFinalBindTrace_cond_final_eq.
@@ -803,22 +803,6 @@ rewrite (kl_ext
 exact: Hcond.
 Qed.
 
-Lemma completedFinalBindTrace_finite_kl
-  {ℓ : nat}
-  {mid_t out_t : choice_type}
-  (K : mid_t * heap -> {distr (out_t * heap) / R})
-  (mid : pred (mid_t * heap))
-  (s : (ℓ.+1).-tuple R)
-  (P0 Q0 : {distr ((ℓ.+1).-tuple (option (nat * heap))) / R}) :
-  pythDist P0 Q0 s ->
-  finite_kl
-    (completedFinalBindTrace K mid P0)
-    (completedFinalBindTrace K mid Q0).
-(* TODO: prove KL-integrand summability is preserved by the final-bind trace
-   transformer. The support/absolute-continuity part is already available as
-   [completedFinalBindTrace_absolute_continuous]. *)
-Admitted.
-
 Lemma completedFinalBindTrace_cond_finite_kl
   {ℓ : nat}
   {mid_t out_t : choice_type}
@@ -832,10 +816,47 @@ Lemma completedFinalBindTrace_cond_finite_kl
     finite_kl
       (conditional_coordinate (completedFinalBindTrace K mid P0) i a)
       (conditional_coordinate (completedFinalBindTrace K mid Q0) i a).
-(* TODO: prove coordinate-wise finite-KL preservation for the final-bind trace
-   transformer, using the existing conditional-coordinate equalities and data
-   processing facts. *)
-Admitted.
+Proof.
+move=> Hdist i a.
+case Himax: (i == @ord_max ℓ).
+  have -> : i = @ord_max ℓ by apply/eqP.
+  have Hfin0 := pythDist_cond_finite_kl P0 Q0 s Hdist (@ord_max ℓ) a.
+  have Hfin_dlet :
+      finite_kl
+        (\dlet_(z <- conditional_coordinate P0 (@ord_max ℓ) a)
+          completedSemanticBindKernel K mid z)
+        (\dlet_(z <- conditional_coordinate Q0 (@ord_max ℓ) a)
+          completedSemanticBindKernel K mid z).
+    exact: (finite_kl_dlet_same_kernel
+      (conditional_coordinate P0 (@ord_max ℓ) a)
+      (conditional_coordinate Q0 (@ord_max ℓ) a)
+      (completedSemanticBindKernel K mid)
+      Hfin0 (completedSemanticBindKernel_dweight1 K mid)).
+  apply: (finite_kl_ext _ _ _ _ _ _ Hfin_dlet).
+  - move=> x.
+    symmetry.
+    exact: (completedFinalBindTrace_cond_final_eq K mid P0 a x).
+  - move=> x.
+    symmetry.
+    exact: (completedFinalBindTrace_cond_final_eq K mid Q0 a x).
+have Hi : (i < @ord_max ℓ)%N.
+  rewrite /ord_max /=.
+  have Hi_le : (i <= ℓ)%N by rewrite -ltnS.
+  move: Hi_le; rewrite leq_eqVlt; move/orP=> [/eqP Hi_eq|Hi_lt];
+    last exact: Hi_lt.
+  have Hi_ord : i = @ord_max ℓ by apply: val_inj; rewrite /= Hi_eq.
+  by rewrite Hi_ord eqxx in Himax.
+have [HP HQ] := completedFinalBindTrace_cond_nonfinal_eq
+  K mid P0 Q0 i a Hi.
+have Hfin0 := pythDist_cond_finite_kl P0 Q0 s Hdist i a.
+apply: (finite_kl_ext _ _ _ _ _ _ Hfin0).
+- move=> x.
+  symmetry.
+  exact: HP x.
+- move=> x.
+  symmetry.
+  exact: HQ x.
+Qed.
 
 Lemma completedFinalBindTrace_pythDist
   {ℓ : nat}
@@ -851,13 +872,11 @@ Lemma completedFinalBindTrace_pythDist
     s.
 Proof.
 move=> Hdist.
-case: Hdist=> Hs [Hfin [HP [HQ [Hcond_fin Hcond]]]].
+case: Hdist=> Hs [HP [HQ [Hcond_fin Hcond]]].
 have Hdist : pythDist P0 Q0 s.
-  by split; first exact: Hs; split; first exact: Hfin;
-     split; first exact: HP; split; first exact: HQ; split.
+  by split; first exact: Hs; split; first exact: HP;
+     split; first exact: HQ; split.
 split; first exact: Hs.
-split.
-  exact: (completedFinalBindTrace_finite_kl K mid s P0 Q0 Hdist).
 split.
   exact: (completedFinalBindTrace_dweight1 K mid P0 HP).
 split.
@@ -1166,7 +1185,7 @@ rewrite /completedPythTraceKernelL.
 case: (tnth omega ord_max)=> [packed|]; last exact: dunit_dweight.
 case: (decode_output_heap packed)=> [y|]; last exact: dunit_dweight.
 destruct (@idP (mid y)) as [Hy|Hnot].
-  by case: (HK (exist _ y Hy))=> _ [_ [Hmass _]].
+  by case: (HK (exist _ y Hy))=> _ [Hmass _].
 exact: dunit_dweight.
 Qed.
 
@@ -1186,7 +1205,7 @@ rewrite /completedPythTraceKernelR.
 case: (tnth omega ord_max)=> [packed|]; last exact: dunit_dweight.
 case: (decode_output_heap packed)=> [y|]; last exact: dunit_dweight.
 destruct (@idP (mid y)) as [Hy|Hnot].
-  by case: (HK (exist _ y Hy))=> _ [_ [_ [Hmass _]]].
+  by case: (HK (exist _ y Hy))=> _ [_ [Hmass _]].
 exact: dunit_dweight.
 Qed.
 
@@ -1207,7 +1226,7 @@ Lemma completedTraceBind_dweightL
   dweight P = 1.
 Proof.
 move=> [HP _] Hdist0 HK.
-case: Hdist0=> _ [_ [HP0mass _]].
+case: Hdist0=> _ [HP0mass _].
 rewrite (pr_ext P (completedPythTraceBindL mid P0 K) predT HP).
 rewrite /completedPythTraceBindL.
 rewrite (pr_dlet_cat_prefix_lift_eq P0 (completedPythTraceKernelL mid K)
@@ -1234,7 +1253,7 @@ Lemma completedTraceBind_dweightR
   dweight Q = 1.
 Proof.
 move=> [_ HQ] Hdist0 HK.
-case: Hdist0=> _ [_ [_ [HQ0mass _]]].
+case: Hdist0=> _ [_ [HQ0mass _]].
 rewrite (pr_ext Q (completedPythTraceBindR mid Q0 K) predT HQ).
 rewrite /completedPythTraceBindR.
 rewrite (pr_dlet_cat_prefix_lift_eq Q0 (completedPythTraceKernelR mid K)
@@ -1540,10 +1559,10 @@ Lemma completedTraceBind_suffix_bound_valid_mid
 Proof.
 move=> Hbind Hdist0 HK Homega Hdecode.
 have Hac0 := pythDist_absolute_continuous P0 Q0 s1 Hdist0.
-move: Hdist0=> [Hs1 [Hfin0 [HP0mass [HQ0mass [Hcond0_fin Hcond0]]]]].
+move: Hdist0=> [Hs1 [HP0mass [HQ0mass [Hcond0_fin Hcond0]]]].
 have Hdist0 : pythDist P0 Q0 s1.
-  by split; first exact: Hs1; split; first exact: Hfin0;
-     split; first exact: HP0mass; split; first exact: HQ0mass; split.
+  by split; first exact: Hs1; split; first exact: HP0mass;
+     split; first exact: HQ0mass; split.
 case HP0z: (P0 (catTuplePrefix a) == 0).
   have Hs2 : forall j : 'I_(ℓ2.+1), 0 <= tnth s2 j.
     by case: (HK y)=> Hs2 _.
@@ -1790,35 +1809,6 @@ case: (ltnP i ℓ1.+1)=> Hi.
     Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK Hi).
 Qed.
 
-Lemma completedTraceBind_finite_kl
-  {ℓ1 ℓ2 : nat}
-  {mid_t out_t : choice_type}
-  (ML MR : {distr (mid_t * heap) / R})
-  (KL KR : mid_t * heap -> {distr (out_t * heap) / R})
-  (mid : pred (mid_t * heap))
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R)
-  (P0 Q0 : {distr ((ℓ1.+1).-tuple (option (nat * heap))) / R})
-  (K : { y : mid_t * heap | mid y } ->
-      completedPythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple
-      (option (nat * heap))) / R}) :
-  completedPythTraceBindPair mid P0 Q0 K P Q ->
-  pythDist P0 Q0 s1 ->
-  dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
-  dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
-  (forall y, y \in dinsupp ML -> mid y) ->
-  (forall y, y \in dinsupp MR -> mid y) ->
-  (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
-  (forall y, pythDist (K y).1 (K y).2 s2) ->
-  finite_kl P Q.
-(* TODO: prove finite-KL preservation for trace concatenation/bind. This should
-   combine the prefix finite-KL proof with finite-KL of the selected suffix
-   kernel. *)
-Admitted.
-
 Lemma completedTraceBind_cond_finite_kl
   {ℓ1 ℓ2 : nat}
   {mid_t out_t : choice_type}
@@ -1847,9 +1837,177 @@ Lemma completedTraceBind_cond_finite_kl
     finite_kl
       (conditional_coordinate P i a)
       (conditional_coordinate Q i a).
-(* TODO: prove coordinate-wise finite-KL preservation for trace concatenation,
-   splitting on prefix and suffix coordinates as in [completedTraceBind_cond_bound]. *)
-Admitted.
+Proof.
+move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK i a.
+case: (ltnP i ℓ1.+1)=> Hi.
+- pose i0 : 'I_(ℓ1.+1) := Ordinal Hi.
+  pose a0 : forall j : 'I_(ℓ1.+1), option (nat * heap) :=
+    fun j => a (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))).
+  have Hfin0 := pythDist_cond_finite_kl P0 Q0 s1 Hdist0 i0 a0.
+  case: Hbind=> HP HQ.
+  apply: (finite_kl_ext _ _ _ _ _ _ Hfin0).
+  + move=> x; symmetry.
+    rewrite (conditional_coordinate_dist_ext P
+      (completedPythTraceBindL mid P0 K) i a HP x).
+    exact: (conditional_coordinate_dlet_cat_prefix_eq
+      P0 (completedPythTraceKernelL mid K) i a Hi
+      (fun omega => completedPythTraceKernelL_dweight1
+        mid s2 K omega HK) x).
+  + move=> x; symmetry.
+    rewrite (conditional_coordinate_dist_ext Q
+      (completedPythTraceBindR mid Q0 K) i a HQ x).
+    exact: (conditional_coordinate_dlet_cat_prefix_eq
+      Q0 (completedPythTraceKernelR mid K) i a Hi
+      (fun omega => completedPythTraceKernelR_dweight1
+        mid s2 K omega HK) x).
+have Hzero_fin :
+    P0 (catTuplePrefix a) = 0 ->
+    finite_kl
+      (conditional_coordinate P i a)
+      (conditional_coordinate Q i a).
+  move=> HP0z.
+  apply: finite_kl_left_dnull.
+  case: Hbind=> HP _ x.
+  rewrite (conditional_coordinate_dist_ext P
+    (completedPythTraceBindL mid P0 K) i a HP x).
+  exact: (conditional_coordinate_dlet_cat_suffix_zero_prefix
+    P0 (completedPythTraceKernelL mid K) i a Hi HP0z x).
+have Hac0 := pythDist_absolute_continuous P0 Q0 s1 Hdist0.
+case Hfinal: (tnth (catTuplePrefix a) ord_max)=> [packed|].
+  case Hdecode: (@decode_output_heap mid_t packed)=> [y|].
+    case Hmidy: (mid y).
+      have Hy : mid y by rewrite Hmidy.
+      pose ysig : { y : mid_t * heap | mid y } :=
+        exist (fun y : mid_t * heap => mid y) y Hy.
+      case HP0z: (P0 (catTuplePrefix a) == 0).
+        exact: Hzero_fin (eqP HP0z).
+      have HP0pos : 0 < P0 (catTuplePrefix a).
+        by rewrite lt_def ge0_mu HP0z.
+      have HQ0pos : 0 < Q0 (catTuplePrefix a).
+        exact: (absolute_continuous_positive P0 Q0 _ Hac0 HP0pos).
+      have HfinK := pythDist_cond_finite_kl
+        (K ysig).1 (K ysig).2 s2 (HK ysig)
+        (catTupleSuffixIndex i Hi)
+        (catTupleSuffixAssignment i Hi a).
+      apply: (finite_kl_ext _ _ _ _ _ _ HfinK).
+      * move=> x; symmetry.
+        exact: (completedTraceBind_suffix_condL_valid_mid
+          ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
+          packed ysig Hbind Hfinal Hdecode HP0pos x).
+      * move=> x; symmetry.
+        exact: (completedTraceBind_suffix_condR_valid_mid
+          ML MR KL KR mid s1 s2 P0 Q0 K P Q i a Hi
+          packed ysig Hbind Hfinal Hdecode HQ0pos x).
+    have Hbad : is_true (
+        match tnth (catTuplePrefix a) ord_max with
+        | Some packed =>
+            match @decode_output_heap mid_t packed with
+            | Some y => ~~ mid y
+            | None => true
+            end
+        | None => true
+        end) by rewrite Hfinal Hdecode Hmidy.
+    have HP0z : P0 (catTuplePrefix a) = 0.
+      case HP0z: (P0 (catTuplePrefix a) == 0).
+        exact/eqP.
+      have Hprefix_supp : catTuplePrefix a \in dinsupp P0.
+        by rewrite in_dinsupp HP0z.
+      have Hfinal_supp_P0 :
+          Some packed \in
+            dinsupp (dmargin (fun omega => tnth omega ord_max) P0).
+        rewrite -Hfinal.
+        exact: (dmargin_dinsupp_image P0
+          (fun omega => tnth omega ord_max) _ Hprefix_supp).
+      have Hfinal_supp_ML :
+          Some packed \in dinsupp (completed_output_heap ML).
+        rewrite in_dinsupp -HmarginL0.
+        by move: Hfinal_supp_P0; rewrite in_dinsupp.
+      have Hpacked_supp :
+          packed \in dinsupp (dmargin (@pack_output_heap mid_t) ML).
+        move: Hfinal_supp_ML.
+        by rewrite in_dinsupp /completed_output_heap completeE /= in_dinsupp.
+      have [z Hz Hpack] :=
+        dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
+          packed Hpacked_supp.
+      have Hdecode_z : @decode_output_heap mid_t packed = Some z.
+        by rewrite -Hpack decode_output_heap_pack.
+      move: Hbad.
+      rewrite Hfinal.
+      case Hdecode': (@decode_output_heap mid_t packed)=> [y'|].
+      + have Hyz : y' = z by move: Hdecode'; rewrite Hdecode_z=> -[].
+        rewrite Hyz (HmidL z Hz).
+        by [].
+      + by rewrite Hdecode_z in Hdecode'.
+    exact: Hzero_fin HP0z.
+  have Hbad : is_true (
+      match tnth (catTuplePrefix a) ord_max with
+      | Some packed =>
+          match @decode_output_heap mid_t packed with
+          | Some y => ~~ mid y
+          | None => true
+          end
+      | None => true
+      end) by rewrite Hfinal Hdecode.
+  have HP0z : P0 (catTuplePrefix a) = 0.
+    case HP0z: (P0 (catTuplePrefix a) == 0).
+      exact/eqP.
+    have Hprefix_supp : catTuplePrefix a \in dinsupp P0.
+      by rewrite in_dinsupp HP0z.
+    have Hfinal_supp_P0 :
+        Some packed \in
+          dinsupp (dmargin (fun omega => tnth omega ord_max) P0).
+      rewrite -Hfinal.
+      exact: (dmargin_dinsupp_image P0
+        (fun omega => tnth omega ord_max) _ Hprefix_supp).
+    have Hfinal_supp_ML :
+        Some packed \in dinsupp (completed_output_heap ML).
+      rewrite in_dinsupp -HmarginL0.
+      by move: Hfinal_supp_P0; rewrite in_dinsupp.
+    have Hpacked_supp :
+        packed \in dinsupp (dmargin (@pack_output_heap mid_t) ML).
+      move: Hfinal_supp_ML.
+      by rewrite in_dinsupp /completed_output_heap completeE /= in_dinsupp.
+    have [z Hz Hpack] :=
+      dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
+        packed Hpacked_supp.
+    have Hdecode_z : @decode_output_heap mid_t packed = Some z.
+      by rewrite -Hpack decode_output_heap_pack.
+    move: Hbad.
+    rewrite Hfinal.
+    case Hdecode': (@decode_output_heap mid_t packed)=> [y'|].
+    + have Hyz : y' = z by move: Hdecode'; rewrite Hdecode_z=> -[].
+      rewrite Hyz (HmidL z Hz).
+      by [].
+    + by rewrite Hdecode_z in Hdecode'.
+  exact: Hzero_fin HP0z.
+case HP0z: (P0 (catTuplePrefix a) == 0).
+  exact: Hzero_fin (eqP HP0z).
+have HP0pos : 0 < P0 (catTuplePrefix a).
+  by rewrite lt_def ge0_mu HP0z.
+have HQ0pos : 0 < Q0 (catTuplePrefix a).
+  exact: (absolute_continuous_positive P0 Q0 _ Hac0 HP0pos).
+pose D : {distr (option (nat * heap)) / R} := conditional_coordinate
+  (dunit (default_completed_pyth_trace (n := ℓ2.+1)))
+  (catTupleSuffixIndex i Hi)
+  (catTupleSuffixAssignment i Hi a).
+apply: (finite_kl_ext _ _ _ _ _ _ (finite_kl_refl D)).
+- move=> x; symmetry.
+  case: Hbind=> HP _.
+  rewrite (conditional_coordinate_dist_ext P
+    (completedPythTraceBindL mid P0 K) i a HP x).
+  pose omega1 := catTuplePrefix a.
+  rewrite (conditional_coordinate_dlet_cat_suffix_eq
+    P0 (completedPythTraceKernelL mid K) i a Hi omega1 erefl HP0pos x).
+  by rewrite /completedPythTraceKernelL Hfinal.
+- move=> x; symmetry.
+  case: Hbind=> _ HQ.
+  rewrite (conditional_coordinate_dist_ext Q
+    (completedPythTraceBindR mid Q0 K) i a HQ x).
+  pose omega1 := catTuplePrefix a.
+  rewrite (conditional_coordinate_dlet_cat_suffix_eq
+    Q0 (completedPythTraceKernelR mid K) i a Hi omega1 erefl HQ0pos x).
+  by rewrite /completedPythTraceKernelR Hfinal.
+Qed.
 
 Lemma completedTraceBind_pythDist
   {ℓ1 ℓ2 : nat}
@@ -1877,19 +2035,15 @@ Lemma completedTraceBind_pythDist
   pythDist P Q (cat_tuple s1 s2).
 Proof.
 move=> Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK.
-move: Hdist0=> [Hs1 [Hfin0 [HP0 [HQ0 [Hcond0_fin Hcond0]]]]].
+move: Hdist0=> [Hs1 [HP0 [HQ0 [Hcond0_fin Hcond0]]]].
 have Hdist0 : pythDist P0 Q0 s1.
-  by split; first exact: Hs1; split; first exact: Hfin0;
-     split; first exact: HP0; split; first exact: HQ0; split.
+  by split; first exact: Hs1; split; first exact: HP0;
+     split; first exact: HQ0; split.
 split.
 - move=> i.
   apply: (cat_tuple_nonneg s1 s2 i).
   + exact: Hs1.
   + exact: Hs2.
-split.
-- exact: (completedTraceBind_finite_kl
-    ML MR KL KR mid s1 s2 P0 Q0 K P Q
-    Hbind Hdist0 HmarginL0 HmarginR0 HmidL HmidR Hs2 HK).
 split.
 - exact: (completedTraceBind_dweightL
     mid s1 s2 P0 Q0 K P Q Hbind Hdist0 HK).

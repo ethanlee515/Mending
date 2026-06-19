@@ -154,11 +154,10 @@ split.
     Hpyth memL memR xL xR (Hpre _ Hpre').
   exists P, Q.
   split.
-  - move: Hdist=> [Heps [Hfin [HP [HQ [Hcond_fin Hcond]]]]].
+  - move: Hdist=> [Heps [HP [HQ [Hcond_fin Hcond]]]].
     split.
       move=> i.
       exact: (le_trans (Heps i) (Hs i)).
-    split; first exact: Hfin.
     split; first exact: HP.
     split; first exact: HQ.
     split; first exact: Hcond_fin.
