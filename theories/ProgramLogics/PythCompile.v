@@ -1560,17 +1560,34 @@ Lemma compileRule
           (xL == xR) && (memL == memR) &&
           call_invariant memL ⦄
     (fun x => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P' fn (prog x))
+      (compile_calls q (X := X) (Y := Y) P' fn (prog x))
       P')
-    ≈( Num.sqrt ((q.+1%:R * eps) / 2) )
+    ≈( Num.sqrt ((q%:R * eps) / 2) )
     (fun x => code_link
-      (compile_calls q.+1 (X := X) (Y := Y) P'' fn (prog x))
+      (compile_calls q (X := X) (Y := Y) P'' fn (prog x))
       P')
   ⦃ fun outs =>
     let '(outL, outR) := outs in
     outL == outR ⦄.
 Proof.
 move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall.
+case: q=> [|q].
+- rewrite /compile_calls /compile_calls_from_trace /=.
+  apply: additiveErrorCompletedOutputHeapTvdEqRule.
+  + exact: Num.Theory.sqrtr_ge0.
+  + move=> memL memR xL xR Hpre.
+    move/andP: Hpre=> [/andP [/eqP -> /eqP ->] _].
+    rewrite continue_from_trace_nil.
+    set D := complete_output_heap (Pr_code (code_link (prog xR) P') memR).
+    change (total_variation D D <= Num.sqrt ((0%:R * eps) / 2)).
+    rewrite /total_variation.
+    rewrite (_ : sum (fun y =>
+        `|D y - D y|) = 0).
+      rewrite mulr0.
+      exact: Num.Theory.sqrtr_ge0.
+    rewrite -(@sum0 R (option (nat * heap))%type).
+    apply/eq_sum=> y.
+    by rewrite subrr normr0.
 rewrite -pythagorean_tv_bound_pythCallErrors.
 exact: (MicciancioWalterRule _ _ _ _ _
   (pythCompileCallsRule q X Y A B K L L' L'' M P' P'' fn prog eps
