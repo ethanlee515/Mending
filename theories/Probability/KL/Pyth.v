@@ -31,33 +31,47 @@ Lemma coordinate_finite_kl_absolute_continuous
   absolute_continuous P Q.
 Admitted.
 
-Lemma summable_kl_from_coordinate_finite_kl
+Lemma summable_kl_from_coordinate_bounded_kl
     {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) :
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  (forall i : 'I_n, 0 <= tnth eps i) ->
   dweight P = 1 ->
   dweight Q = 1 ->
   (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
       (conditional_coordinate P a)
-      (conditional_coordinate Q a)) ->
+      (conditional_coordinate Q a) /\
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
   summable (fun x => P x * ln (P x / Q x)).
 Admitted.
 
-Lemma coordinate_finite_kl_finite_kl
+Lemma coordinate_bounded_kl_finite_kl
     {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) :
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  (forall i : 'I_n, 0 <= tnth eps i) ->
   dweight P = 1 ->
   dweight Q = 1 ->
   (forall (i : 'I_n) (a : i.-tuple A),
     finite_kl
       (conditional_coordinate P a)
-      (conditional_coordinate Q a)) ->
+      (conditional_coordinate Q a) /\
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
   finite_kl P Q.
 Proof.
-move=> HP HQ Hfin.
+move=> Heps HP HQ Hcond.
+have Hfin : forall (i : 'I_n) (a : i.-tuple A),
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a).
+  by move=> i a; have [Hfin _] := Hcond i a.
 split.
 - exact: (coordinate_finite_kl_absolute_continuous P Q HP HQ Hfin).
-- exact: (summable_kl_from_coordinate_finite_kl P Q HP HQ Hfin).
+- exact: (summable_kl_from_coordinate_bounded_kl
+    P Q eps Heps HP HQ Hcond).
 Qed.
 
 Theorem pythagorean_probability_preservation
@@ -77,10 +91,19 @@ Theorem pythagorean_probability_preservation
   total_variation P Q <= Num.sqrt ((\sum_(i < n) tnth eps i) / 2).
 Proof.
 move=> Heps HP HQ Hfin Hcond.
+have Hcond_all : forall (i : 'I_n) (a : i.-tuple A),
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a) /\
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i.
+  by move=> i a; split; [exact: Hfin | exact: Hcond].
 have Hac : absolute_continuous P Q.
   exact: (coordinate_finite_kl_absolute_continuous P Q HP HQ Hfin).
 have HfinPQ : finite_kl P Q.
-  exact: (coordinate_finite_kl_finite_kl P Q HP HQ Hfin).
+  exact: (coordinate_bounded_kl_finite_kl P Q eps
+    Heps HP HQ Hcond_all).
 have Hpin := pinsker P Q HfinPQ HP HQ.
 apply: (le_trans Hpin).
 apply: ler_wsqrtr.
@@ -176,6 +199,15 @@ Lemma pythDist_cond_bound
 Proof.
 move=> [_ [_ [_ Hcond]]] i a.
 by have [_ Hle] := Hcond i a.
+Qed.
+
+Lemma pythDist_finite_kl
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  pythDist P Q eps -> finite_kl P Q.
+Proof.
+move=> [Heps [HP [HQ Hcond]]].
+exact: (coordinate_bounded_kl_finite_kl P Q eps Heps HP HQ Hcond).
 Qed.
 
 Lemma pythDist_refl
@@ -312,7 +344,7 @@ pose final := fun omega : n.+1.-tuple A => tnth omega ord_max.
 have HPfinal : dweight (dmargin final P) = 1 by rewrite dmargin_dweight.
 have HQfinal : dweight (dmargin final Q) = 1 by rewrite dmargin_dweight.
 have HfinPQ : finite_kl P Q.
-  exact: (coordinate_finite_kl_finite_kl P Q HP HQ Hfin).
+  exact: (coordinate_bounded_kl_finite_kl P Q eps Heps HP HQ Hcond_all).
 have Hfinfinal : finite_kl (dmargin final P) (dmargin final Q).
   exact: (finite_kl_dmargin final P Q HfinPQ).
 have Hpin := pinsker (dmargin final P) (dmargin final Q)
