@@ -386,18 +386,15 @@ Lemma pr_dlet_cat_suffix_coordinate_event_eq
         (catTupleSuffixAssignment i Hi a)
         omega2).
 Proof.
-(* TODO: This proof was invalidated by the change in length of `a` from a full
-   assignment to an `i`-length prefix tuple.
 move=> Hprefix _.
 apply: pr_dlet_cat_fixed_prefix_event_eq=> omega1' omega2.
 rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 i Hi).
 rewrite (tuple_prefix_eq_cat_suffix i a Hi omega1 omega1' omega2 Hprefix).
 by case: (tnth omega2 (catTupleSuffixIndex i Hi) \in pred1 x);
    case: (omega1' == omega1);
-   case: (tuple_prefix_eq (catTupleSuffixIndex i Hi)
+   case: (@tuple_prefix_eq _ _ (catTupleSuffixIndex i Hi)
      (catTupleSuffixAssignment i Hi a) omega2).
-*)
-Admitted.
+Qed.
 
 (* Computes suffix conditional probabilities for the inner trace kernel. *)
 Lemma prc_dlet_cat_suffix_coordinate_eq

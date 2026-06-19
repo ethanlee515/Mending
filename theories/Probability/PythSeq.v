@@ -780,20 +780,17 @@ Lemma completedFinalBindTrace_cond_bound
     (conditional_coordinate (completedFinalBindTrace K mid Q0) a)
   <= tnth s i.
 Proof.
-(* TODO: This proof was invalidated by the change in length of `a` from a full
-   assignment to an `i`-length prefix tuple. The branch `i = ord_max` now needs
-   to transport `a : i.-tuple _` across the dependent equality.
 move=> Hdist.
 case Himax: (i == @ord_max ℓ).
-  have -> : i = @ord_max ℓ by apply/eqP.
+  move/eqP: Himax=> Hi_eq; subst i.
   exact: (completedFinalBindTrace_cond_final_bound K mid s P0 Q0 a Hdist).
-	have Hi : (i < @ord_max ℓ)%N.
-	  rewrite /ord_max /=.
-	  have Hi_le : (i <= ℓ)%N by rewrite -ltnS.
-	  move: Hi_le; rewrite leq_eqVlt; move/orP=> [/eqP Hi_eq|Hi_lt];
-	    last exact: Hi_lt.
-	  have Hi_ord : i = @ord_max ℓ by apply: val_inj; rewrite /= Hi_eq.
-	  by rewrite Hi_ord eqxx in Himax.
+have Hi : (i < @ord_max ℓ)%N.
+  rewrite /ord_max /=.
+  have Hi_le : (i <= ℓ)%N by rewrite -ltnS.
+  move: Hi_le; rewrite leq_eqVlt; move/orP=> [/eqP Hi_eq|Hi_lt];
+    last exact: Hi_lt.
+  have Hi_ord : i = @ord_max ℓ by apply: val_inj; rewrite /= Hi_eq.
+  by rewrite Hi_ord eqxx in Himax.
 have [HP HQ] := completedFinalBindTrace_cond_nonfinal_eq
   K mid P0 Q0 i a Hi.
 have Hcond := pythDist_cond_bound P0 Q0 s Hdist.
@@ -803,8 +800,7 @@ rewrite (kl_ext
   (conditional_coordinate (completedFinalBindTrace K mid Q0) a)
   (conditional_coordinate Q0 a) HP HQ).
 exact: Hcond.
-*)
-Admitted.
+Qed.
 
 Lemma completedFinalBindTrace_cond_finite_kl
   {ℓ : nat}
@@ -820,12 +816,9 @@ Lemma completedFinalBindTrace_cond_finite_kl
       (conditional_coordinate (completedFinalBindTrace K mid P0) a)
       (conditional_coordinate (completedFinalBindTrace K mid Q0) a).
 Proof.
-(* TODO: This proof was invalidated by the change in length of `a` from a full
-   assignment to an `i`-length prefix tuple. The branch `i = ord_max` now needs
-   to transport `a : i.-tuple _` across the dependent equality.
 move=> Hdist i a.
 case Himax: (i == @ord_max ℓ).
-  have -> : i = @ord_max ℓ by apply/eqP.
+  move/eqP: Himax=> Hi_eq; subst i.
   have Hfin0 := pythDist_cond_finite_kl P0 Q0 s Hdist (@ord_max ℓ) a.
   have Hfin_dlet :
       finite_kl
@@ -862,8 +855,7 @@ apply: (finite_kl_ext _ _ _ _ _ _ Hfin0).
 - move=> x.
   symmetry.
   exact: HQ x.
-*)
-Admitted.
+Qed.
 
 Lemma completedFinalBindTrace_pythDist
   {ℓ : nat}

@@ -123,68 +123,25 @@ Lemma tuple_prefix_eq_cat_prefix
   tuple_prefix_eq a (cat_tuple omega1 omega2) =
   @tuple_prefix_eq _ _ i0 a omega1.
 Proof.
-(* TODO: This proof was invalidated by the change in length of `a` from a full
-   assignment to an `i`-length prefix tuple.
 rewrite /tuple_prefix_eq.
-apply/idP/idP.
-- move=> Hbool.
-  have Hfull := forallP Hbool.
-  apply/forallP=> j.
-  have Hj : (j < ℓ1.+1 + ℓ2.+1)%N :=
-    leq_trans (ltn_ord j) (leq_addr _ _).
-  move: (Hfull (Ordinal Hj)).
-  rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 (Ordinal Hj)
-    (ltn_ord j)) /=.
-  have -> : @Ordinal ℓ1.+1 (nat_of_ord j) (ltn_ord j) = j
-    by apply: val_inj.
+apply/forallP/forallP=> Hprefix j; move: (Hprefix j).
+  rewrite (cat_tuple_tnth_prefix_choice omega1 omega2
+    (widen_ord (ltnW (ltn_ord i)) j)
+    (ltn_trans (ltn_ord j) Hi)).
   have -> :
-      @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j) Hj =
-      @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
-        (leq_trans (ltn_ord j) (leq_addr _ _))
+      Ordinal (ltn_trans (ltn_ord j) Hi) =
+      widen_ord (ltnW (ltn_ord (Ordinal Hi))) j
     by apply: val_inj.
   by [].
-- move=> HsmallBool.
-  have Hsmall := forallP HsmallBool.
-  apply/forallP=> k.
-  case Hki: (k < i)%N.
-    have Hklt : (k < ℓ1.+1)%N := leq_ltn_trans (ltnW Hki) Hi.
-    move: (Hsmall (@Ordinal ℓ1.+1 (nat_of_ord k) Hklt)).
-    rewrite /= Hki.
-    rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 k Hklt).
-    rewrite implyTb.
-    have -> :
-        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord k)
-          (leq_trans
-            (ltn_ord (@Ordinal ℓ1.+1 (nat_of_ord k) Hklt))
-            (leq_addr _ _)) = k
-      by apply: val_inj.
-    by [].
-  by [].
-*)
-Admitted.
-
-(* Recovers the original prefix tuple from a concatenated tuple. *)
-Lemma catTuplePrefix_cat
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (i : 'I_(ℓ1.+1 + ℓ2.+1))
-  (Hi : (ℓ1.+1 <= i)%N)
-  (omega1 : (ℓ1.+1).-tuple A)
-  (omega2 : (ℓ2.+1).-tuple A) :
-  catTuplePrefix i Hi (tuple_prefix i
-    (fun j => tnth (cat_tuple omega1 omega2) j)) =
-  omega1.
-Proof.
-(* TODO: This proof was invalidated by the change in length of `a` from a full
-   assignment to an `i`-length prefix tuple.
-apply: eq_from_tnth=> j.
-rewrite /catTuplePrefix tnth_mktuple.
 rewrite (cat_tuple_tnth_prefix_choice omega1 omega2
-  (Ordinal (leq_trans (ltn_ord j) (leq_addr _ _))) (ltn_ord j)).
-congr tnth.
-by apply: val_inj.
-*)
-Admitted.
+  (widen_ord (ltnW (ltn_ord i)) j)
+  (ltn_trans (ltn_ord j) Hi)).
+have -> :
+    Ordinal (ltn_trans (ltn_ord j) Hi) =
+    widen_ord (ltnW (ltn_ord (Ordinal Hi))) j
+  by apply: val_inj.
+by [].
+Qed.
 
 (* Reads coordinates from the extracted prefix tuple. *)
 Lemma catTuplePrefix_tnth
@@ -258,87 +215,86 @@ Lemma tuple_prefix_eq_cat_suffix
       (catTupleSuffixAssignment i Hi a)
       omega2.
 Proof.
-(* TODO: This proof was invalidated by the change in length of `a` from a full
-   assignment to an `i`-length prefix tuple.
 move=> Hprefix.
 rewrite /tuple_prefix_eq.
-apply/idP/idP.
-- move=> HfullBool.
+apply/idP/idP=> [HfullBool|/andP [/eqP Homega HsuffixBool]].
   have Hfull := forallP HfullBool.
   apply/andP; split.
     apply/eqP.
     apply: eq_from_tnth=> j.
-    have Hj : (j < ℓ1.+1 + ℓ2.+1)%N :=
-      leq_trans (ltn_ord j) (leq_addr _ _).
-    have Hji : (Ordinal Hj < i)%N := leq_trans (ltn_ord j) Hi.
-    move: (Hfull (Ordinal Hj)).
-    rewrite Hji /=.
+    have Hjle : (j <= ℓ1)%N by rewrite -ltnS.
+    pose k : 'I_i := Ordinal (leq_ltn_trans Hjle Hi).
+    move: (Hfull k).
     rewrite (cat_tuple_tnth_prefix_choice omega1' omega2
-      (Ordinal Hj) (ltn_ord j)).
-    have -> : @Ordinal ℓ1.+1 (nat_of_ord j) (ltn_ord j) = j
+      (widen_ord (ltnW (ltn_ord i)) k)
+      (ltn_ord j)).
+    have -> : Ordinal (n := ℓ1.+1)
+        (m := widen_ord (ltnW (ltn_ord i)) k) (ltn_ord j) = j
       by apply: val_inj.
     rewrite -Hprefix catTuplePrefix_tnth.
-    have -> :
-        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
-          (leq_trans (ltn_ord j) (leq_addr _ _)) =
-        @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j) Hj
+    have -> : Ordinal (leq_trans (ltn_ord j) Hi) = k
       by apply: val_inj.
-    by move/eqP.
+    by move/eqP=> ->.
   apply/forallP=> j.
-  case Hji: (j < catTupleSuffixIndex i Hi)%N.
-    have Hsum_i := catTupleSuffixOrdinal_lt i Hi j Hji.
-    pose k : 'I_(ℓ1.+1 + ℓ2.+1) :=
-      Ordinal (catTupleSuffixOrdinal_bound (ℓ1 := ℓ1) (ℓ2 := ℓ2) j).
-    move: (Hfull k).
-    rewrite Hsum_i /=.
-    rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 k
-      (leq_addr _ _)).
-    have -> :
-        @Ordinal ℓ2.+1 (nat_of_ord k - ℓ1.+1)
-          (cat_tuple_suffix_bound k (leq_addr _ _)) = j.
-      apply: val_inj.
-      rewrite /= /k /=.
-      by rewrite addKn.
-    by [].
+  pose j' : 'I_(ℓ2.+1) :=
+    Ordinal (ltn_trans (ltn_ord j) (ltn_ord (catTupleSuffixIndex i Hi))).
+  pose k : 'I_i := Ordinal (catTupleSuffixOrdinal_lt i Hi j' (ltn_ord j)).
+  move: (Hfull k).
+  rewrite (cat_tuple_tnth_suffix_choice omega1' omega2
+    (widen_ord (ltnW (ltn_ord i)) k)
+    (leq_addr _ _)).
+  have -> :
+      Ordinal (cat_tuple_suffix_bound
+        (widen_ord (ltnW (ltn_ord i)) k) (leq_addr _ _)) = j'.
+    apply: val_inj.
+    rewrite /= /k /j' /catTupleSuffixOrdinal_lt /=.
+    by rewrite addKn.
+  rewrite /catTupleSuffixAssignment tnth_mktuple.
+  have -> :
+      Ordinal (catTupleSuffixOrdinal_lt i Hi j' (ltn_ord j)) = k
+    by apply: val_inj.
+  have -> :
+      widen_ord (ltnW (ltn_ord (catTupleSuffixIndex i Hi))) j = j'
+    by apply: val_inj.
   by [].
-- move=> /andP [/eqP Homega HsuffixBool].
-  have Hsuffix := forallP HsuffixBool.
   apply/forallP=> j.
-  case Hji: (j < i)%N.
-    case Hprefix_j: (j < ℓ1.+1)%N.
-      rewrite (cat_tuple_tnth_prefix_choice omega1' omega2 j Hprefix_j).
+  case Hprefix_j: (widen_ord (ltnW (ltn_ord i)) j < ℓ1.+1)%N.
+      rewrite (cat_tuple_tnth_prefix_choice omega1' omega2
+        (widen_ord (ltnW (ltn_ord i)) j) Hprefix_j).
       rewrite Homega.
       rewrite -Hprefix catTuplePrefix_tnth.
-      rewrite implyTb.
       have -> :
-          @Ordinal (ℓ1.+1 + ℓ2.+1) (nat_of_ord j)
-            (leq_trans (ltn_ord (@Ordinal ℓ1.+1 (nat_of_ord j) Hprefix_j))
-              (leq_addr _ _)) = j
+          Ordinal (leq_trans (ltn_ord (Ordinal Hprefix_j)) Hi) = j
         by apply: val_inj.
       by [].
-    have Hjge : (ℓ1.+1 <= j)%N by rewrite leqNgt Hprefix_j.
-    rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 j Hjge).
-    rewrite implyTb.
-    move: (Hsuffix (catTupleSuffixIndex j Hjge)).
-    rewrite (catTupleSuffixIndex_lt i j Hi Hjge Hji) /=.
+    pose k : 'I_(ℓ1.+1 + ℓ2.+1) := widen_ord (ltnW (ltn_ord i)) j.
+    have Hjge : (ℓ1.+1 <= k)%N
+      by rewrite leqNgt Hprefix_j.
+    rewrite (cat_tuple_tnth_suffix_choice omega1' omega2 k Hjge).
+    have Hsuffix := forallP HsuffixBool.
+    pose ksuf : 'I_(catTupleSuffixIndex i Hi) :=
+      Ordinal (catTupleSuffixIndex_lt i k Hi Hjge (ltn_ord j)).
+    move: (Hsuffix ksuf).
     have -> :
-        @Ordinal ℓ2.+1 (nat_of_ord j - ℓ1.+1)
-          (cat_tuple_suffix_bound j Hjge) =
-        catTupleSuffixIndex j Hjge
+        @Ordinal ℓ2.+1 (nat_of_ord k - ℓ1.+1)
+          (cat_tuple_suffix_bound k Hjge) =
+        catTupleSuffixIndex k Hjge
       by apply: val_inj.
-    rewrite /catTupleSuffixAssignment.
     have -> :
-        @Ordinal (ℓ1.+1 + ℓ2.+1)
-          (ℓ1.+1 + nat_of_ord (catTupleSuffixIndex j Hjge))
-          (catTupleSuffixOrdinal_bound (catTupleSuffixIndex j Hjge)) =
-        j.
+        widen_ord (ltnW (ltn_ord (catTupleSuffixIndex i Hi))) ksuf =
+        catTupleSuffixIndex k Hjge
+      by apply: val_inj.
+    rewrite /catTupleSuffixAssignment tnth_mktuple.
+    have -> :
+        Ordinal (catTupleSuffixOrdinal_lt i Hi
+          (Ordinal (ltn_trans (ltn_ord ksuf)
+            (ltn_ord (catTupleSuffixIndex i Hi))))
+          (ltn_ord ksuf)) = j.
       apply: val_inj.
-      rewrite /catTupleSuffixIndex /=.
+      rewrite /= /ksuf /k /catTupleSuffixIndex /=.
       by rewrite subnKC.
     by [].
-    by [].
-*)
-Admitted.
+Qed.
 
 End TupleExtras.
 
