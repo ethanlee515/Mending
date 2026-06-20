@@ -1625,13 +1625,10 @@ Qed.
 
 (** Current assumption frontier for [compileRule]:
 
-    Local proof obligations still exposed by [Print Assumptions] are all in the
+    Local proof obligations still exposed by [Print Assumptions] are in the
     KL/Pinsker path:
-    - [Pinsker.total_variation_chi2_bound]
-    - [Pinsker.kl_lower_bound_chi2]
-    - [ChainPointwise.coordinate_finite_kl_absolute_continuous]
+    - [Pinsker.pinsker]
     - [ChainPointwise.kl_integrand_chain_decomp_pointwise]
-    - [ChainPointwise.sum_coordinate_log_contribution_prefix_weighted]
     - [log_sum_inequality_partition]
 
     External/classical assumptions are currently MathComp/SSProve

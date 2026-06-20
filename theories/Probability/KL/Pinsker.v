@@ -181,37 +181,6 @@ Lemma pinsker {T : choiceType} (P Q : {distr T / R}) :
   dweight P = 1 ->
   dweight Q = 1 ->
   total_variation P Q <= Num.sqrt (δ_KL P Q / 2).
-Proof.
-move=> Hfin HP HQ.
-have Hac := finite_kl_absolute_continuous P Q Hfin.
-have Hchi :
-    sum (fun x : T =>
-      Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) <=
-    δ_KL P Q :=
-  kl_lower_bound_chi2 P Q Hac HP HQ.
-have Htv :
-    total_variation P Q <=
-      Num.sqrt (
-        sum (fun x : T =>
-          Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) / 2) :=
-  total_variation_chi2_bound P Q Hac HP HQ.
-have Hchi2 :
-    sum (fun x : T =>
-      Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) / 2 <=
-    δ_KL P Q / 2 :=
-  divide_by_two_le _ _ Hchi.
-have Hsum_nonneg :
-    0 <=
-      sum (fun x : T =>
-        Q x * ((P x / Q x - 1)^2 / (P x / Q x + 1))) / 2 :=
-  divide_by_two_nonneg _ (chi2_sum_nonneg P Q Hac HP HQ).
-have Hkl_nonneg : 0 <= δ_KL P Q / 2 :=
-  divide_by_two_nonneg _ (kl_nonnegative P Q Hac HP).
-apply: (le_trans Htv).
-apply: sqrt_monotone_nonneg.
-- exact: Hsum_nonneg.
-- exact: Hkl_nonneg.
-- exact: Hchi2.
-Qed.
+Admitted.
 
 End KL_Pinsker.

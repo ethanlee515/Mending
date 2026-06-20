@@ -5,6 +5,7 @@ From mathcomp Require Import all_boot all_order all_algebra.
 From mathcomp Require Import reals realsum exp distr.
 From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
+From mathcomp.algebra_tactics Require Import ring.
 
 From Mending.Probability.KL Require Import Core.
 From Mending.Probability Require Import ConditionalCoordinate.
@@ -18,17 +19,30 @@ Section KL_ChainPointwise.
 
 Context {R : realType}.
 
-Lemma coordinate_finite_kl_absolute_continuous
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) :
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  (forall (i : 'I_n) (a : i.-tuple A),
-    finite_kl
-      (conditional_coordinate P a)
-      (conditional_coordinate Q a)) ->
-  absolute_continuous P Q.
-Admitted.
+Lemma tuple_prefix_ord_max_last_eq
+    {n : nat} {A : choiceType} (x y : n.+1.-tuple A) :
+  tuple_prefix_eq (tuple_prefix ord_max (tnth x)) y &&
+    (tnth y ord_max == tnth x ord_max) =
+  (y == x).
+Proof.
+apply/idP/eqP=> [/andP[Hprefix Hlast]|->].
+- apply: eq_from_tnth=> j.
+  case Hj : (j < n)%N.
+    have Hpref := forallP Hprefix (Ordinal Hj).
+    rewrite /tuple_prefix tnth_mktuple in Hpref.
+    have Hw :
+        widen_ord (ltnW (ltn_ord ord_max)) (Ordinal Hj) = j
+      by apply: val_inj.
+    by move: Hpref; rewrite Hw=> /eqP.
+  have Hjlast : j = ord_max.
+    apply: val_inj.
+    have Hjle : (j <= n)%N by rewrite -ltnS.
+    by move: Hjle; rewrite leq_eqVlt Hj orbF=> /eqP.
+  by rewrite Hjlast; exact/eqP.
+- rewrite eqxx andbT.
+  apply/forallP=> j.
+  by rewrite /tuple_prefix tnth_mktuple.
+Qed.
 
 Lemma norm_le_of_ge0_le (x y : R) :
   0 <= x -> x <= y -> `|x| <= y.
@@ -296,6 +310,8 @@ Definition coordinate_log_contribution
 Lemma kl_integrand_chain_decomp_pointwise
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) :
+  dweight P = 1 ->
+  dweight Q = 1 ->
   absolute_continuous P Q ->
   forall x : n.-tuple A,
     P x * ln (P x / Q x) =
@@ -397,6 +413,62 @@ apply/eq_psum=> x.
 rewrite !inE -!topredE /=.
 case: (tuple_prefix_eq a x); case: (tnth x i == b);
   rewrite ?mul0r ?mul1r //.
+Qed.
+
+Lemma coordinate_finite_kl_absolute_continuous
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) :
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
+  absolute_continuous P Q.
+Proof.
+case: n P Q=> [|n] P Q HP HQ Hfin x HQx0.
+- have Hpred1 : pred1 x =1 predT.
+    move=> y.
+    by rewrite /pred1 (tuple0 y) (tuple0 x).
+  have HQx1 : Q x = 1.
+    rewrite pr_pred1 /pr.
+    rewrite (eq_psum (F2 := Q)); last by move=> y; rewrite Hpred1 mul1r.
+    by rewrite -pr_predT HQ.
+  exfalso.
+  move: (@oner_eq0 R).
+  by rewrite -HQx1 HQx0 eqxx.
+- pose i : 'I_n.+1 := ord_max.
+  pose a : i.-tuple A := tuple_prefix i (tnth x).
+  pose b : A := tnth x i.
+  have Hevent (mu : {distr (n.+1.-tuple A) / R}) :
+      \P_[mu] (fun y => tuple_prefix_eq a y && (tnth y i == b)) = mu x.
+    rewrite pr_pred1 /pr /a /b /i.
+    apply: eq_psum=> y.
+    by rewrite tuple_prefix_ord_max_last_eq.
+  have HcondQ0 : conditional_coordinate Q a b = 0.
+    case Hpref0 : (\P_[Q] (fun y => tuple_prefix_eq a y) == 0).
+      by rewrite (conditional_coordinate_zero_prefix Q i a (eqP Hpref0)) dnullE.
+    have Hprod0 :
+        \P_[Q] (fun y => tuple_prefix_eq a y) *
+          conditional_coordinate Q a b = 0.
+      rewrite -prefix_coordinate_pr_factor Hevent HQx0.
+      by [].
+    apply/eqP.
+    move/eqP: Hprod0.
+    rewrite mulf_eq0.
+    have -> : \P_[Q] (fun y => tuple_prefix_eq a y) == 0 = false
+      by [].
+    by rewrite orFb.
+  have HcondP0 : conditional_coordinate P a b = 0.
+    have [Hac _] := Hfin i a.
+    exact: Hac b HcondQ0.
+  have HprodP0 :
+      \P_[P] (fun y => tuple_prefix_eq a y) *
+        conditional_coordinate P a b = 0
+    by rewrite HcondP0 mulr0.
+  move: HprodP0.
+  rewrite -prefix_coordinate_pr_factor Hevent.
+  by [].
 Qed.
 
 Lemma finite_sum_coordinate_log_contribution_partition_coordinate
@@ -847,7 +919,7 @@ Lemma finite_sum_fpos_kl_chain_decomp
 Proof.
 move=> HP HQ Hac Hfin J Huniq.
 apply: (finite_sum_fpos_kl_chain_decomp_from_pointwise P Q HP HQ Hac Hfin).
-  exact: (kl_integrand_chain_decomp_pointwise P Q Hac).
+  exact: (kl_integrand_chain_decomp_pointwise P Q HP HQ Hac).
 exact: Huniq.
 Qed.
 
@@ -874,6 +946,75 @@ Proof.
 rewrite dmargin_psumE /pr.
 apply: eq_psum=> x.
 by rewrite tuple_prefix_eq_prefix.
+Qed.
+
+Lemma summable_dmargin_comp
+    {T U : choiceType} (P : {distr T / R}) (f : T -> U) (h : U -> R) :
+  summable (fun x => P x * h (f x)) ->
+  summable (fun y => dmargin f P y * h y).
+Proof.
+move=> Hsumm.
+pose F := fun x : T => P x * h (f x).
+pose G := fun y : U => dmargin f P y * h y.
+have HposF x : fpos F x = P x * fpos h (f x).
+  rewrite /F.
+  have := fposZ h (ge0_mu P x) (f x).
+  by [].
+have HnegF x : fneg F x = P x * fneg h (f x).
+  rewrite /F.
+  have := fnegZ h (ge0_mu P x) (f x).
+  by [].
+have HposG y : fpos G y = dmargin f P y * fpos h y.
+  rewrite /G.
+  have := fposZ h (ge0_mu (dmargin f P) y) y.
+  by [].
+have HnegG y : fneg G y = dmargin f P y * fneg h y.
+  rewrite /G.
+  have := fnegZ h (ge0_mu (dmargin f P) y) y.
+  by [].
+have Hpos_summable : summable (fun x : T => P x * fpos h (f x)).
+  apply: (eq_summable (S1 := fpos F)); first by move=> x; rewrite HposF.
+  exact: summable_fpos.
+have Hneg_summable : summable (fun x : T => P x * fneg h (f x)).
+  apply: (eq_summable (S1 := fneg F)); first by move=> x; rewrite HnegF.
+  exact: summable_fneg.
+apply: summable_from_fpos_fneg.
+- apply: (eq_summable (S1 := fun y : U =>
+    psum (fun x : T => (f x == y)%:R * (P x * fpos h (f x))))).
+    move=> y.
+    rewrite HposG dmargin_psumE.
+    rewrite [psum _ * fpos h y]mulrC -psumZ; last exact: ge0_fpos.
+    apply: eq_psum=> x.
+    case Hfy : (f x == y).
+      have Hfy_bool := Hfy.
+      move/eqP: Hfy=> Hfy_eq.
+      rewrite /= Hfy_bool Hfy_eq.
+      have -> : true%:R = (1 : R) by [].
+      ring.
+    rewrite /= Hfy.
+    have -> : false%:R = (0 : R) by [].
+    by rewrite !mul0r !mulr0.
+  apply: (summable_fiber_psum f (fun x : T => P x * fpos h (f x))).
+  + by move=> x; rewrite mulr_ge0 ?ge0_mu ?ge0_fpos.
+  + exact: Hpos_summable.
+- apply: (eq_summable (S1 := fun y : U =>
+    psum (fun x : T => (f x == y)%:R * (P x * fneg h (f x))))).
+    move=> y.
+    rewrite HnegG dmargin_psumE.
+    rewrite [psum _ * fneg h y]mulrC -psumZ; last exact: ge0_fneg.
+    apply: eq_psum=> x.
+    case Hfy : (f x == y).
+      have Hfy_bool := Hfy.
+      move/eqP: Hfy=> Hfy_eq.
+      rewrite /= Hfy_bool Hfy_eq.
+      have -> : true%:R = (1 : R) by [].
+      ring.
+    rewrite /= Hfy.
+    have -> : false%:R = (0 : R) by [].
+    by rewrite !mul0r !mulr0.
+  apply: (summable_fiber_psum f (fun x : T => P x * fneg h (f x))).
+  + by move=> x; rewrite mulr_ge0 ?ge0_mu ?ge0_fneg.
+  + exact: Hneg_summable.
 Qed.
 
 Lemma sum_dmargin_comp
@@ -930,7 +1071,76 @@ congr (_ - _).
     move/eqP: Hfy=> Hfy.
     rewrite Hfy /= !mulr1.
     by rewrite Hfy eqxx mul1r mulrC.
-  by rewrite /= Hfy mulr0 mul0r mulr0.
+	  by rewrite /= Hfy mulr0 mul0r mulr0.
+Qed.
+
+Lemma psum_pair_fst_fiber
+    {T U : choiceType} (S : T * U -> R) (x : T) :
+  (forall xy, 0 <= S xy) ->
+  psum (fun xy : T * U => (xy.1 == x)%:R * S xy) =
+  psum (fun y : U => S (x, y)).
+Proof.
+move=> HS.
+rewrite (@reindex_psum_onto R (T * U)%type U
+  (fun xy : T * U => (xy.1 == x)%:R * S xy)
+  [pred xy : T * U | xy.1 == x]
+  (fun y : U => (x, y))
+  (fun xy : T * U => if xy.1 == x then Some xy.2 else None)).
+- apply/eq_psum=> y.
+  by rewrite eqxx mul1r.
+- move=> xy Hxy.
+  case Hxyx : (xy.1 == x); first by [].
+  by move: Hxy; rewrite Hxyx mul0r eqxx.
+- case=> x' y /= Hx'.
+  move: Hx'; rewrite /= => /eqP Hx'.
+  change (x' = x) in Hx'.
+  by rewrite Hx' eqxx.
+- by move=> y _; rewrite eqxx.
+Qed.
+
+Lemma summable_pair_fst_rows_nonneg
+    {T U : choiceType} (S : T * U -> R) :
+  (forall xy, 0 <= S xy) ->
+  summable S ->
+  summable (fun x : T => psum (fun y : U => S (x, y))).
+Proof.
+move=> HS Hsumm.
+apply: (eq_summable
+  (S1 := fun x : T =>
+    psum (fun xy : T * U => (xy.1 == x)%:R * S xy))).
+  move=> x.
+  by rewrite psum_pair_fst_fiber.
+exact: (summable_fiber_psum (fun xy : T * U => xy.1) S HS Hsumm).
+Qed.
+
+Lemma sum_pair_fst_rows
+    {T U : choiceType} (F : T * U -> R) :
+  summable F ->
+  (forall x : T, summable (fun y : U => F (x, y))) ->
+  sum F = sum (fun x : T => sum (fun y : U => F (x, y))).
+Proof.
+move=> Hsumm Hrow.
+pose A := fun x : T => psum (fun y : U => fpos F (x, y)).
+pose B := fun x : T => psum (fun y : U => fneg F (x, y)).
+have HA : summable A.
+  apply: summable_pair_fst_rows_nonneg.
+  - move=> xy; exact: ge0_fpos.
+  - exact: summable_fpos.
+have HB : summable B.
+  apply: summable_pair_fst_rows_nonneg.
+  - move=> xy; exact: ge0_fneg.
+  - exact: summable_fneg.
+rewrite (eq_sum (F2 := A \+ (fun x : T => - B x))); last first.
+  move=> x.
+  by rewrite /A /B /sum.
+rewrite (@sumD R T A (fun x : T => - B x) HA (summableN HB)).
+rewrite sumN.
+have HsumA : sum A = psum A by rewrite -psum_sum // => x; exact: ge0_psum.
+have HsumB : sum B = psum B by rewrite -psum_sum // => x; exact: ge0_psum.
+rewrite HsumA HsumB.
+rewrite -(psum_pair (S := fpos F) (summable_fpos Hsumm)).
+rewrite -(psum_pair (S := fneg F) (summable_fneg Hsumm)).
+by rewrite /sum.
 Qed.
 
 Lemma dmargin_prefix_coordinateE
@@ -1295,7 +1505,61 @@ Lemma sum_coordinate_log_contribution_prefix_weighted
     \P_[P] (fun x => tuple_prefix_eq a x) *
     δ_KL (conditional_coordinate P a)
          (conditional_coordinate Q a)).
-Admitted.
+Proof.
+move=> Hsumm _ Hfin.
+pose fpair (x : n.-tuple A) := (tuple_prefix i (tnth x), tnth x i).
+pose hpair (ab : i.-tuple A * A) :=
+  ln (conditional_coordinate P ab.1 ab.2 /
+      conditional_coordinate Q ab.1 ab.2).
+have Hsumm_fpair :
+    summable (fun x : n.-tuple A => P x * hpair (fpair x)).
+  apply: (eq_summable
+    (S1 := fun x : n.-tuple A => P x * coordinate_log_contribution P Q x i)).
+    by move=> x; rewrite /fpair /hpair /coordinate_log_contribution.
+  exact: Hsumm.
+rewrite (eq_sum
+  (F2 := fun x : n.-tuple A => P x * hpair (fpair x))); last first.
+  by move=> x; rewrite /fpair /hpair /coordinate_log_contribution.
+rewrite (sum_dmargin_comp P fpair hpair Hsumm_fpair).
+pose F := fun ab : i.-tuple A * A =>
+  \P_[P] (fun x => tuple_prefix_eq ab.1 x) *
+  (conditional_coordinate P ab.1 ab.2 *
+   ln (conditional_coordinate P ab.1 ab.2 /
+       conditional_coordinate Q ab.1 ab.2)).
+have Hsumm_pair : summable F.
+  apply: (eq_summable
+    (S1 := fun ab : i.-tuple A * A => dmargin fpair P ab * hpair ab)).
+    case=> a b.
+    by rewrite /F /hpair /fpair dmargin_prefix_coordinateE mulrA.
+  exact: (summable_dmargin_comp P fpair hpair Hsumm_fpair).
+rewrite (eq_sum (F2 := F)); last first.
+  case=> a b.
+  by rewrite /F /hpair /fpair dmargin_prefix_coordinateE mulrA.
+rewrite (sum_pair_fst_rows F Hsumm_pair); last first.
+  move=> a.
+  apply: (eq_summable
+    (S1 := \P_[P] (fun x => tuple_prefix_eq a x) \*o
+      (fun b : A =>
+        conditional_coordinate P a b *
+        ln (conditional_coordinate P a b /
+            conditional_coordinate Q a b)))).
+    move=> b.
+    by rewrite /F.
+  apply: summableZ.
+  exact: (finite_kl_summable
+    (conditional_coordinate P a) (conditional_coordinate Q a) (Hfin a)).
+apply/eq_sum=> a.
+rewrite (eq_sum
+  (F2 := fun b : A =>
+    \P_[P] (fun x => tuple_prefix_eq a x) *
+    (conditional_coordinate P a b *
+     ln (conditional_coordinate P a b /
+         conditional_coordinate Q a b)))); last first.
+  by move=> b; rewrite /F.
+exact: (sum_scaled_kl_integrand
+  (conditional_coordinate P a) (conditional_coordinate Q a)
+  (\P_[P] (fun x => tuple_prefix_eq a x)) (Hfin a)).
+Qed.
 
 
 
@@ -1559,7 +1823,7 @@ move=> Heps HP HQ Hfin Hfincond Hcond.
 have Hac : absolute_continuous P Q := finite_kl_absolute_continuous P Q Hfin.
 apply: (iterated_kl_chain_bound_from_pointwise P Q eps
   Heps HP HQ Hfin Hfincond _ Hcond).
-exact: (kl_integrand_chain_decomp_pointwise P Q Hac).
+exact: (kl_integrand_chain_decomp_pointwise P Q HP HQ Hac).
 Qed.
 
 
