@@ -4,7 +4,7 @@ From mathcomp Require Import realseq realsum exp.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
-From Mending.Probability.KL Require Import Core.
+From Mending.Probability.KL Require Import Core ChainPointwise.
 From Mending.Probability Require Import ConditionalCoordinate.
 
 Import GRing.Theory Num.Theory Order.Theory.
@@ -160,6 +160,10 @@ Lemma iterated_kl_chain_bound
     δ_KL (conditional_coordinate P a)
          (conditional_coordinate Q a) <= tnth eps i) ->
   δ_KL P Q <= \sum_(i < n) tnth eps i.
-Admitted.
+Proof.
+move=> Heps Hfin HP HQ Hcond.
+exact: (iterated_kl_chain_bound_via_pointwise
+  P Q eps Heps HP HQ Hfin Hcond).
+Qed.
 
 End KL_Conditional.

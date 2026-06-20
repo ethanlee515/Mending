@@ -15,10 +15,11 @@
   only `absolute_continuous P Q`.
 - The finite-coordinate summability/interchange helpers are proved:
   `summable_finite_ord_sum` and `sum_finite_ord_sum`.
-- The local `iterated_kl_chain_bound_from_pointwise` admit in `KL/Pyth.v` is
-  removed. It currently bridges to the public
-  `KL/Conditional.v` theorem, so the remaining mathematical chain-rule admit is
-  centralized there.
+- The coordinate/value-side KL machinery was split out of `KL/Pyth.v` into
+  `KL/ChainPointwise.v`, breaking the would-be
+  `Conditional.v -> Pyth.v -> Conditional.v` import cycle.
+- The public `iterated_kl_chain_bound` in `KL/Conditional.v` is now proved by
+  calling `iterated_kl_chain_bound_via_pointwise` from `KL/ChainPointwise.v`.
 - The public `iterated_kl_chain_bound` in `KL/Conditional.v` now also assumes
   `finite_kl P Q`; the `Pyth.v` callers derive it from coordinate-wise
   `finite_kl` using `coordinate_bounded_kl_finite_kl`.
@@ -35,11 +36,11 @@ coqc -Q theories Mending theories/Probability/KL/Pyth.v
 The remaining admitted value theorem is:
 
 ```coq
-iterated_kl_chain_bound
+iterated_kl_chain_bound_from_pointwise
 ```
 
-It is now centralized in `KL/Conditional.v`. The pointwise-facing theorem in
-`KL/Pyth.v` is closed, but by delegating to this public theorem.
+It now lives in `KL/ChainPointwise.v`, which is the common dependency of both
+`KL/Conditional.v` and `KL/Pyth.v`.
 
 The conceptual proof should be:
 
@@ -74,7 +75,7 @@ under suitable summability assumptions.
 
 ## Good next target
 
-Move the proof of `iterated_kl_chain_bound` out of the admit in
-`KL/Conditional.v`, likely by relocating enough pointwise/value-side machinery
-to avoid the current `Conditional.v` -> `Pyth.v` import cycle, then have the
-public theorem call `iterated_kl_chain_bound_via_pointwise` directly.
+Prove `iterated_kl_chain_bound_from_pointwise` in `KL/ChainPointwise.v`.
+The import graph is ready now; the remaining work is the actual value-side
+proof using `sum_finite_ord_sum`, prefix grouping, and
+`prefix_coordinate_weighted_kl_bound`.
