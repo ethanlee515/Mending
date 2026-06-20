@@ -669,6 +669,49 @@ exact: (finite_sum_fpos_coordinate_log_contribution_bound
   P Q i J HP HQ Hac (fun a => Hfin i a) Huniq).
 Qed.
 
+Lemma summable_finite_ord_sum
+    {T : choiceType} {m : nat} (F : 'I_m -> T -> R) :
+  (forall i : 'I_m, summable (F i)) ->
+  summable (fun x => \sum_(i < m) F i x).
+Proof.
+move=> Hsumm.
+elim: m F Hsumm=> [|m IH] F Hsumm.
+  apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+  by move=> x; rewrite big_ord0.
+apply: (eq_summable
+  (S1 := fun x : T =>
+    F ord0 x + \sum_(i < m) F (lift ord0 i) x)).
+  by move=> x; rewrite big_ord_recl.
+apply: summableD.
+  exact: Hsumm.
+apply: IH=> i.
+exact: Hsumm.
+Qed.
+
+Lemma sum_finite_ord_sum
+    {T : choiceType} {m : nat} (F : 'I_m -> T -> R) :
+  (forall i : 'I_m, summable (F i)) ->
+  sum (fun x => \sum_(i < m) F i x) =
+  \sum_(i < m) sum (F i).
+Proof.
+move=> Hsumm.
+elim: m F Hsumm=> [|m IH] F Hsumm.
+  rewrite big_ord0.
+  rewrite (eq_sum (F2 := fun _ : T => 0)); first exact: sum0.
+  by move=> x; rewrite big_ord0.
+rewrite big_ord_recl.
+rewrite (eq_sum (F2 := fun x : T =>
+  F ord0 x + \sum_(i < m) F (lift ord0 i) x)); last first.
+  by move=> x; rewrite big_ord_recl.
+rewrite sumD.
+  congr (_ + _).
+  apply: IH=> i.
+  exact: Hsumm.
+  exact: Hsumm.
+apply: summable_finite_ord_sum=> i.
+exact: Hsumm.
+Qed.
+
 Lemma iterated_kl_chain_bound_from_pointwise
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
@@ -683,7 +726,10 @@ Lemma iterated_kl_chain_bound_from_pointwise
     δ_KL (conditional_coordinate P a)
          (conditional_coordinate Q a) <= tnth eps i) ->
   δ_KL P Q <= \sum_(i < n) tnth eps i.
-Admitted.
+Proof.
+move=> Heps HP HQ Hfin _ Hcond.
+exact: (iterated_kl_chain_bound P Q eps Heps Hfin HP HQ Hcond).
+Qed.
 
 Lemma iterated_kl_chain_bound_via_pointwise
     {n : nat} {A : choiceType}
@@ -1045,7 +1091,7 @@ apply: (le_trans Hpin).
 apply: ler_wsqrtr.
 have Hkl :
     δ_KL P Q <= \sum_(i < n) tnth eps i :=
-  iterated_kl_chain_bound P Q eps Heps HfinPQ HP HQ Hcond.
+  iterated_kl_chain_bound_via_pointwise P Q eps Heps HP HQ HfinPQ Hcond.
 lra.
 Qed.
 
@@ -1102,13 +1148,9 @@ Lemma pythDist_absolute_continuous
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
   pythDist P Q eps -> absolute_continuous P Q.
 Proof.
-move=> [_ [HP [HQ Hcond]]].
-have Hfin : forall (i : 'I_n) (a : i.-tuple A),
-    finite_kl
-      (conditional_coordinate P a)
-      (conditional_coordinate Q a).
-  by move=> i a; have [Hfin _] := Hcond i a.
-exact: (coordinate_finite_kl_absolute_continuous P Q HP HQ Hfin).
+move=> [Heps [HP [HQ Hcond]]].
+exact: (finite_kl_absolute_continuous P Q
+  (coordinate_bounded_kl_finite_kl P Q eps Heps HP HQ Hcond)).
 Qed.
 
 Lemma pythDist_cond_finite_kl
@@ -1289,7 +1331,8 @@ apply: (le_trans Hpin).
 rewrite /pythagorean_tv_bound /tuple_sum.
 apply: ler_wsqrtr.
 have Hdata := kl_dmargin_data_processing final P Q Hac.
-have Hchain := iterated_kl_chain_bound P Q eps Heps HfinPQ HP HQ Hcond.
+have Hchain := iterated_kl_chain_bound_via_pointwise
+  P Q eps Heps HP HQ HfinPQ Hcond.
 have Hkl := le_trans Hdata Hchain.
 lra.
 Qed.

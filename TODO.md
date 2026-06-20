@@ -13,9 +13,16 @@
 - `iterated_kl_chain_bound_from_pointwise` and
   `iterated_kl_chain_bound_via_pointwise` now assume `finite_kl P Q` instead of
   only `absolute_continuous P Q`.
+- The finite-coordinate summability/interchange helpers are proved:
+  `summable_finite_ord_sum` and `sum_finite_ord_sum`.
+- The local `iterated_kl_chain_bound_from_pointwise` admit in `KL/Pyth.v` is
+  removed. It currently bridges to the public
+  `KL/Conditional.v` theorem, so the remaining mathematical chain-rule admit is
+  centralized there.
 - The public `iterated_kl_chain_bound` in `KL/Conditional.v` now also assumes
   `finite_kl P Q`; the `Pyth.v` callers derive it from coordinate-wise
   `finite_kl` using `coordinate_bounded_kl_finite_kl`.
+- The `Pyth.v` callers now go through `iterated_kl_chain_bound_via_pointwise`.
 
 Checked with:
 
@@ -28,8 +35,11 @@ coqc -Q theories Mending theories/Probability/KL/Pyth.v
 The remaining admitted value theorem is:
 
 ```coq
-iterated_kl_chain_bound_from_pointwise
+iterated_kl_chain_bound
 ```
+
+It is now centralized in `KL/Conditional.v`. The pointwise-facing theorem in
+`KL/Pyth.v` is closed, but by delegating to this public theorem.
 
 The conceptual proof should be:
 
@@ -44,6 +54,10 @@ The conceptual proof should be:
 
 ## Main proof-engineering obstacles
 
+- `coordinate_finite_kl_absolute_continuous` is still an admitted dependency of
+  `pythSeqRule`. Today's summability work gives the summability half of
+  ensemble `finite_kl`, but the absolute-continuity half still needs the
+  coordinate-to-ensemble support proof.
 - The remaining proof still needs summability facts for `sumD` and finite-bigop
   linearity.
 - The likely central helper is a finite-coordinate linearity/interchange lemma:
@@ -60,6 +74,7 @@ under suitable summability assumptions.
 
 ## Good next target
 
-Try proving the central finite-coordinate linearity/interchange lemma, then use
-it inside `iterated_kl_chain_bound_from_pointwise`. After that, make the public
-`iterated_kl_chain_bound` call `iterated_kl_chain_bound_via_pointwise`.
+Move the proof of `iterated_kl_chain_bound` out of the admit in
+`KL/Conditional.v`, likely by relocating enough pointwise/value-side machinery
+to avoid the current `Conditional.v` -> `Pyth.v` import cycle, then have the
+public theorem call `iterated_kl_chain_bound_via_pointwise` directly.
