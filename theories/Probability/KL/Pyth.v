@@ -53,7 +53,8 @@ apply: (le_trans Hpin).
 apply: ler_wsqrtr.
 have Hkl :
     δ_KL P Q <= \sum_(i < n) tnth eps i :=
-  iterated_kl_chain_bound_via_pointwise P Q eps Heps HP HQ HfinPQ Hcond.
+  iterated_kl_chain_bound_via_pointwise
+    P Q eps Heps HP HQ HfinPQ Hfin Hcond.
 lra.
 Qed.
 
@@ -294,7 +295,7 @@ rewrite /pythagorean_tv_bound /tuple_sum.
 apply: ler_wsqrtr.
 have Hdata := kl_dmargin_data_processing final P Q Hac.
 have Hchain := iterated_kl_chain_bound_via_pointwise
-  P Q eps Heps HP HQ HfinPQ Hcond.
+  P Q eps Heps HP HQ HfinPQ Hfin Hcond.
 have Hkl := le_trans Hdata Hchain.
 lra.
 Qed.

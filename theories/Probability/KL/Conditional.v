@@ -157,13 +157,17 @@ Lemma iterated_kl_chain_bound
   dweight P = 1 ->
   dweight Q = 1 ->
   (forall (i : 'I_n) (a : i.-tuple A),
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
+  (forall (i : 'I_n) (a : i.-tuple A),
     δ_KL (conditional_coordinate P a)
          (conditional_coordinate Q a) <= tnth eps i) ->
   δ_KL P Q <= \sum_(i < n) tnth eps i.
 Proof.
-move=> Heps Hfin HP HQ Hcond.
+move=> Heps Hfin HP HQ Hfincond Hcond.
 exact: (iterated_kl_chain_bound_via_pointwise
-  P Q eps Heps HP HQ Hfin Hcond).
+  P Q eps Heps HP HQ Hfin Hfincond Hcond).
 Qed.
 
 End KL_Conditional.

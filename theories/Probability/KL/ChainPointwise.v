@@ -87,6 +87,16 @@ rewrite Hnorm Hnorm.
 by rewrite subrK.
 Qed.
 
+Lemma sum_le_of_psum_fpos_le_add_fneg {T : choiceType}
+    (F : T -> R) (c : R) :
+  psum (fpos F) <= c + psum (fneg F) ->
+  sum F <= c.
+Proof.
+move=> Hle.
+rewrite /sum.
+lra.
+Qed.
+
 Lemma scaled_kl_integrand_fneg_psum_le
     {T : choiceType} (P Q : {distr T / R}) (c : R) :
   0 <= c ->
@@ -135,6 +145,21 @@ apply: lerD.
   by rewrite mulrC.
   by rewrite Hsum_scaled.
 - exact: (scaled_kl_integrand_fneg_psum_le P Q c Hc Hac).
+Qed.
+
+Lemma sum_scaled_kl_integrand
+    {T : choiceType} (P Q : {distr T / R}) (c : R) :
+  finite_kl P Q ->
+  sum (fun x => c * (P x * ln (P x / Q x))) =
+  c * δ_KL P Q.
+Proof.
+move=> Hfin.
+pose S := fun x : T => P x * ln (P x / Q x).
+rewrite (eq_sum (F2 := c \*o S)); last by move=> x.
+rewrite sumZ /S /δ_KL /esp.
+congr (c * _).
+apply/eq_sum=> x.
+by rewrite mulrC.
 Qed.
 
 Lemma fpos_mul_le_of_le (p r l : R) :
@@ -188,6 +213,46 @@ rewrite (eq_bigr (fun x => F x * l)); last first.
   by rewrite (max_r Hxge0) !ger0_norm.
 rewrite -big_distrl.
 exact: ler_wpM2r.
+Qed.
+
+Lemma finite_sum_fneg_scaled_le {T : choiceType}
+    (J : seq T) (p : pred T) (F : T -> R) (r l : R) :
+  (forall x, 0 <= F x) ->
+  \sum_(x <- J | p x) F x <= r ->
+  \sum_(x <- J | p x) `|fneg (fun _ : unit => F x * l) tt| <=
+  `|fneg (fun _ : unit => r * l) tt|.
+Proof.
+move=> HF Hsum.
+have Hsum_ge0 : 0 <= \sum_(x <- J | p x) F x.
+  by apply: sumr_ge0=> x _; exact: HF.
+have Hr : 0 <= r := le_trans Hsum_ge0 Hsum.
+rewrite /fneg /=.
+case Hl : (0 <= l).
+  have Hlge0 : 0 <= l by rewrite Hl.
+  have Hrge0 : 0 <= r * l := mulr_ge0 Hr Hlge0.
+  rewrite (min_l Hrge0) normr0.
+  rewrite big1 // => x _.
+  have Hxge0 : 0 <= F x * l := mulr_ge0 (HF x) Hlge0.
+  by rewrite (min_l Hxge0) !normr0.
+have Hlt : l < 0 by rewrite ltNge Hl.
+have Hle0 : l <= 0 := ltW Hlt.
+have Hrle0 : r * l <= 0 := mulr_ge0_le0 Hr Hle0.
+rewrite (min_r Hrle0).
+rewrite ger0_norm ?normr_ge0.
+rewrite ler0_norm //.
+rewrite (eq_bigr (fun x => `|F x * l|)); last first.
+  move=> x _.
+  have Hxle0 : F x * l <= 0 := mulr_ge0_le0 (HF x) Hle0.
+  by rewrite (min_r Hxle0) ger0_norm ?normr_ge0.
+rewrite (eq_bigr (fun x => F x * (- l))); last first.
+  move=> x _.
+  have Hxle0 : F x * l <= 0 := mulr_ge0_le0 (HF x) Hle0.
+  by rewrite ler0_norm // -mulrN.
+rewrite -big_distrl.
+have Hnl : 0 <= - l by lra.
+apply: (le_trans (ler_wpM2r Hnl Hsum)).
+by rewrite mulrN.
+by [].
 Qed.
 
 Lemma finite_sum_partition_by_image {T U : choiceType}
@@ -524,6 +589,52 @@ exact: (scaled_kl_integrand_fpos_psum_le
   (ge0_pr _ _) Hfin).
 Qed.
 
+Lemma prefix_coordinate_weighted_kl_sum
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (a : i.-tuple A) :
+  finite_kl
+    (conditional_coordinate P a)
+    (conditional_coordinate Q a) ->
+  sum
+    (fun b : A =>
+      \P_[P] (fun x => tuple_prefix_eq a x) *
+      (conditional_coordinate P a b *
+       ln (conditional_coordinate P a b /
+           conditional_coordinate Q a b))) =
+  \P_[P] (fun x => tuple_prefix_eq a x) *
+  δ_KL (conditional_coordinate P a)
+       (conditional_coordinate Q a).
+Proof.
+move=> Hfin.
+exact: (sum_scaled_kl_integrand
+  (conditional_coordinate P a)
+  (conditional_coordinate Q a)
+  (\P_[P] (fun x => tuple_prefix_eq a x)) Hfin).
+Qed.
+
+Lemma conditional_coordinate_kl_nonnegative
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (a : i.-tuple A) :
+  absolute_continuous P Q ->
+  0 <= δ_KL (conditional_coordinate P a)
+             (conditional_coordinate Q a).
+Proof.
+move=> Hac.
+case Hpref0 : (\P_[P] (fun x => tuple_prefix_eq a x) == 0).
+  rewrite (kl_left_dnull (conditional_coordinate P a)
+    (conditional_coordinate Q a)).
+    exact: lexx.
+  exact: (conditional_coordinate_zero_prefix P i a (eqP Hpref0)).
+have Hpref_pos : 0 < \P_[P] (fun x => tuple_prefix_eq a x).
+  by rewrite lt_def ge0_pr Hpref0.
+apply: kl_nonnegative.
+  exact: conditional_coordinate_absolute_continuous.
+rewrite /conditional_coordinate dmargin_dweight.
+exact: dcond_mass1.
+Qed.
+
 Lemma finite_sum_selected_prefix_mass_le1
     {n : nat} {A : choiceType}
     (P : {distr (n.-tuple A) / R})
@@ -711,41 +822,6 @@ apply: summable_finite_ord_sum=> i.
 exact: Hsumm.
 Qed.
 
-Lemma iterated_kl_chain_bound_from_pointwise
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
-  (forall i : 'I_n, 0 <= tnth eps i) ->
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  finite_kl P Q ->
-  (forall x : n.-tuple A,
-    P x * ln (P x / Q x) =
-    \sum_(i < n) P x * coordinate_log_contribution P Q x i) ->
-  (forall (i : 'I_n) (a : i.-tuple A),
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <= tnth eps i) ->
-  δ_KL P Q <= \sum_(i < n) tnth eps i.
-Admitted.
-
-Lemma iterated_kl_chain_bound_via_pointwise
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
-  (forall i : 'I_n, 0 <= tnth eps i) ->
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  finite_kl P Q ->
-  (forall (i : 'I_n) (a : i.-tuple A),
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <= tnth eps i) ->
-  δ_KL P Q <= \sum_(i < n) tnth eps i.
-Proof.
-move=> Heps HP HQ Hfin Hcond.
-have Hac : absolute_continuous P Q := finite_kl_absolute_continuous P Q Hfin.
-apply: (iterated_kl_chain_bound_from_pointwise P Q eps
-  Heps HP HQ Hfin _ Hcond).
-exact: (kl_integrand_chain_decomp_pointwise P Q Hac).
-Qed.
-
 Lemma finite_sum_fpos_kl_chain_decomp
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) :
@@ -799,6 +875,431 @@ rewrite dmargin_psumE /pr.
 apply: eq_psum=> x.
 by rewrite tuple_prefix_eq_prefix.
 Qed.
+
+Lemma sum_dmargin_comp
+    {T U : choiceType} (P : {distr T / R}) (f : T -> U) (h : U -> R) :
+  summable (fun x => P x * h (f x)) ->
+  sum (fun x => P x * h (f x)) =
+  sum (fun y => dmargin f P y * h y).
+Proof.
+move=> Hsumm.
+pose F := fun x : T => P x * h (f x).
+pose G := fun y : U => dmargin f P y * h y.
+have HposF x : fpos F x = P x * fpos h (f x).
+  rewrite /F.
+  have := fposZ h (ge0_mu P x) (f x).
+  by [].
+have HnegF x : fneg F x = P x * fneg h (f x).
+  rewrite /F.
+  have := fnegZ h (ge0_mu P x) (f x).
+  by [].
+have HposG y : fpos G y = dmargin f P y * fpos h y.
+  rewrite /G.
+  have := fposZ h (ge0_mu (dmargin f P) y) y.
+  by [].
+have HnegG y : fneg G y = dmargin f P y * fneg h y.
+  rewrite /G.
+  have := fnegZ h (ge0_mu (dmargin f P) y) y.
+  by [].
+have Hpos_summable : summable (fun x : T => P x * fpos h (f x)).
+  apply: (eq_summable (S1 := fpos F)); first by move=> x; rewrite HposF.
+  exact: summable_fpos.
+have Hneg_summable : summable (fun x : T => P x * fneg h (f x)).
+  apply: (eq_summable (S1 := fneg F)); first by move=> x; rewrite HnegF.
+  exact: summable_fneg.
+rewrite /sum.
+rewrite (eq_psum HposF) (eq_psum HnegF).
+rewrite (eq_psum HposG) (eq_psum HnegG).
+rewrite (partition_psum f Hpos_summable).
+rewrite (partition_psum f Hneg_summable).
+congr (_ - _).
+- apply: eq_psum=> y.
+  rewrite dmargin_psumE.
+  rewrite [psum _ * fpos h y]mulrC -psumZ; last exact: ge0_fpos.
+  apply: eq_psum=> x.
+  case Hfy : (f x == y).
+    move/eqP: Hfy=> Hfy.
+    rewrite Hfy /= !mulr1.
+    by rewrite Hfy eqxx mul1r mulrC.
+  by rewrite /= Hfy mulr0 mul0r mulr0.
+- apply: eq_psum=> y.
+  rewrite dmargin_psumE.
+  rewrite [psum _ * fneg h y]mulrC -psumZ; last exact: ge0_fneg.
+  apply: eq_psum=> x.
+  case Hfy : (f x == y).
+    move/eqP: Hfy=> Hfy.
+    rewrite Hfy /= !mulr1.
+    by rewrite Hfy eqxx mul1r mulrC.
+  by rewrite /= Hfy mulr0 mul0r mulr0.
+Qed.
+
+Lemma dmargin_prefix_coordinateE
+    {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R})
+    (i : 'I_n) (a : i.-tuple A) (b : A) :
+  dmargin (fun x : n.-tuple A => (tuple_prefix i (tnth x), tnth x i)) P
+    (a, b) =
+  \P_[P] (fun x => tuple_prefix_eq a x) *
+  conditional_coordinate P a b.
+Proof.
+rewrite dmargin_psumE -prefix_coordinate_pr_factor /pr.
+apply: eq_psum=> x.
+case Hprefix : (tuple_prefix_eq a x);
+  case Hb : (tnth x i == b).
+- have Hpair : (tuple_prefix i (tnth x), tnth x i) == (a, b).
+    rewrite xpair_eqE Hb andbT.
+    by rewrite tuple_prefix_eq_prefix.
+  by rewrite Hpair /= !mul1r.
+- have Hpair : ((tuple_prefix i (tnth x), tnth x i) == (a, b)) = false.
+    rewrite xpair_eqE Hb andbF.
+    by [].
+  by rewrite Hpair /= !mul0r.
+- have Hpair : ((tuple_prefix i (tnth x), tnth x i) == (a, b)) = false.
+    have Hpa : (tuple_prefix i (tnth x) == a) = false.
+      by rewrite tuple_prefix_eq_prefix.
+    by rewrite xpair_eqE Hpa.
+  by rewrite Hpair /= !mul0r.
+- have Hpair : ((tuple_prefix i (tnth x), tnth x i) == (a, b)) = false.
+    rewrite xpair_eqE Hb andbF.
+    by [].
+  by rewrite Hpair /= !mul0r.
+Qed.
+
+Lemma summable_prefix_coordinate_weighted_kl
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R)
+    (i : 'I_n) :
+  0 <= tnth eps i ->
+  absolute_continuous P Q ->
+  (forall a : i.-tuple A,
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
+  summable
+    (fun a : i.-tuple A =>
+      \P_[P] (fun x => tuple_prefix_eq a x) *
+      δ_KL (conditional_coordinate P a)
+           (conditional_coordinate Q a)).
+Proof.
+move=> Heps_i Hac Hcond.
+pose pref_mass (a : i.-tuple A) :=
+  \P_[P] (fun x => tuple_prefix_eq a x).
+pose pref_dmargin :=
+  dmargin (fun x : n.-tuple A => tuple_prefix i (tnth x)) P.
+have Hpref_summable : summable pref_mass.
+  apply: (eq_summable (S1 := pref_dmargin)).
+    by move=> a; rewrite /pref_dmargin dmargin_tuple_prefixE.
+  exact: summable_mu.
+have Hbound a :
+    0 <= pref_mass a *
+      δ_KL (conditional_coordinate P a)
+           (conditional_coordinate Q a) <=
+    tnth eps i * pref_mass a.
+  apply/andP; split.
+    apply: mulr_ge0; first exact: ge0_pr.
+    exact: conditional_coordinate_kl_nonnegative.
+  rewrite [tnth eps i * _]mulrC.
+  apply: ler_wpM2l; first exact: ge0_pr.
+  exact: Hcond.
+apply: (le_summable (F2 := fun a => tnth eps i * pref_mass a)).
+  exact: Hbound.
+apply: summableZ.
+exact: Hpref_summable.
+Qed.
+
+Lemma sum_prefix_coordinate_weighted_kl_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R)
+    (i : 'I_n) :
+  0 <= tnth eps i ->
+  absolute_continuous P Q ->
+  (forall a : i.-tuple A,
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
+  sum
+    (fun a : i.-tuple A =>
+      \P_[P] (fun x => tuple_prefix_eq a x) *
+      δ_KL (conditional_coordinate P a)
+           (conditional_coordinate Q a)) <=
+  tnth eps i.
+Proof.
+move=> Heps_i Hac Hcond.
+pose pref_mass (a : i.-tuple A) :=
+  \P_[P] (fun x => tuple_prefix_eq a x).
+pose H := fun a : i.-tuple A =>
+  pref_mass a *
+  δ_KL (conditional_coordinate P a)
+       (conditional_coordinate Q a).
+have Hnonneg a : 0 <= H a.
+  rewrite /H.
+  apply: mulr_ge0; first exact: ge0_pr.
+  exact: conditional_coordinate_kl_nonnegative.
+have Hpref_summable : summable pref_mass.
+  apply: (eq_summable
+    (S1 := dmargin (fun x : n.-tuple A => tuple_prefix i (tnth x)) P)).
+    by move=> a; rewrite dmargin_tuple_prefixE.
+  exact: summable_mu.
+have Hpref_psum : psum pref_mass <= 1.
+  rewrite (eq_psum
+    (F2 := dmargin (fun x : n.-tuple A => tuple_prefix i (tnth x)) P));
+    last by move=> a; rewrite dmargin_tuple_prefixE.
+  exact: le1_mu.
+rewrite -psum_sum; last exact: Hnonneg.
+apply: (le_trans _ _).
+  apply: (le_psum (F2 := tnth eps i \*o pref_mass)).
+    move=> a.
+    apply/andP; split; first exact: Hnonneg.
+    rewrite /H /pref_mass /=.
+    rewrite [X in _ <= X]mulrC.
+    apply: ler_wpM2l; first exact: ge0_pr.
+    exact: Hcond.
+  change (summable (tnth eps i \*o pref_mass)).
+  exact: summableZ.
+rewrite psumZ //.
+apply: (le_trans (ler_wpM2l Heps_i Hpref_psum)).
+by rewrite mulr1.
+Qed.
+
+Lemma finite_sum_fneg_coordinate_log_contribution_partition_prefix
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (J : seq (n.-tuple A)) :
+  uniq J ->
+  \sum_(x <- J)
+    `|fneg
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
+    \sum_(x <- J | tuple_prefix_eq a x)
+      `|fneg
+        (fun x => P x * coordinate_log_contribution P Q x i) x|.
+Proof.
+move=> Huniq.
+rewrite [leLHS]big_mkcond.
+rewrite [leLHS]big_seq_cond.
+rewrite [leRHS](eq_bigr (fun a =>
+    \sum_(x <- J)
+      (if tuple_prefix_eq a x then
+        `|fneg
+          (fun x => P x * coordinate_log_contribution P Q x i) x|
+       else 0))); last first.
+  by move=> a _; rewrite big_mkcond.
+rewrite [leRHS]exchange_big.
+rewrite [leRHS]big_seq_cond.
+apply: ler_sum=> x /andP[HxJ _].
+set t := `|fneg _ _|.
+pose a0 := tuple_prefix i (tnth x).
+have Ha0 : a0 \in undup [seq tuple_prefix i (tnth x) | x <- J].
+  rewrite mem_undup.
+  apply/mapP; exists x=> //.
+have Hu : uniq (undup [seq tuple_prefix i (tnth x) | x <- J]) by rewrite undup_uniq.
+have Hprefix : tuple_prefix_eq a0 x.
+  apply/forallP=> j.
+  rewrite /a0 /tuple_prefix_eq /tuple_prefix tnth_mktuple.
+  by rewrite eqxx.
+rewrite (bigD1_seq a0 Ha0 Hu) /= Hprefix.
+rewrite -/t.
+rewrite lerDl.
+apply: sumr_ge0=> a _.
+case: (tuple_prefix_eq a x); first exact: normr_ge0.
+exact: lexx.
+Qed.
+
+Lemma finite_sum_fneg_coordinate_log_contribution_partition_coordinate
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) :
+  uniq J ->
+  \sum_(x <- J | tuple_prefix_eq a x)
+    `|fneg
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  \sum_(b <- undup [seq tnth x i | x <- J])
+    \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b))
+      `|fneg
+        (fun x => P x * coordinate_log_contribution P Q x i) x|.
+Proof.
+move=> _.
+exact: (finite_sum_partition_by_image
+  J (fun x => tnth x i) (fun x => tuple_prefix_eq a x)
+  (fun x => `|fneg
+    (fun x => P x * coordinate_log_contribution P Q x i) x|)
+  (fun x => normr_ge0 _)).
+Qed.
+
+Lemma finite_sum_prefix_coordinate_fiber_log_fneg_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) (b : A) :
+  uniq J ->
+  \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b))
+    `|fneg
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  `|fneg
+    (fun b : A =>
+      \P_[P] (fun x => tuple_prefix_eq a x) *
+      (conditional_coordinate P a b *
+       ln (conditional_coordinate P a b /
+           conditional_coordinate Q a b))) b|.
+Proof.
+move=> Huniq.
+set l := ln (conditional_coordinate P a b / conditional_coordinate Q a b).
+set r := \P_[P] (fun x => tuple_prefix_eq a x) *
+  conditional_coordinate P a b.
+rewrite (eq_bigr (fun x => `|fneg (fun _ : unit => P x * l) tt|));
+  last first.
+  move=> x /andP[Hprefix /eqP Hb].
+  rewrite /fneg /= /l.
+  rewrite (coordinate_log_contribution_prefix P Q i a x Hprefix).
+  by rewrite Hb.
+apply: (le_trans
+  (finite_sum_fneg_scaled_le
+    J (fun x => tuple_prefix_eq a x && (tnth x i == b))
+    (fun x => P x) r l (fun x => ge0_mu P x)
+    (finite_sum_selected_prefix_coordinate_mass_le P i J a b Huniq))).
+rewrite /r /l.
+by rewrite -mulrA.
+Qed.
+
+Lemma finite_sum_fneg_coordinate_log_contribution_prefix_coordinate_group_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) :
+  uniq J ->
+  \sum_(x <- J | tuple_prefix_eq a x)
+    `|fneg
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  \sum_(b <- undup [seq tnth x i | x <- J])
+    `|fneg
+      (fun b : A =>
+        \P_[P] (fun x => tuple_prefix_eq a x) *
+        (conditional_coordinate P a b *
+         ln (conditional_coordinate P a b /
+             conditional_coordinate Q a b))) b|.
+Proof.
+move=> Huniq.
+apply: (le_trans
+  (finite_sum_fneg_coordinate_log_contribution_partition_coordinate P Q i J a Huniq)).
+apply: ler_sum=> b _.
+exact: (finite_sum_prefix_coordinate_fiber_log_fneg_bound P Q i J a b Huniq).
+Qed.
+
+Lemma finite_sum_fneg_coordinate_log_contribution_prefix_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) :
+  uniq J ->
+  absolute_continuous
+    (conditional_coordinate P a) (conditional_coordinate Q a) ->
+  \sum_(x <- J | tuple_prefix_eq a x)
+    `|fneg
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  psum (fneg
+    (fun b : A =>
+      \P_[P] (fun x => tuple_prefix_eq a x) *
+      (conditional_coordinate P a b *
+       ln (conditional_coordinate P a b /
+           conditional_coordinate Q a b)))).
+Proof.
+move=> Huniq Hac.
+apply: (le_trans
+  (finite_sum_fneg_coordinate_log_contribution_prefix_coordinate_group_bound
+    P Q i J a Huniq)).
+apply: gerfinseq_psum; first exact: undup_uniq.
+apply: (eq_summable (S1 :=
+  \P_[P] (fun x => tuple_prefix_eq a x) \*o
+  fneg (fun b : A =>
+    conditional_coordinate P a b *
+    ln (conditional_coordinate P a b /
+        conditional_coordinate Q a b)))).
+  move=> b.
+  have := fnegZ
+    (fun b : A =>
+      conditional_coordinate P a b *
+      ln (conditional_coordinate P a b /
+          conditional_coordinate Q a b))
+    (ge0_pr (fun x => tuple_prefix_eq a x) P) b.
+  by [].
+apply: summableZ.
+exact: (summable_fneg_kl_integrand
+  (conditional_coordinate P a) (conditional_coordinate Q a) Hac).
+Qed.
+
+Lemma finite_sum_fneg_coordinate_log_contribution_group_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (J : seq (n.-tuple A)) :
+  (forall a : i.-tuple A,
+    absolute_continuous
+      (conditional_coordinate P a) (conditional_coordinate Q a)) ->
+  uniq J ->
+  \sum_(x <- J)
+    `|fneg
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
+    psum (fneg
+      (fun b : A =>
+        \P_[P] (fun x => tuple_prefix_eq a x) *
+        (conditional_coordinate P a b *
+         ln (conditional_coordinate P a b /
+             conditional_coordinate Q a b)))).
+Proof.
+move=> Hac Huniq.
+apply: (le_trans
+  (finite_sum_fneg_coordinate_log_contribution_partition_prefix P Q i J Huniq)).
+apply: ler_sum=> a _.
+exact: (finite_sum_fneg_coordinate_log_contribution_prefix_bound
+  P Q i J a Huniq (Hac a)).
+Qed.
+
+Lemma finite_sum_fneg_coordinate_log_contribution_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R})
+    (i : 'I_n) (J : seq (n.-tuple A)) :
+  (forall a : i.-tuple A,
+    finite_kl (conditional_coordinate P a)
+              (conditional_coordinate Q a)) ->
+  uniq J ->
+  \sum_(x <- J)
+    `|fneg
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  1.
+Proof.
+move=> Hfin Huniq.
+have Hac (a : i.-tuple A) : absolute_continuous
+    (conditional_coordinate P a) (conditional_coordinate Q a).
+  by have [Hac _] := Hfin a.
+apply: (le_trans
+  (finite_sum_fneg_coordinate_log_contribution_group_bound P Q i J Hac Huniq)).
+apply: (le_trans _ (finite_sum_selected_prefix_mass_le1 P i J)).
+apply: ler_sum=> a _.
+exact: (scaled_kl_integrand_fneg_psum_le
+  (conditional_coordinate P a) (conditional_coordinate Q a)
+  (\P_[P] (fun x => tuple_prefix_eq a x))
+  (ge0_pr (fun x => tuple_prefix_eq a x) P) (Hac a)).
+Qed.
+
+
+Lemma sum_coordinate_log_contribution_prefix_weighted
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (i : 'I_n) :
+  summable (fun x => P x * coordinate_log_contribution P Q x i) ->
+  summable (fun a : i.-tuple A =>
+    \P_[P] (fun x => tuple_prefix_eq a x) *
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a)) ->
+  (forall a : i.-tuple A,
+    finite_kl (conditional_coordinate P a)
+              (conditional_coordinate Q a)) ->
+  sum (fun x => P x * coordinate_log_contribution P Q x i) =
+  sum (fun a : i.-tuple A =>
+    \P_[P] (fun x => tuple_prefix_eq a x) *
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a)).
+Admitted.
+
+
+
+
 
 Lemma finite_sum_prefix_event_mass_le1
     {n : nat} {A : choiceType}
@@ -894,6 +1395,173 @@ apply: (le_trans (ler_wpM2l Heps_i
     (undup [seq tuple_prefix i (tnth x) | x <- J]) (undup_uniq _)))).
 by rewrite mulr1.
 Qed.
+
+Lemma finite_sum_fpos_coordinate_log_contribution_bound_eps
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R)
+    (i : 'I_n) (J : seq (n.-tuple A)) :
+  0 <= tnth eps i ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  absolute_continuous P Q ->
+  (forall a : i.-tuple A,
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a) /\
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
+  uniq J ->
+  \sum_(x <- J)
+    `|fpos
+      (fun x => P x * coordinate_log_contribution P Q x i) x| <=
+  tnth eps i + 1.
+Proof.
+move=> Heps_i HP HQ Hac Hcond Huniq.
+have Hfin (a : i.-tuple A) : finite_kl
+    (conditional_coordinate P a) (conditional_coordinate Q a).
+  by have [Hfin _] := Hcond a.
+apply: (le_trans
+  (finite_sum_fpos_coordinate_log_contribution_bound
+    P Q i J HP HQ Hac Hfin Huniq)).
+apply: lerD; last exact: lexx.
+exact: (prefix_coordinate_kl_contribution_bound
+  P Q eps i J Heps_i Hcond).
+Qed.
+
+Lemma summable_coordinate_log_contribution
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R)
+    (i : 'I_n) :
+  0 <= tnth eps i ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  absolute_continuous P Q ->
+  (forall a : i.-tuple A,
+    finite_kl (conditional_coordinate P a)
+              (conditional_coordinate Q a)) ->
+  (forall a : i.-tuple A,
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
+  summable (fun x => P x * coordinate_log_contribution P Q x i).
+Proof.
+move=> Heps_i HP HQ Hac Hfin Hcond.
+apply: summable_from_fpos_fneg.
+- apply/summable_seqP.
+  exists (tnth eps i + 1); first by lra.
+  move=> J Huniq.
+  exact: (finite_sum_fpos_coordinate_log_contribution_bound_eps
+    P Q eps i J Heps_i HP HQ Hac
+    (fun a => conj (Hfin a) (Hcond a)) Huniq).
+- apply/summable_seqP.
+  exists 1; first by lra.
+  move=> J Huniq.
+  exact: (finite_sum_fneg_coordinate_log_contribution_bound
+    P Q i J Hfin Huniq).
+Qed.
+
+Lemma sum_coordinate_log_contribution_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R)
+    (i : 'I_n) :
+  0 <= tnth eps i ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  absolute_continuous P Q ->
+  (forall a : i.-tuple A,
+    finite_kl (conditional_coordinate P a)
+              (conditional_coordinate Q a)) ->
+  (forall a : i.-tuple A,
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i) ->
+  sum (fun x => P x * coordinate_log_contribution P Q x i) <=
+  tnth eps i.
+Proof.
+move=> Heps_i HP HQ Hac Hfin Hcond.
+have Hsumm_coord : summable
+    (fun x => P x * coordinate_log_contribution P Q x i).
+  exact: (summable_coordinate_log_contribution
+    P Q eps i Heps_i HP HQ Hac Hfin Hcond).
+have Hsumm_pref : summable
+    (fun a : i.-tuple A =>
+      \P_[P] (fun x => tuple_prefix_eq a x) *
+      δ_KL (conditional_coordinate P a)
+           (conditional_coordinate Q a)).
+  exact: (summable_prefix_coordinate_weighted_kl P Q eps i Heps_i Hac Hcond).
+rewrite (sum_coordinate_log_contribution_prefix_weighted
+  P Q i Hsumm_coord Hsumm_pref Hfin).
+exact: (sum_prefix_coordinate_weighted_kl_bound P Q eps i Heps_i Hac Hcond).
+Qed.
+
+
+Lemma iterated_kl_chain_bound_from_pointwise
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  (forall i : 'I_n, 0 <= tnth eps i) ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  finite_kl P Q ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
+  (forall x : n.-tuple A,
+    P x * ln (P x / Q x) =
+    \sum_(i < n) P x * coordinate_log_contribution P Q x i) ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+  δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <= tnth eps i) ->
+  δ_KL P Q <= \sum_(i < n) tnth eps i.
+Proof.
+move=> Heps HP HQ Hfin Hfincond Hpoint Hcond.
+have Hac : absolute_continuous P Q :=
+  finite_kl_absolute_continuous P Q Hfin.
+pose F (i : 'I_n) (x : n.-tuple A) :=
+  P x * coordinate_log_contribution P Q x i.
+have HsummF : forall i : 'I_n, summable (F i).
+  move=> i.
+  exact: (summable_coordinate_log_contribution P Q eps i
+    (Heps i) HP HQ Hac (fun a => Hfincond i a) (fun a => Hcond i a)).
+rewrite /δ_KL /esp.
+rewrite (eq_sum (F2 := fun x => P x * ln (P x / Q x))); last first.
+  by move=> x; rewrite mulrC.
+have Hsum_eq :
+    sum (fun x => P x * ln (P x / Q x)) =
+    sum (fun x => \sum_(i < n) F i x).
+  apply/eq_sum=> x.
+  by rewrite /F Hpoint.
+rewrite Hsum_eq.
+rewrite (sum_finite_ord_sum F HsummF).
+apply: ler_sum=> i _.
+exact: (sum_coordinate_log_contribution_bound P Q eps i
+  (Heps i) HP HQ Hac (fun a => Hfincond i a) (fun a => Hcond i a)).
+Qed.
+
+Lemma iterated_kl_chain_bound_via_pointwise
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  (forall i : 'I_n, 0 <= tnth eps i) ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  finite_kl P Q ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a)) ->
+  (forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <= tnth eps i) ->
+  δ_KL P Q <= \sum_(i < n) tnth eps i.
+Proof.
+move=> Heps HP HQ Hfin Hfincond Hcond.
+have Hac : absolute_continuous P Q := finite_kl_absolute_continuous P Q Hfin.
+apply: (iterated_kl_chain_bound_from_pointwise P Q eps
+  Heps HP HQ Hfin Hfincond _ Hcond).
+exact: (kl_integrand_chain_decomp_pointwise P Q Hac).
+Qed.
+
 
 Lemma prefix_coordinate_weighted_kl_bound
     {n : nat} {A : choiceType}
