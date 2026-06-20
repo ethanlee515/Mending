@@ -18,6 +18,43 @@ Context {R : realType}.
 Definition total_variation {T : choiceType} (P Q : {distr T / R}) : R :=
   (1 / 2) * sum (fun x => `| P x - Q x |).
 
+Lemma fposDfneg_norm {T : choiceType} (F : T -> R) x :
+  fpos F x + fneg F x = `|F x|.
+Proof.
+rewrite /fpos /fneg.
+case: (ger0P (F x))=> H.
+  by rewrite normr0 addr0 ger0_norm.
+by rewrite normr0 add0r ltr0_norm.
+Qed.
+
+Lemma norm_sum_le_psum {T : choiceType} (F : T -> R) :
+  summable F ->
+  `|sum F| <= psum F.
+Proof.
+move=> Hsumm.
+rewrite /sum.
+set p := psum (fpos F).
+set q := psum (fneg F).
+have Hp : 0 <= p by exact: ge0_psum.
+have Hq : 0 <= q by exact: ge0_psum.
+have Hpsum : psum F = p + q.
+  rewrite -[LHS]psum_abs.
+  rewrite (eq_psum (F2 := fpos F \+ fneg F)); last first.
+    move=> x /=.
+    exact/esym/fposDfneg_norm.
+  rewrite psumD.
+  - by [].
+  - move=> x; exact: ge0_fpos.
+  - move=> x; exact: ge0_fneg.
+  - exact: (summable_fpos Hsumm).
+  - exact: (summable_fneg Hsumm).
+rewrite Hpsum.
+have Habs : `|p - q| <= p + q.
+  have H := ler_normB p q.
+  by rewrite (ger0_norm Hp) (ger0_norm Hq) in H.
+exact: Habs.
+Qed.
+
 (* -- Conditional distributions -- *)
 
 Lemma isdistr_dcond {T : choiceType} (P : {distr T / R}) (p : pred T) :
@@ -208,6 +245,123 @@ rewrite psumD in H; try solve [move=> x; rewrite addr_ge0 ?ge0_fpos ?ge0_fneg].
 all: try by move=> x; rewrite ?addr_ge0 ?ge0_fpos ?ge0_fneg.
 all: try by apply: summableD.
 all: done.
+Qed.
+
+Lemma summable_fiber_psum_nonneg {T U : choiceType}
+    (f : T -> U) (S : T -> R) :
+  (forall x, 0 <= S x) ->
+  summable S ->
+  summable (fun y => psum (fun x => (f x == y)%:R * S x)).
+Proof.
+move=> HS smS.
+apply/summable_seqP; exists (psum S); first exact: ge0_psum.
+move=> J uqJ.
+rewrite (eq_bigr (fun y => psum (fun x => (f x == y)%:R * S x)));
+  last by move=> y _; rewrite ger0_norm ?ge0_psum.
+rewrite (@psum_bigop R T U (fun y x => (f x == y)%:R * S x) predT J).
+- apply: le_psum; last exact: smS.
+  move=> x; apply/andP; split.
+  + apply: sumr_ge0=> y _.
+    by rewrite mulr_ge0 ?HS ?ler0n.
+  + case HfxJ : (f x \in J).
+    * rewrite (bigD1_seq (f x) HfxJ uqJ) /= eqxx mul1r.
+      rewrite big1 ?addr0 // => y.
+      by rewrite eq_sym=> /negbTE ->; rewrite mul0r.
+    * rewrite big_seq_cond big1 ?mul0r // => y /andP[Hy _].
+      case Hfy : (f x == y); last by rewrite mul0r.
+      by move: HfxJ; rewrite (eqP Hfy) Hy.
+- by move=> y x; rewrite mulr_ge0 ?HS ?ler0n.
+- by move=> y; exact: (@summable_condl R T S (fun x => f x == y) smS).
+Qed.
+
+Lemma dmargin_signed_sumE {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) y :
+  dmargin f P y - dmargin f Q y =
+  sum (fun x : T => (f x == y)%:R * (P x - Q x)).
+Proof.
+rewrite dmargin_psumE.
+rewrite dmargin_psumE.
+  rewrite (eq_sum (F2 := fun x : T =>
+      (f x == y)%:R * P x + - ((f x == y)%:R * Q x))); last first.
+    move=> x.
+    by rewrite mulrBr.
+  have HsmP : summable (fun x : T => (f x == y)%:R * P x).
+    apply: summable_condl.
+    exact: summable_mu.
+  have HsmQ : summable (fun x : T => (f x == y)%:R * Q x).
+    apply: summable_condl.
+    exact: summable_mu.
+rewrite (@sumD T
+  (fun x : T => (f x == y)%:R * P x)
+  (fun x : T => - ((f x == y)%:R * Q x))
+  HsmP (summableN HsmQ)).
+- rewrite sumN.
+  rewrite -!psum_sum.
+  + by [].
+  + move=> x; apply: mulr_ge0; [exact: ler0n | exact: ge0_mu].
+  + move=> x; apply: mulr_ge0; [exact: ler0n | exact: ge0_mu].
+Qed.
+
+Lemma total_variation_dmargin_le {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  total_variation (dmargin f P) (dmargin f Q) <= total_variation P Q.
+Proof.
+rewrite /total_variation.
+apply: ler_wpM2l; first by lra.
+  pose S := fun x : T => P x - Q x.
+  pose fiber_abs := fun y : U => psum (fun x : T => (f x == y)%:R * S x).
+  have Hfiber_summable y :
+      summable (fun x : T => (f x == y)%:R * S x).
+    apply: (eq_summable (S1 := fun x : T =>
+      (f x == y)%:R * P x + - ((f x == y)%:R * Q x))).
+      move=> x.
+      by rewrite /S mulrBr.
+    apply: summableD.
+      apply: summable_condl.
+      exact: summable_mu.
+    apply: summableN.
+    apply: summable_condl.
+    exact: summable_mu.
+  have Hpoint y :
+      `|dmargin f P y - dmargin f Q y| <= fiber_abs y.
+    rewrite dmargin_signed_sumE.
+    exact: norm_sum_le_psum.
+have Habs_summable : summable (fun x : T => `|S x|).
+  apply/summable_abs.
+  apply: (eq_summable (S1 := fun x : T => P x + - Q x)).
+    by move=> x; rewrite /S.
+  apply: summableD; first exact: summable_mu.
+  exact: summableN; exact: summable_mu.
+have Hfiber_abs_summable : summable fiber_abs.
+  rewrite /fiber_abs.
+  apply: (eq_summable (S1 := fun y : U =>
+    psum (fun x : T => (f x == y)%:R * `|S x|))).
+    move=> y.
+    apply/eq_psum_abs=> x.
+    case Hfy : (f x == y).
+      by rewrite /= !mul1r ger0_norm ?normr_ge0.
+    by rewrite /= !mul0r !normr0.
+  apply: summable_fiber_psum_nonneg; first by move=> x; exact: normr_ge0.
+  exact: Habs_summable.
+apply: (le_trans (le_sum _ _ Hpoint)).
+  apply: (le_summable (F2 := fiber_abs)).
+    move=> y; apply/andP; split; first exact: normr_ge0.
+    exact: Hpoint.
+  exact: Hfiber_abs_summable.
+  exact: Hfiber_abs_summable.
+rewrite /fiber_abs.
+rewrite -psum_sum; last by move=> y; exact: ge0_psum.
+rewrite (eq_psum (F2 := fun y : U =>
+  psum (fun x : T => `|S x| * (f x == y)%:R))); last first.
+  move=> y.
+  apply/eq_psum_abs=> x.
+  case Hfy : (f x == y).
+    by rewrite /= !mul1r !mulr1 [RHS]ger0_norm ?normr_ge0.
+  by rewrite /= !mul0r !mulr0 !normr0.
+rewrite -(@partition_psum R T U f (fun x : T => `|S x|)).
+  rewrite -psum_sum; last by move=> x; exact: normr_ge0.
+  apply: lexx.
+exact: Habs_summable.
 Qed.
 
 Lemma expectation_add {T : choiceType} (P : {distr T / R}) (f g : T -> R) :

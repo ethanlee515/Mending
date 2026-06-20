@@ -269,7 +269,6 @@ Lemma pythDist_final_total_variation
     pythagorean_tv_bound eps.
 Proof.
 move=> Hdist.
-have Hac := pythDist_absolute_continuous P Q eps Hdist.
 case: Hdist=> Heps [HP [HQ Hcond_all]].
 have Hfin : forall (i : 'I_n.+1) (a : i.-tuple A),
     finite_kl
@@ -282,21 +281,15 @@ have Hcond : forall (i : 'I_n.+1) (a : i.-tuple A),
       tnth eps i.
   by move=> i a; have [_ Hle] := Hcond_all i a.
 pose final := fun omega : n.+1.-tuple A => tnth omega ord_max.
-have HPfinal : dweight (dmargin final P) = 1 by rewrite dmargin_dweight.
-have HQfinal : dweight (dmargin final Q) = 1 by rewrite dmargin_dweight.
 have HfinPQ : finite_kl P Q.
   exact: (coordinate_bounded_kl_finite_kl P Q eps Heps HP HQ Hcond_all).
-have Hfinfinal : finite_kl (dmargin final P) (dmargin final Q).
-  exact: (finite_kl_dmargin final P Q HfinPQ).
-have Hpin := pinsker (dmargin final P) (dmargin final Q)
-  Hfinfinal HPfinal HQfinal.
+have Hpin := pinsker P Q HfinPQ HP HQ.
+apply: (le_trans (total_variation_dmargin_le final P Q)).
 apply: (le_trans Hpin).
 rewrite /pythagorean_tv_bound /tuple_sum.
 apply: ler_wsqrtr.
-have Hdata := kl_dmargin_data_processing final P Q Hac.
 have Hchain := iterated_kl_chain_bound_via_pointwise
   P Q eps Heps HP HQ HfinPQ Hfin Hcond.
-have Hkl := le_trans Hdata Hchain.
 lra.
 Qed.
 
