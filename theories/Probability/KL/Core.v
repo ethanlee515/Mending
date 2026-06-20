@@ -519,15 +519,89 @@ rewrite (eq_sum (F2 := fun x => P x * ln (P x / Q x))); last first.
 exact: kl_dmargin_log_sum_inequality.
 Qed.
 
+Lemma sum_le_psum_fpos {T : choiceType} (F : T -> R) :
+  sum F <= psum (fpos F).
+Proof.
+rewrite /sum.
+have Hneg : 0 <= psum (fneg F) := ge0_psum _.
+lra.
+Qed.
+
 Lemma kl_dmargin_fpos_le_fiber_fpos {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :
-  absolute_continuous P Q ->
+  finite_kl P Q ->
   forall y,
     fpos (fun y =>
       dmargin f P y * ln (dmargin f P y / dmargin f Q y)) y <=
     psum (fun x =>
       (f x == y)%:R * fpos (fun x => P x * ln (P x / Q x)) x).
-Admitted.
+Proof.
+move=> Hfin y.
+have Hac := finite_kl_absolute_continuous P Q Hfin.
+have Hsrc_fpos_sm :
+    summable (fpos (fun x => P x * ln (P x / Q x))) :=
+  summable_fpos (finite_kl_summable P Q Hfin).
+pose py := fun x : T => (f x == y)%:R * P x.
+pose qy := fun x : T => (f x == y)%:R * Q x.
+pose lhs := dmargin f P y * ln (dmargin f P y / dmargin f Q y).
+have Hpy_ge x : 0 <= py x by rewrite /py mulr_ge0 ?ler0n ?ge0_mu.
+have Hqy_ge x : 0 <= qy x by rewrite /qy mulr_ge0 ?ler0n ?ge0_mu.
+have Hpy_sm : summable py by apply: summable_condl.
+have Hqy_sm : summable qy by apply: summable_condl.
+have Hfiber_ac x : qy x = 0 -> py x = 0.
+  rewrite /py /qy.
+  case Hfx: (f x == y); last by rewrite !mul0r.
+  rewrite !mul1r.
+  exact: Hac x.
+have Hlogsum :
+    lhs <= sum (fun x => py x * ln (py x / qy x)).
+  have H :=
+    log_sum_inequality_partition (fun _ : T => tt) py qy
+      Hpy_ge Hqy_ge Hpy_sm Hqy_sm Hfiber_ac.
+  apply: (le_trans _ H).
+  rewrite /lhs.
+  rewrite (sum_seq1 tt).
+  - rewrite !eqxx.
+    have -> : psum (fun x : T => true%:R * py x) = psum py.
+      by apply/eq_psum=> x; rewrite /= mul1r.
+    have -> : psum (fun x : T => true%:R * qy x) = psum qy.
+      by apply/eq_psum=> x; rewrite /= mul1r.
+    by rewrite /py /qy !dmargin_psumE.
+  - by move=> z Hnz; case: z Hnz.
+have Hrhs :
+    sum (fun x => py x * ln (py x / qy x)) <=
+    psum (fun x =>
+      (f x == y)%:R * fpos (fun x => P x * ln (P x / Q x)) x).
+  apply: (le_trans (sum_le_psum_fpos _)).
+  apply/le_psum.
+    move=> x; apply/andP; split; first exact: ge0_fpos.
+      have -> :
+        fpos (fun x0 : T => py x0 * ln (py x0 / qy x0)) x =
+        (f x == y)%:R *
+          fpos (fun x0 : T => P x0 * ln (P x0 / Q x0)) x.
+      rewrite /py /qy.
+      case Hfx: (f x == y).
+        by rewrite /fpos /= Hfx /= !mul1r.
+      rewrite /fpos /= Hfx /= !mul0r.
+      change (fpos (fun _ : T => (0 : R)) x = 0).
+      exact: (@fpos0 R T x).
+    exact: lexx.
+  exact: (@summable_condl R T
+    (fpos (fun x => P x * ln (P x / Q x)))
+    (fun x => f x == y) Hsrc_fpos_sm).
+pose rhs := psum (fun x =>
+  (f x == y)%:R * fpos (fun x => P x * ln (P x / Q x)) x).
+have Hbound : lhs <= rhs := le_trans Hlogsum Hrhs.
+change (fpos (fun _ : U => lhs) y <= rhs).
+have Hposle :
+    fpos (fun _ : U => lhs) y <= fpos (fun _ : U => rhs) y :=
+  @le_fpos R U (fun _ : U => lhs) (fun _ : U => rhs)
+    (fun _ : U => Hbound) y.
+apply: (le_trans Hposle).
+rewrite fpos_ge0 //.
+move=> _.
+exact: ge0_psum.
+Qed.
 
 Lemma summable_fpos_kl_dmargin {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :
@@ -541,8 +615,7 @@ apply: (le_summable
   (F2 := fun y => psum (fun x =>
     (f x == y)%:R * fpos (fun x => P x * ln (P x / Q x)) x))).
   move=> y; apply/andP; split; first exact: ge0_fpos.
-  exact: (kl_dmargin_fpos_le_fiber_fpos f P Q
-    (finite_kl_absolute_continuous P Q Hfin) y).
+  exact: (kl_dmargin_fpos_le_fiber_fpos f P Q Hfin y).
 apply: summable_fiber_psum.
 - exact: ge0_fpos.
 - exact: (summable_fpos Hsrc).

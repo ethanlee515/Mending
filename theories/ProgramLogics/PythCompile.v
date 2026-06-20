@@ -1633,7 +1633,6 @@ Qed.
     - [ChainPointwise.kl_integrand_chain_decomp_pointwise]
     - [ChainPointwise.sum_coordinate_log_contribution_prefix_weighted]
     - [log_sum_inequality_partition]
-    - [kl_dmargin_fpos_le_fiber_fpos]
 
     External/classical assumptions are currently MathComp/SSProve
     infinite-sum admits plus extensionality/choice/proof-irrelevance axioms.
