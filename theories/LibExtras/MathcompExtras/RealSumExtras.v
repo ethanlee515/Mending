@@ -142,6 +142,67 @@ rewrite -[a * b / (a * c)]mulf_div.
 by rewrite divff ?mul1r // lt0r_neq0.
 Qed.
 
+Lemma minr_lel (x y : R) :
+  Num.min x y <= x.
+Proof.
+rewrite minr_absE.
+have Hnorm : y - x <= `|x - y|.
+  rewrite -opprB -normrN.
+  exact: ler_norm.
+lra.
+Qed.
+
+Lemma minr_ler (x y : R) :
+  Num.min x y <= y.
+Proof.
+rewrite minr_absE.
+have Hnorm : x - y <= `|x - y| := ler_norm _.
+lra.
+Qed.
+
+Lemma minr_ge0 (x y : R) :
+  0 <= x ->
+  0 <= y ->
+  0 <= Num.min x y.
+Proof.
+move=> Hx Hy.
+rewrite minr_absE.
+have Hnorm : `|x - y| <= x + y.
+  apply: (le_trans (ler_normB x y)).
+  by rewrite !ger0_norm.
+lra.
+Qed.
+
+Lemma summable_minl_nonneg
+    {T : choiceType} (F G : T -> R) :
+  (forall x, 0 <= F x) ->
+  (forall x, 0 <= G x) ->
+  summable F ->
+  summable (fun x => Num.min (F x) (G x)).
+Proof.
+move=> HF HG HsummF.
+apply: (le_summable (F2 := F)); last exact: HsummF.
+move=> x.
+apply/andP; split.
+- exact: minr_ge0.
+- exact: minr_lel.
+Qed.
+
+Lemma summable_minr_nonneg
+    {T : choiceType} (F G : T -> R) :
+  (forall x, 0 <= F x) ->
+  (forall x, 0 <= G x) ->
+  summable G ->
+  summable (fun x => Num.min (F x) (G x)).
+Proof.
+move=> HF HG HsummG.
+apply: (le_summable (F2 := G)); last exact: HsummG.
+move=> x.
+apply/andP; split.
+- exact: minr_ge0.
+- exact: minr_ler.
+Qed.
+
 End RealSumExtras.
 
 Fixpoint max_nat_lst (s : list nat) : nat :=

@@ -10,7 +10,7 @@ From Mending.NextMessage Require Import Trace.
 From Mending.Probability Require Import Ae OutputHeap.
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph
-  choice_type fmap_extra.
+  choice_type fmap_extra SubDistr.
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve.Crypt.nominal Require Import Pr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
@@ -164,26 +164,26 @@ Lemma additiveErrorCompletedOutputHeapTvdEqRule
     outL == outR ⦄.
 Proof.
 move=> Heps Htv.
-have Hae : ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
-    fun outs =>
-      let '((yL, memL'), (yR, memR')) := outs in
-      (yL == yR) && (memL' == memR') ⦄.
-  apply: (additiveErrorTvdEqRule progL progR pre ε)=> //.
-  move=> memL memR xL xR Hpre.
-  exact: (le_trans (total_variation_complete_output_heap_ge _ _)
-           (Htv memL memR xL xR Hpre)).
-move: Hae=> [_ Hae].
 split; first exact: Heps.
 move=> memL memR xL xR Hpre.
-have [d [Hd Hprob]] := Hae memL memR xL xR Hpre.
-exists d; split; first exact: Hd.
-apply: (le_trans Hprob).
-apply: subset_pr=> out Hout.
-case: out Hout=> [[outL|] [outR|]] //=.
-case: outL outR=> yL memL' [yR memR'] /= Hout.
-apply/eqP.
-move/andP: Hout=> [/eqP -> /eqP ->].
-by [].
+set out1 := Pr_code (progL xL) memL.
+set out2 := Pr_code (progR xR) memR.
+have Htv_complete : total_variation (complete out1) (complete out2) <= ε.
+  rewrite (total_variation_complete_output_heap out1 out2).
+  exact: Htv.
+have [d [HdL [HdR Hprob]]] :=
+  maximal_coupling_total_variation (complete out1) (complete out2) ε
+    (complete_dweight out1) (complete_dweight out2) Htv_complete.
+exists d.
+split.
+- split.
+  + apply: distr_ext=> x.
+    by rewrite /lmg dmarginE.
+  + apply: distr_ext=> x.
+    by rewrite /rmg dmarginE.
+- rewrite (eq_pr (B := fun xy => xy.1 == xy.2)).
+    exact: Hprob.
+  by case=> outL outR.
 Qed.
 
 Lemma additiveErrorTvdEqPostRule

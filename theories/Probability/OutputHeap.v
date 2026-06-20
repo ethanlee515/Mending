@@ -172,4 +172,51 @@ rewrite (psum_option_split S HSnonneg HSsumm).
 by rewrite lerDl.
 Qed.
 
+Lemma total_variation_complete_output_heap
+  {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
+  total_variation (complete P) (complete Q) =
+  total_variation (complete_output_heap P) (complete_output_heap Q).
+Proof.
+rewrite /complete_output_heap /total_variation.
+set P' := dmargin _ P.
+set Q' := dmargin _ Q.
+congr (_ * _).
+rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
+pose S := fun x : option (out_t * heap) =>
+    `|complete P x - complete Q x|.
+pose S' := fun x : option (nat * heap) =>
+    `|complete P' x - complete Q' x|.
+have HSnonneg : forall x, 0 <= S x by move=> x; exact: normr_ge0.
+have HSsumm : summable S.
+  apply/summable_abs.
+  apply: summableD; first exact: summable_mu.
+  by apply: summableN; exact: summable_mu.
+have HS'nonneg : forall x, 0 <= S' x by move=> x; exact: normr_ge0.
+have HS'summ : summable S'.
+  apply/summable_abs.
+  apply: summableD; first exact: summable_mu.
+  by apply: summableN; exact: summable_mu.
+rewrite (psum_option_split S HSnonneg HSsumm).
+rewrite (psum_option_split S' HS'nonneg HS'summ).
+have -> : psum (fun x : out_t * heap => S (Some x)) =
+    psum (fun x : out_t * heap => `|P x - Q x|).
+  apply/eq_psum=> x.
+  by rewrite /S !completeE.
+have -> : psum (fun x : nat * heap => S' (Some x)) =
+    psum (fun x : nat * heap => `|P' x - Q' x|).
+  apply/eq_psum=> x.
+  by rewrite /S' !completeE.
+have Hpack :
+    psum (fun x : out_t * heap => `|P x - Q x|) =
+    psum (fun x : nat * heap => `|P' x - Q' x|).
+  move: (total_variation_pack_output_heap P Q).
+  rewrite /total_variation /P' /Q'.
+  rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
+  move=> H.
+  lra.
+rewrite Hpack.
+congr (_ + _).
+by rewrite /S /S' !completeE /= /P' /Q' !dmargin_dweight.
+Qed.
+
 End OutputHeap.

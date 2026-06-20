@@ -1531,6 +1531,27 @@ split.
   by split.
 Qed.
 
+Lemma diagonalCoupling
+  (A : ord_choiceType) (D : {distr A / R}) :
+  coupling (\dlet_(z <- D) dunit (z, z)) D D.
+Proof.
+split.
+- apply: distr_ext=> x.
+  rewrite /lmg dmarginE __deprecated__dlet_dlet.
+  rewrite (eq_dlet (m := D) (g := fun y => dunit y)); last first.
+    move=> y.
+    apply: distr_ext=> z.
+    by rewrite dlet_unit.
+  by rewrite dlet_dunit_id.
+- apply: distr_ext=> x.
+  rewrite /rmg dmarginE __deprecated__dlet_dlet.
+  rewrite (eq_dlet (m := D) (g := fun y => dunit y)); last first.
+    move=> y.
+    apply: distr_ext=> z.
+    by rewrite dlet_unit.
+  by rewrite dlet_dunit_id.
+Qed.
+
 Lemma compileRule
   (q : nat) (X Y A B : choice_type)
   (K L L' L'' : Locations) (M : Interface)
@@ -1573,23 +1594,48 @@ Proof.
 move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall.
 case: q=> [|q].
 - rewrite /compile_calls /compile_calls_from_trace /=.
-  apply: additiveErrorCompletedOutputHeapTvdEqRule.
-  + exact: Num.Theory.sqrtr_ge0.
-  + move=> memL memR xL xR Hpre.
-    move/andP: Hpre=> [/andP [/eqP -> /eqP ->] _].
-    rewrite continue_from_trace_nil.
-    set D := complete_output_heap (Pr_code (code_link (prog xR) P') memR).
-    change (total_variation D D <= Num.sqrt ((0%:R * eps) / 2)).
-    rewrite /total_variation.
-    rewrite (_ : sum (fun y =>
-        `|D y - D y|) = 0).
-      rewrite mulr0.
-      exact: Num.Theory.sqrtr_ge0.
-    rewrite -(@sum0 R (option (nat * heap))%type).
-    apply/eq_sum=> y.
-    by rewrite subrr normr0.
+  split; first exact: Num.Theory.sqrtr_ge0.
+  move=> memL memR xL xR Hpre.
+  move/andP: Hpre=> [/andP [/eqP -> /eqP ->] _].
+  rewrite continue_from_trace_nil.
+  set D := complete (Pr_code (code_link (prog xR) P') memR).
+  exists (\dlet_(z <- D) dunit (z, z)).
+  split; first exact: diagonalCoupling.
+  rewrite (_ : \P_[\dlet_(z <- D) dunit (z, z)]
+      (fun outs =>
+        let '(outL, outR) := outs in outL == outR) = 1).
+    have -> : Num.sqrt ((0%:R * eps) / 2) = 0.
+      by rewrite mul0r mul0r sqrtr0.
+    by rewrite subr0 lexx.
+  rewrite pr_dlet.
+  rewrite (expectation_ext D
+    (fun z =>
+      \P_[dunit (z, z)]
+        (fun outs =>
+          let '(outL, outR) := outs in outL == outR))
+    (fun _ => 1)); last first.
+    move=> z.
+    by rewrite pr_dunit eqxx.
+  by rewrite expectation_const // /D complete_dweight.
 rewrite -pythagorean_tv_bound_pythCallErrors.
 exact: (MicciancioWalterRule _ _ _ _ _
   (pythCompileCallsRule q X Y A B K L L' L'' M P' P'' fn prog eps
     call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall)).
 Qed.
+
+(** Current assumption frontier for [compileRule]:
+
+    Local proof obligations still exposed by [Print Assumptions] are all in the
+    KL/Pinsker path:
+    - [Pinsker.total_variation_chi2_bound]
+    - [Pinsker.kl_lower_bound_chi2]
+    - [ChainPointwise.coordinate_finite_kl_absolute_continuous]
+    - [ChainPointwise.kl_integrand_chain_decomp_pointwise]
+    - [ChainPointwise.sum_coordinate_log_contribution_prefix_weighted]
+    - [log_sum_inequality_partition]
+    - [kl_dmargin_fpos_le_fiber_fpos]
+
+    External/classical assumptions are currently MathComp/SSProve
+    infinite-sum admits plus extensionality/choice/proof-irrelevance axioms.
+ *)
+Print Assumptions compileRule.
