@@ -1623,15 +1623,3 @@ exact: (MicciancioWalterRule _ _ _ _ _
     call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall)).
 Qed.
 
-(** Current assumption frontier for [compileRule]:
-
-    Local proof obligations still exposed by [Print Assumptions] are in the
-    KL/Pinsker path:
-    - [Pinsker.pinsker]
-    - [ChainPointwise.kl_integrand_chain_decomp_pointwise]
-    - [log_sum_inequality_partition]
-
-    External/classical assumptions are currently MathComp/SSProve
-    infinite-sum admits plus extensionality/choice/proof-irrelevance axioms.
- *)
-Print Assumptions compileRule.

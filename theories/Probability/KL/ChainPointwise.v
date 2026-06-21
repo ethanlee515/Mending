@@ -344,17 +344,6 @@ rewrite -[X in _ = X + _](IH Hp0 Hq0).
   move=> k Hk; exact: Hq k (leq_trans Hk (leqnSn n)).
 Qed.
 
-Lemma kl_integrand_chain_decomp_pointwise
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) :
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  absolute_continuous P Q ->
-  forall x : n.-tuple A,
-    P x * ln (P x / Q x) =
-    \sum_(i < n) P x * coordinate_log_contribution P Q x i.
-Admitted.
-
 Lemma finite_sum_coordinate_log_contribution_partition_prefix
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R})
@@ -416,6 +405,164 @@ have Ha : tuple_prefix i (tnth x) = a.
 by rewrite /coordinate_log_contribution Ha.
 Qed.
 
+Lemma tuple_prefix_eq_succ
+    {n : nat} {A : choiceType} (x y : n.-tuple A)
+    (i : 'I_n) (Hi : (i.+1 < n)%N) :
+  tuple_prefix_eq (tuple_prefix (Ordinal Hi) (tnth x)) y =
+  tuple_prefix_eq (tuple_prefix i (tnth x)) y &&
+  (tnth y i == tnth x i).
+Proof.
+rewrite /tuple_prefix_eq.
+apply/forallP/idP=> [Hsucc|/andP[Hpref Hi_eq]].
+  apply/andP; split.
+    apply/forallP=> j.
+    move: (Hsucc (@widen_ord i i.+1 (leqnSn i) j)).
+    rewrite !tnth_mktuple.
+    have -> :
+        widen_ord (ltnW (ltn_ord (Ordinal Hi)))
+          (@widen_ord i i.+1 (leqnSn i) j) =
+        widen_ord (ltnW (ltn_ord i)) j
+      by apply: val_inj.
+    by [].
+  move: (Hsucc ord_max).
+  rewrite !tnth_mktuple.
+  have -> :
+      widen_ord (ltnW (ltn_ord (Ordinal Hi))) ord_max = i
+    by apply: val_inj.
+  by [].
+move=> j.
+rewrite !tnth_mktuple.
+case Hj : (j < i)%N.
+  pose j_i : 'I_i := Ordinal Hj.
+  move/forallP: Hpref=> /(_ j_i) Hji.
+  rewrite /tuple_prefix tnth_mktuple in Hji.
+  have Hj_val : j = j_i :> nat by rewrite /j_i.
+  have Hw :
+      widen_ord (ltnW (ltn_ord (Ordinal Hi))) j =
+      widen_ord (ltnW (ltn_ord i)) j_i
+    by apply: val_inj.
+  by rewrite -Hw in Hji.
+have Hj_eq : j = ord_max.
+  apply: val_inj.
+  have Hjle : (j <= i)%N by rewrite -ltnS ltn_ord.
+  by move: Hjle; rewrite leq_eqVlt Hj orbF=> /eqP.
+rewrite Hj_eq.
+have -> :
+    widen_ord (ltnW (ltn_ord (Ordinal Hi))) ord_max = i
+  by apply: val_inj.
+exact: Hi_eq.
+Qed.
+
+Definition tuple_prefix_mass {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R}) (x : n.-tuple A) (k : nat) : R :=
+  match ltnP k n with
+  | LtnNotGeq Hk =>
+      \P_[P] (fun y => tuple_prefix_eq (tuple_prefix (Ordinal Hk) (tnth x)) y)
+  | GeqNotLtn _ => P x
+  end.
+
+Lemma tuple_prefix_eq_self {n : nat} {A : choiceType}
+    (x : n.-tuple A) (i : 'I_n) :
+  tuple_prefix_eq (tuple_prefix i (tnth x)) x.
+Proof.
+apply/forallP=> j.
+by rewrite /tuple_prefix_eq /tuple_prefix tnth_mktuple eqxx.
+Qed.
+
+Lemma tuple_prefix_mass0
+    {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R}) (x : n.-tuple A) :
+  dweight P = 1 -> tuple_prefix_mass P x 0 = 1.
+Proof.
+move=> HP.
+rewrite /tuple_prefix_mass.
+case: ltnP=> Hn.
+  rewrite -[RHS]HP pr_predT /pr.
+  apply/eq_psum=> y.
+  have Hpref : tuple_prefix_eq (tuple_prefix (Ordinal Hn) (tnth x)) y.
+    apply/forallP=> j.
+    case: j=> j Hj.
+    by exfalso; move: Hj; rewrite /= ltn0.
+  by rewrite Hpref /= mul1r.
+rewrite (pr_pred1 P x).
+have Hpred : pred1 x =1 predT.
+  move=> y.
+  have Hn0 : n = 0%N by apply/eqP; rewrite eqn_leq Hn.
+  subst n.
+  by rewrite (tuple0 y) (tuple0 x).
+rewrite -HP.
+apply/eq_psum=> y.
+by rewrite Hpred mul1r.
+Qed.
+
+Lemma tuple_prefix_mass_full
+    {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R}) (x : n.-tuple A) :
+  tuple_prefix_mass P x n = P x.
+Proof.
+rewrite /tuple_prefix_mass.
+case: ltnP=> H; last by [].
+by exfalso; move: H; rewrite ltnn.
+Qed.
+
+Lemma tuple_prefix_mass_pos
+    {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R}) (x : n.-tuple A) (k : nat) :
+  (k <= n)%N -> 0 < P x -> 0 < tuple_prefix_mass P x k.
+Proof.
+move=> Hkn HPx.
+rewrite /tuple_prefix_mass.
+case: ltnP=> Hk; last exact: HPx.
+rewrite lt_def ge0_pr andbT.
+apply/eqP=> Hzero.
+have Hpx0 : P x = 0.
+  apply: (pr_eq0 Hzero).
+  exact: tuple_prefix_eq_self.
+by move: HPx; rewrite Hpx0 ltxx.
+Qed.
+
+Lemma prefix_coordinate_event_mass
+    {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R}) (x : n.-tuple A) (i : 'I_n) :
+  \P_[P] (fun y => tuple_prefix_eq (tuple_prefix i (tnth x)) y &&
+                  (tnth y i == tnth x i)) =
+  tuple_prefix_mass P x i.+1.
+Proof.
+rewrite /tuple_prefix_mass.
+case: ltnP=> Hi.
+  apply/eq_psum=> y.
+  rewrite tuple_prefix_eq_succ.
+  by [].
+have Hle : (i.+1 <= n)%N by exact: ltn_ord.
+have Hi_eq : i.+1 = n by apply/eqP; rewrite eqn_leq Hi Hle.
+rewrite (pr_pred1 P x) /pr.
+apply/eq_psum=> y.
+have Hev :
+    (tuple_prefix_eq (tuple_prefix i (tnth x)) y &&
+      (tnth y i == tnth x i)) = (y == x).
+  apply/idP/eqP=> [/andP[Hpref Hcoord]|->].
+    apply: eq_from_tnth=> j.
+    case Hj : (j < i)%N.
+      pose j_i : 'I_i := Ordinal Hj.
+      move/forallP: Hpref=> /(_ j_i) Hji.
+      rewrite /tuple_prefix tnth_mktuple in Hji.
+      have Hw :
+          widen_ord (ltnW (ltn_ord i)) j_i = j
+        by apply: val_inj; rewrite /j_i.
+      apply/eqP.
+      by rewrite -Hw.
+    have Hj_eq : j = i.
+      apply: val_inj.
+      have Hjle : (j <= i)%N.
+        rewrite -ltnS Hi_eq.
+        exact: ltn_ord.
+      by move: Hjle; rewrite leq_eqVlt Hj orbF=> /eqP.
+    by rewrite Hj_eq; exact/eqP.
+  rewrite tuple_prefix_eq_self eqxx.
+  by [].
+by rewrite Hev.
+Qed.
+
 Lemma prefix_coordinate_pr_factor
     {n : nat} {A : choiceType}
     (P : {distr (n.-tuple A) / R})
@@ -449,7 +596,85 @@ rewrite /pr.
 apply/eq_psum=> x.
 rewrite !inE -!topredE /=.
 case: (tuple_prefix_eq a x); case: (tnth x i == b);
-  rewrite ?mul0r ?mul1r //.
+	  rewrite ?mul0r ?mul1r //.
+Qed.
+
+Lemma conditional_coordinate_prefix_mass
+    {n : nat} {A : choiceType}
+    (P : {distr (n.-tuple A) / R}) (x : n.-tuple A) (i : 'I_n) :
+  0 < tuple_prefix_mass P x i ->
+  conditional_coordinate P (tuple_prefix i (tnth x)) (tnth x i) =
+  tuple_prefix_mass P x i.+1 / tuple_prefix_mass P x i.
+Proof.
+move=> Hpref_pos.
+rewrite -prefix_coordinate_event_mass.
+rewrite prefix_coordinate_pr_factor.
+rewrite /tuple_prefix_mass.
+case: ltnP=> Hi.
+  have -> : Ordinal Hi = i by apply: val_inj.
+  have Hdenpos : 0 <
+      \P_[P] [eta tuple_prefix_eq (tuple_prefix i (tnth x))].
+    move: Hpref_pos.
+    rewrite /tuple_prefix_mass.
+    case: ltnP=> Hi'.
+      have -> : Ordinal Hi' = i by apply: val_inj.
+      by [].
+    move=> _.
+    exfalso.
+    have Hnot : ~~ (i < n)%N by rewrite -leqNgt.
+    by move: (ltn_ord i); rewrite (negbTE Hnot).
+  field.
+  by rewrite gt_eqF.
+exfalso.
+have Hnot : ~~ (i < n)%N by rewrite -leqNgt.
+by move: (ltn_ord i); rewrite (negbTE Hnot).
+Qed.
+
+Lemma kl_integrand_chain_decomp_pointwise
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) :
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  absolute_continuous P Q ->
+  forall x : n.-tuple A,
+    P x * ln (P x / Q x) =
+    \sum_(i < n) P x * coordinate_log_contribution P Q x i.
+Proof.
+move=> HP HQ Hac x.
+case HPx0 : (P x == 0).
+  rewrite (eqP HPx0) mul0r.
+  rewrite big1 // => i _.
+  by rewrite mul0r.
+have HPxpos : 0 < P x by rewrite lt_def ge0_mu andbT HPx0.
+have HQxpos : 0 < Q x.
+  rewrite lt_def ge0_mu andbT.
+  apply/eqP=> HQx0.
+  by move: HPxpos; rewrite (Hac x HQx0) ltxx.
+pose p := tuple_prefix_mass P x.
+pose q := tuple_prefix_mass Q x.
+have Hp_pos k : (k <= n)%N -> 0 < p k.
+  move=> Hk.
+  exact: (tuple_prefix_mass_pos P x k Hk HPxpos).
+have Hq_pos k : (k <= n)%N -> 0 < q k.
+  move=> Hk.
+  exact: (tuple_prefix_mass_pos Q x k Hk HQxpos).
+have Htel :
+    ln (P x / Q x) =
+    \sum_(i < n) ln ((p i.+1 / p i) / (q i.+1 / q i)).
+  have H := ln_ratio_telescoping n p q
+    (tuple_prefix_mass0 P x HP)
+    (tuple_prefix_mass0 Q x HQ) Hp_pos Hq_pos.
+  by rewrite /p /q !tuple_prefix_mass_full in H.
+rewrite Htel.
+rewrite -mulr_sumr.
+congr (P x * _).
+apply: eq_bigr=> i _.
+rewrite /coordinate_log_contribution /p /q.
+  rewrite (conditional_coordinate_prefix_mass P x i).
+  rewrite (conditional_coordinate_prefix_mass Q x i).
+    by [].
+  exact: (Hq_pos i (ltnW (ltn_ord i))).
+exact: (Hp_pos i (ltnW (ltn_ord i))).
 Qed.
 
 Lemma coordinate_finite_kl_absolute_continuous

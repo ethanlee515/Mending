@@ -406,6 +406,53 @@ apply/orP; left; apply/eqP.
 ring.
 Qed.
 
+Lemma log_sum_inequality2_nonneg (a b c d : R) :
+  0 <= a -> 0 <= b -> 0 <= c -> 0 <= d ->
+  (b = 0 -> a = 0) ->
+  (d = 0 -> c = 0) ->
+  (a + c) * ln ((a + c) / (b + d)) <=
+  a * ln (a / b) + c * ln (c / d).
+Proof.
+move=> Ha Hb Hc Hd Hab Hcd.
+case Hb0: (b == 0).
+  have Ha_eq0 : a = 0 by exact: Hab (eqP Hb0).
+  have -> : b = 0 by exact/eqP.
+  rewrite Ha_eq0.
+  rewrite !add0r !mul0r.
+  lra.
+case Hd0: (d == 0).
+  have Hc_eq0 : c = 0 by exact: Hcd (eqP Hd0).
+  have -> : d = 0 by exact/eqP.
+  rewrite Hc_eq0.
+  rewrite !addr0 !mul0r !addr0.
+  lra.
+have Hbpos : 0 < b by rewrite lt_def Hb Hb0.
+have Hdpos : 0 < d by rewrite lt_def Hd Hd0.
+case Ha0: (a == 0).
+  have -> : a = 0 by exact/eqP.
+  rewrite !add0r !mul0r add0r.
+  case Hc0: (c == 0).
+    by rewrite (eqP Hc0) !mul0r.
+  have Hcpos : 0 < c by rewrite lt_def Hc Hc0.
+  apply: ler_wpM2l; first exact: ltW Hcpos.
+  rewrite ler_ln ?qualifE /= ?divr_gt0 ?addr_gt0 //.
+  rewrite [c / (b + d)]mulrC [c / d]mulrC.
+  apply: ler_wpM2r; first exact: ltW Hcpos.
+  by rewrite lef_pV2 ?posrE ?addr_gt0 //; lra.
+case Hc0: (c == 0).
+  have -> : c = 0 by exact/eqP.
+  rewrite !addr0 !mul0r addr0.
+  have Hapos : 0 < a by rewrite lt_def Ha Ha0.
+  apply: ler_wpM2l; first exact: ltW Hapos.
+  rewrite ler_ln ?qualifE /= ?divr_gt0 ?addr_gt0 //.
+  rewrite [a / (b + d)]mulrC [a / b]mulrC.
+  apply: ler_wpM2r; first exact: ltW Hapos.
+  by rewrite lef_pV2 ?posrE ?addr_gt0 //; lra.
+have Hapos : 0 < a by rewrite lt_def Ha Ha0.
+have Hcpos : 0 < c by rewrite lt_def Hc Hc0.
+exact: log_sum_inequality2_pos.
+Qed.
+
 Lemma sum_seq_ge0 {T : eqType} (s : seq T) (a : T -> R) :
   (forall x, x \in s -> 0 <= a x) ->
   0 <= \sum_(x <- s) a x.
@@ -429,6 +476,429 @@ apply: ltr_pwDl; first exact: Ha x (mem_head _ _).
 apply: sum_seq_ge0=> y Hy.
 apply: ltW; apply: Ha.
 by rewrite inE Hy orbT.
+Qed.
+
+Lemma sum_seq_eq0 {T : eqType} (s : seq T) (a : T -> R) :
+  (forall x, x \in s -> 0 <= a x) ->
+  \sum_(x <- s) a x = 0 ->
+  forall x, x \in s -> a x = 0.
+Proof.
+elim: s=> [|x s IH] Ha; first by move=> _ x; rewrite in_nil.
+rewrite big_cons=> Hsum y.
+have Hx : 0 <= a x by exact: Ha x (mem_head _ _).
+have Htail_ge : 0 <= \sum_(z <- s) a z.
+  apply: sum_seq_ge0=> z Hz.
+  apply: Ha.
+  by rewrite inE Hz orbT.
+have Hx0 : a x = 0 by lra.
+have Htail0 : \sum_(z <- s) a z = 0 by lra.
+rewrite inE=> /orP[/eqP ->|Hy]; first exact: Hx0.
+apply: IH=> // z Hz.
+apply: Ha.
+by rewrite inE Hz orbT.
+Qed.
+
+Lemma log_sum_inequality_seq {T : eqType} (s : seq T) (p q : T -> R) :
+  (forall x, x \in s -> 0 <= p x) ->
+  (forall x, x \in s -> 0 <= q x) ->
+  (forall x, x \in s -> q x = 0 -> p x = 0) ->
+  (\sum_(x <- s) p x) *
+    ln ((\sum_(x <- s) p x) / (\sum_(x <- s) q x)) <=
+  \sum_(x <- s) p x * ln (p x / q x).
+Proof.
+elim: s=> [|x s IH] Hp Hq Hac.
+  by rewrite !big_nil mul0r.
+rewrite !big_cons.
+set sp := \sum_(z <- s) p z.
+set sq := \sum_(z <- s) q z.
+have Hpx : 0 <= p x by exact: Hp x (mem_head _ _).
+have Hqx : 0 <= q x by exact: Hq x (mem_head _ _).
+have Hsp : 0 <= sp.
+  apply: sum_seq_ge0=> z Hz.
+  apply: Hp.
+  by rewrite inE Hz orbT.
+have Hsq : 0 <= sq.
+  apply: sum_seq_ge0=> z Hz.
+  apply: Hq.
+  by rewrite inE Hz orbT.
+have Htail_ac : sq = 0 -> sp = 0.
+  move=> Hsq0.
+  have Hq_nonneg_tail z : z \in s -> 0 <= q z.
+    move=> Hz; apply: Hq.
+    by rewrite inE Hz orbT.
+  have Hq0_all := sum_seq_eq0 s q Hq_nonneg_tail Hsq0.
+  have Hq0 z : z \in s -> q z = 0.
+    exact: Hq0_all.
+  rewrite /sp.
+  apply: big1_seq=> z /andP[_ Hz].
+  have Hz_cons : z \in x :: s by rewrite in_cons Hz orbT.
+  apply: Hac.
+    exact: Hz_cons.
+  exact: Hq0.
+have Hbin := log_sum_inequality2_nonneg (p x) (q x) sp sq
+  Hpx Hqx Hsp Hsq (Hac x (mem_head _ _)) Htail_ac.
+have Htail : sp * ln (sp / sq) <=
+    \sum_(z <- s) p z * ln (p z / q z).
+  apply: IH=> z Hz.
+  - apply: Hp.
+    by rewrite inE Hz orbT.
+  - apply: Hq.
+    by rewrite inE Hz orbT.
+  - apply: Hac.
+    by rewrite inE Hz orbT.
+rewrite -/sp -/sq.
+apply: (le_trans Hbin).
+by apply: lerD; [exact: lexx | exact: Htail].
+Qed.
+
+Lemma finite_sum_by_image {T U : choiceType}
+    (J : seq T) (f : T -> U) (G : T -> R) :
+  uniq J ->
+  \sum_(y <- undup [seq f x | x <- J])
+    \sum_(x <- J | f x == y) G x =
+  \sum_(x <- J) G x.
+Proof.
+move=> uqJ.
+rewrite [LHS](eq_bigr (fun y =>
+  \sum_(x <- J) (if f x == y then G x else 0))); last first.
+  by move=> y _; rewrite big_mkcond.
+rewrite exchange_big.
+rewrite [LHS]big_seq_cond.
+rewrite [RHS]big_seq_cond.
+apply: eq_bigr=> x /andP[HxJ _].
+pose y0 := f x.
+have Hy0 : y0 \in undup [seq f z | z <- J].
+  rewrite mem_undup.
+  apply/mapP; exists x; first exact: HxJ.
+  by [].
+have Hu : uniq (undup [seq f z | z <- J]) by rewrite undup_uniq.
+rewrite (bigD1_seq y0 Hy0 Hu) /= /y0 eqxx.
+rewrite big_seq_cond big1 ?addr0 // => y /andP[_ Hy].
+by rewrite eq_sym (negbTE Hy).
+Qed.
+
+Lemma psum_finseq_nonneg {T : choiceType} (J : seq T) (S : T -> R) :
+  uniq J ->
+  (forall x, 0 <= S x) ->
+  (forall x, S x != 0 -> x \in J) ->
+  psum S = \sum_(x <- J) S x.
+Proof.
+move=> uqJ HS Hsupp.
+rewrite (psum_finseq (r := J)) //.
+apply: eq_bigr=> x _.
+by rewrite ger0_norm.
+Qed.
+
+Lemma psum_fiber_finseq {T U : choiceType}
+    (J : seq T) (f : T -> U) (S : T -> R) (y : U) :
+  uniq J ->
+  (forall x, 0 <= S x) ->
+  (forall x, S x != 0 -> x \in J) ->
+  psum (fun x => (f x == y)%:R * S x) =
+  \sum_(x <- J | f x == y) S x.
+Proof.
+move=> uqJ HS Hsupp.
+rewrite (psum_finseq_nonneg J
+  (fun x => (f x == y)%:R * S x)) //.
+- rewrite [RHS]big_mkcond.
+  apply: eq_bigr=> x _.
+  by case: (f x == y); rewrite ?mul1r ?mul0r.
+- move=> x.
+  by rewrite mulr_ge0 ?ler0n ?HS.
+- move=> x.
+  case Hfx: (f x == y); last by rewrite mul0r eqxx.
+  rewrite mul1r.
+  exact: Hsupp.
+Qed.
+
+Lemma log_sum_inequality_partition_seq {T U : choiceType}
+    (J : seq T) (f : T -> U) (p q : T -> R) :
+  uniq J ->
+  (forall x, x \in J -> 0 <= p x) ->
+  (forall x, x \in J -> 0 <= q x) ->
+  (forall x, x \in J -> q x = 0 -> p x = 0) ->
+  \sum_(y <- undup [seq f x | x <- J])
+    ((\sum_(x <- J | f x == y) p x) *
+      ln ((\sum_(x <- J | f x == y) p x) /
+          (\sum_(x <- J | f x == y) q x))) <=
+  \sum_(x <- J) p x * ln (p x / q x).
+Proof.
+move=> uqJ Hp Hq Hac.
+rewrite -(finite_sum_by_image J f (fun x => p x * ln (p x / q x)) uqJ).
+apply: ler_sum=> y _.
+have Hfiber :
+  (\sum_(x <- [seq x <- J | f x == y]) p x) *
+    ln ((\sum_(x <- [seq x <- J | f x == y]) p x) /
+        (\sum_(x <- [seq x <- J | f x == y]) q x)) <=
+  \sum_(x <- [seq x <- J | f x == y]) p x * ln (p x / q x).
+  apply: log_sum_inequality_seq.
+  - move=> x.
+    rewrite mem_filter=> /andP[/eqP _ HxJ].
+    exact: Hp.
+  - move=> x.
+    rewrite mem_filter=> /andP[/eqP _ HxJ].
+    exact: Hq.
+  - move=> x.
+    rewrite mem_filter=> /andP[/eqP _ HxJ].
+    exact: Hac.
+by rewrite !big_filter in Hfiber.
+Qed.
+
+Lemma log_sum_inequality_partition_finsupp {T U : choiceType}
+    (J : seq T) (f : T -> U) (p q : T -> R) :
+  uniq J ->
+  (forall x, 0 <= p x) ->
+  (forall x, 0 <= q x) ->
+  (forall x, p x != 0 -> x \in J) ->
+  (forall x, q x != 0 -> x \in J) ->
+  (forall x, q x = 0 -> p x = 0) ->
+  sum (fun y =>
+    psum (fun x => (f x == y)%:R * p x) *
+      ln (psum (fun x => (f x == y)%:R * p x) /
+          psum (fun x => (f x == y)%:R * q x))) <=
+  sum (fun x => p x * ln (p x / q x)).
+Proof.
+move=> uqJ Hp Hq Hpsupp Hqsupp Hac.
+set imJ := undup [seq f x | x <- J].
+rewrite (sum_finseq (r := imJ)); last 2 first.
+- exact: undup_uniq.
+- move=> y; rewrite inE=> Hy_nz.
+  apply/negP=> Hy_notin.
+  have Hp_fiber0 :
+      psum (fun x : T => (f x == y)%:R * p x) = 0.
+    apply: psum_eq0=> x.
+    case Hfx: (f x == y); last by rewrite mul0r.
+    rewrite mul1r.
+    apply/eqP; apply/negP=> Hpx.
+    have Hpxb : p x != 0 by apply/negP.
+    move: Hy_notin; apply/negP.
+    rewrite /imJ mem_undup.
+    apply/mapP; exists x; first by rewrite (Hpsupp x Hpxb).
+    by rewrite (eqP Hfx).
+  move: Hy_nz.
+  by rewrite Hp_fiber0 mul0r eqxx.
+rewrite (sum_finseq (r := J)); last 2 first.
+- exact: uqJ.
+- move=> x; rewrite inE=> Hx_nz.
+  apply: Hpsupp.
+  apply/negP=> Hpx0.
+  move: Hx_nz.
+  by rewrite (eqP Hpx0) mul0r eqxx.
+rewrite (eq_bigr (fun y =>
+  ((\sum_(x <- J | f x == y) p x) *
+    ln ((\sum_(x <- J | f x == y) p x) /
+        (\sum_(x <- J | f x == y) q x))))); last first.
+  move=> y _.
+  by rewrite (psum_fiber_finseq J f p y)
+    ?(psum_fiber_finseq J f q y).
+apply: log_sum_inequality_partition_seq.
+- exact: uqJ.
+- move=> x _; exact: Hp x.
+- move=> x _; exact: Hq x.
+- move=> x _; exact: Hac x.
+Qed.
+
+Lemma ln_lower_exp_ratio_core (r h : R) :
+  0 < r ->
+  r * h - sequences.expR h + 1 <= r * ln r - r + 1.
+Proof.
+move=> Hr.
+have Hpos : 0 < sequences.expR h / r by rewrite divr_gt0 ?expR_gt0.
+have Harg_gt : -1 < sequences.expR h / r - 1 by lra.
+have Hln := le_ln1Dx Harg_gt.
+have Harg : 1 + (sequences.expR h / r - 1) = sequences.expR h / r by ring.
+rewrite Harg in Hln.
+rewrite ln_div in Hln.
+- rewrite (@expRK R h) in Hln.
+  have Hscaled := ler_wpM2l (ltW Hr) Hln.
+  have Hcancel : r * (sequences.expR h / r) = sequences.expR h.
+    by rewrite mulrC divfK ?lt0r_neq0.
+  have Hrhs : r * (sequences.expR h / r - 1) = sequences.expR h - r.
+    by rewrite mulrBr Hcancel; ring.
+  rewrite Hrhs in Hscaled.
+  lra.
+- by rewrite qualifE /= expR_gt0.
+- by rewrite qualifE.
+Qed.
+
+Lemma kl_integrand_variational_pointwise_core (p q h : R) :
+  0 <= p ->
+  0 <= q ->
+  (q = 0 -> p = 0) ->
+  p * h - q * (sequences.expR h - 1) <=
+    p * ln (p / q) - p + q.
+Proof.
+move=> Hp Hq Hac.
+case Hq0: (q == 0).
+  have Hp0 : p = 0 by exact: Hac (eqP Hq0).
+  rewrite (eqP Hq0) Hp0 !mul0r sub0r addr0.
+  have Hexp_nonneg : 0 <= sequences.expR h by exact: expR_ge0.
+  lra.
+case Hp0: (p == 0).
+  rewrite (eqP Hp0) mul0r.
+  have Hqpos : 0 < q by rewrite lt_def Hq Hq0.
+  have Hexp_nonneg : 0 <= sequences.expR h by exact: expR_ge0.
+  have Hprod : 0 <= q * sequences.expR h.
+    exact: mulr_ge0 Hq Hexp_nonneg.
+  lra.
+have Hqpos : 0 < q by rewrite lt_def Hq Hq0.
+have Hppos : 0 < p by rewrite lt_def Hp Hp0.
+pose r := p / q.
+have Hrpos : 0 < r by rewrite /r divr_gt0.
+have Hineq := ln_lower_exp_ratio_core r h Hrpos.
+have Hscaled := ler_wpM2l (ltW Hqpos) Hineq.
+have HpE : p = q * r by rewrite /r mulrC divfK ?lt0r_neq0.
+rewrite HpE.
+have Hscaled_lhs :
+    q * (r * h - sequences.expR h + 1) =
+    q * r * h - q * (sequences.expR h - 1) by ring.
+have Hscaled_rhs :
+    q * (r * ln r - r + 1) =
+    q * r * ln r - q * r + q by ring.
+rewrite Hscaled_lhs Hscaled_rhs in Hscaled.
+have Hratio : q * r / q = r.
+  by rewrite [q * r]mulrC divfK ?lt0r_neq0.
+rewrite Hratio.
+exact: Hscaled.
+Qed.
+
+Lemma log_sum_inequality_finite {T : choiceType} (p q : T -> R) :
+  (forall x, 0 <= p x) ->
+  (forall x, 0 <= q x) ->
+  summable p ->
+  summable q ->
+  summable (fun x => p x * ln (p x / q x)) ->
+  (forall x, q x = 0 -> p x = 0) ->
+  psum p * ln (psum p / psum q) <=
+  sum (fun x => p x * ln (p x / q x)).
+Proof.
+move=> Hp Hq Hpsm Hqsm Hkl Hac.
+pose A := psum p.
+pose B := psum q.
+case HB0: (B == 0).
+  have HA0 : A = 0.
+    rewrite /A.
+    apply: psum_eq0=> x.
+    have Hqx0 : q x = 0.
+      apply: (eq0_psum Hqsm).
+      exact: (eqP HB0).
+    exact: (Hac x Hqx0).
+  rewrite /A in HA0.
+  rewrite HA0 mul0r.
+  rewrite (eq_sum (F2 := fun _ : T => 0)); last first.
+    move=> x.
+    have Hpx0 : p x = 0.
+      apply: (eq0_psum Hpsm).
+      exact: HA0.
+    by rewrite Hpx0 mul0r.
+  by rewrite sum0.
+case HA0: (A == 0).
+  have HA0' : psum p = 0 by exact: (eqP HA0).
+  rewrite HA0' mul0r.
+  rewrite (eq_sum (F2 := fun _ : T => 0)); last first.
+    move=> x.
+    have Hpx0 : p x = 0.
+      apply: (eq0_psum Hpsm).
+      exact: HA0'.
+    by rewrite Hpx0 mul0r.
+  by rewrite sum0.
+have HApos : 0 < A by rewrite lt_def ge0_psum HA0.
+have HBpos : 0 < B by rewrite lt_def ge0_psum HB0.
+pose h := ln (A / B).
+pose F := fun x : T => p x * h - q x * (sequences.expR h - 1).
+pose G := fun x : T => p x * ln (p x / q x) - p x + q x.
+have HFsm : summable F.
+  apply: (eq_summable
+    (S1 := (fun x : T => h * p x) \+
+      (fun x : T => - ((sequences.expR h - 1) * q x)))).
+    by move=> x; rewrite /F /=; ring.
+  apply: summableD.
+  - apply: summableZ; exact: Hpsm.
+  - apply: summableN.
+    apply: summableZ; exact: Hqsm.
+have HGsm : summable G.
+  apply: (eq_summable
+    (S1 := (fun x : T => p x * ln (p x / q x)) \+
+      ((fun x : T => - p x) \+ q))).
+    by move=> x; rewrite /G /=; ring.
+  apply: summableD; first exact: Hkl.
+  apply: summableD; first exact: summableN.
+  exact: Hqsm.
+have Hpoint x : F x <= G x.
+  rewrite /F /G.
+  exact: (kl_integrand_variational_pointwise_core
+    (p x) (q x) h (Hp x) (Hq x) (Hac x)).
+have Hle := le_sum HFsm HGsm Hpoint.
+rewrite /F /G in Hle.
+have HFsum :
+    sum F = h * sum p - (sequences.expR h - 1) * sum q.
+  have Hhp : summable (fun x : T => h * p x).
+    apply: summableZ; exact: Hpsm.
+  have Hnq : summable (fun x : T => - ((sequences.expR h - 1) * q x)).
+    apply: summableN.
+    apply: summableZ; exact: Hqsm.
+  rewrite (eq_sum (F2 := (fun x : T => h * p x) \+
+      (fun x : T => - ((sequences.expR h - 1) * q x)))); last first.
+    by move=> x; rewrite /= /F; ring.
+  rewrite (@sumD R T (fun x : T => h * p x)
+    (fun x : T => - ((sequences.expR h - 1) * q x)) Hhp Hnq).
+  rewrite sumN.
+  have -> : sum (fun x : T => h * p x) = h * sum p.
+    exact: sumZ.
+  have -> : sum (fun x : T => (sequences.expR h - 1) * q x) =
+      (sequences.expR h - 1) * sum q.
+    exact: sumZ.
+  ring.
+have HGsum :
+    sum G =
+    sum (fun x : T => p x * ln (p x / q x)) - sum p + sum q.
+  have Hnpq : summable ((fun x : T => - p x) \+ q).
+    apply: summableD; first exact: summableN.
+    exact: Hqsm.
+  rewrite (eq_sum (F2 := (fun x : T => p x * ln (p x / q x)) \+
+      ((fun x : T => - p x) \+ q))); last first.
+    by move=> x; rewrite /= /G; ring.
+  rewrite (@sumD R T (fun x : T => p x * ln (p x / q x))
+    ((fun x : T => - p x) \+ q) Hkl Hnpq).
+  rewrite (@sumD R T (fun x : T => - p x) q
+    (summableN Hpsm) Hqsm).
+  rewrite sumN.
+  ring.
+rewrite HFsum HGsum in Hle.
+have Hsum_p : sum p = A.
+  rewrite /A.
+  symmetry.
+  exact: (@psum_sum R T p Hp).
+have Hsum_q : sum q = B.
+  rewrite /B.
+  symmetry.
+  exact: (@psum_sum R T q Hq).
+rewrite Hsum_p Hsum_q in Hle.
+rewrite /h.
+have Hexp : sequences.expR (ln (A / B)) = A / B.
+  rewrite lnK //.
+  by rewrite qualifE /= divr_gt0.
+have Hcancel : (A / B) * B = A by rewrite divfK ?lt0r_neq0.
+rewrite Hexp in Hle.
+have Hleft :
+    ln (A / B) * A - (A / B - 1) * B =
+    A * ln (A / B) - A + B.
+  rewrite mulrBl Hcancel.
+  ring.
+rewrite Hleft in Hle.
+rewrite -/A -/B in Hle.
+set K := sum (fun x : T => p x * ln (p x / q x)).
+rewrite -/K in Hle.
+have Hfinal :
+    (A * ln (A / B) - A + B) + (A - B) <=
+    (K - A + B) + (A - B).
+  exact: (lerD Hle (lexx (A - B))).
+have HfinalL :
+    (A * ln (A / B) - A + B) + (A - B) =
+    A * ln (A / B) by ring.
+have HfinalR :
+    (K - A + B) + (A - B) = K by ring.
+by rewrite HfinalL HfinalR in Hfinal.
 Qed.
 
 Lemma log_sum_inequality_seq_pos {T : eqType} (s : seq T) (p q : T -> R) :
