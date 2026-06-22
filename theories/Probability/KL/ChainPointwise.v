@@ -947,28 +947,6 @@ exact: (sum_scaled_kl_integrand
   (\P_[P] (fun x => tuple_prefix_eq a x)) Hfin).
 Qed.
 
-Lemma conditional_coordinate_kl_nonnegative
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R})
-    (i : 'I_n) (a : i.-tuple A) :
-  absolute_continuous P Q ->
-  0 <= δ_KL (conditional_coordinate P a)
-             (conditional_coordinate Q a).
-Proof.
-move=> Hac.
-case Hpref0 : (\P_[P] (fun x => tuple_prefix_eq a x) == 0).
-  rewrite (kl_left_dnull (conditional_coordinate P a)
-    (conditional_coordinate Q a)).
-    exact: lexx.
-  exact: (conditional_coordinate_zero_prefix P i a (eqP Hpref0)).
-have Hpref_pos : 0 < \P_[P] (fun x => tuple_prefix_eq a x).
-  by rewrite lt_def ge0_pr Hpref0.
-apply: kl_nonnegative.
-  exact: conditional_coordinate_absolute_continuous.
-rewrite /conditional_coordinate dmargin_dweight.
-exact: dcond_mass1.
-Qed.
-
 Lemma finite_sum_selected_prefix_mass_le1
     {n : nat} {A : choiceType}
     (P : {distr (n.-tuple A) / R})

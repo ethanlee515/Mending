@@ -719,81 +719,6 @@ case HQres0: (dweight (residual_distr Q P) == 0).
   exact: Hoverlap_ge.
 Qed.
 
-Lemma pr_le_dweight {A : choiceType} (D : {distr A / R}) (p : pred A) :
-  \P_[D] p <= dweight D.
-Proof.
-have H : \P_[D] p <= \P_[D] predT.
-  apply: subset_pr => x _.
-  by [].
-exact: H.
-Qed.
-
-Lemma dweight_le_pointwise {A : choiceType} (D E : {distr A / R}) :
-  D <=1 E ->
-  dweight D <= dweight E.
-Proof.
-move=> HDE.
-rewrite !pr_predT.
-apply: le_psum; last exact: summable_mu.
-move=> x.
-apply/andP; split.
-- exact: ge0_mu.
-- exact: HDE x.
-Qed.
-
-Lemma coupling_with_loss_left_mass1
-  {outL_t outR_t : choiceType}
-  (d : {distr (outL_t * outR_t) / R})
-  (outL : {distr outL_t / R})
-  (outR : {distr outR_t / R})
-  (post : pred (outL_t * outR_t)) :
-  coupling_with_loss d outL outR ->
-  \P_[ d ] post >= 1 ->
-  dweight outL = 1.
-Proof.
-move=> [HdL _] Hpost.
-have Hprob_le : \P_[ d ] post <= dweight d.
-  exact: pr_le_dweight.
-have Hd_ge1 : 1 <= dweight d := le_trans Hpost Hprob_le.
-have Hd_le1 : dweight d <= 1 by rewrite pr_predT; exact: le1_mu.
-have Hd_weight : dweight d = 1.
-  apply/eqP; rewrite eq_le; apply/andP; split.
-  - exact: Hd_le1.
-  - exact: Hd_ge1.
-have Hout_ge1 : 1 <= dweight outL.
-  have := dweight_le_pointwise (dmargin fst d) outL HdL.
-  by rewrite dmargin_dweight Hd_weight.
-have Hout_le1 : dweight outL <= 1 by rewrite pr_predT; exact: le1_mu.
-apply/eqP; rewrite eq_le; apply/andP; split.
-- exact: Hout_le1.
-- exact: Hout_ge1.
-Qed.
-
-Lemma coupling_with_loss_eq_output_heaps
-  {out_t mem_t : choiceType}
-  (d : {distr ((out_t * mem_t) * (out_t * mem_t)) / R})
-  (outL outR : {distr (out_t * mem_t) / R})
-  (post : pred (out_t * mem_t)) :
-  coupling_with_loss d outL outR ->
-  \P_[ d ] (fun outs =>
-    let '((yL, memL'), (yR, memR')) := outs in
-    (yL == yR) && (memL' == memR') && post (yL, memL')) >= 1 ->
-  outL =1 outR.
-Admitted.
-
-Lemma coupling_with_loss_eq_output_heap_post_support
-  {out_t mem_t : choiceType}
-  (d : {distr ((out_t * mem_t) * (out_t * mem_t)) / R})
-  (outL outR : {distr (out_t * mem_t) / R})
-  (post : pred (out_t * mem_t)) :
-  coupling_with_loss d outL outR ->
-  \P_[ d ] (fun outs =>
-    let '((yL, memL'), (yR, memR')) := outs in
-    (yL == yR) && (memL' == memR') && post (yL, memL')) >= 1 ->
-  (forall y, y \in dinsupp outL -> post y) /\
-  (forall y, y \in dinsupp outR -> post y).
-Admitted.
-
 Definition lift_loss_post
   {outL_t outR_t : choiceType}
   (post : pred (outL_t * outR_t)) : pred (option outL_t * option outR_t) :=
@@ -802,43 +727,5 @@ Definition lift_loss_post
     | (Some outL, Some outR) => post (outL, outR)
     | _ => false
     end.
-
-Lemma coupling_with_loss_total_variation_dmargin_match
-  {outL_t outR_t A : choiceType}
-  (fL : outL_t -> A) (fR : outR_t -> A)
-  (d : {distr (outL_t * outR_t) / R})
-  (outL : {distr outL_t / R})
-  (outR : {distr outR_t / R})
-  (ε : R) :
-  coupling_with_loss d outL outR ->
-  \P_[ d ] (fun xy => fL xy.1 == fR xy.2) >= 1 - ε ->
-  total_variation (dmargin fL outL) (dmargin fR outR) <= ε.
-Admitted.
-
-Lemma coupling_with_loss_bind
-  {midL_t midR_t outL_t outR_t : choiceType}
-  (ML : {distr midL_t / R})
-  (MR : {distr midR_t / R})
-  (KL : midL_t -> {distr outL_t / R})
-  (KR : midR_t -> {distr outR_t / R})
-  (mid : pred (midL_t * midR_t))
-  (post : pred (outL_t * outR_t))
-  (ε ε' : R)
-  (d0 : {distr (midL_t * midR_t) / R}) :
-  0 <= ε ->
-  0 <= ε' ->
-  coupling_with_loss d0 ML MR ->
-  \P_[ d0 ] mid >= 1 - ε ->
-  (forall xL xR,
-    mid (xL, xR) ->
-    exists d1,
-      coupling_with_loss d1 (KL xL) (KR xR) /\
-      \P_[ d1 ] post >= 1 - ε') ->
-  exists d,
-    coupling_with_loss d
-      (\dlet_(xL <- ML) KL xL)
-      (\dlet_(xR <- MR) KR xR) /\
-    \P_[ d ] post >= 1 - (ε + ε').
-Admitted.
 
 End AdditiveErrorCouplings.
