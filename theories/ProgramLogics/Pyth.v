@@ -16,6 +16,7 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
+From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
 From Mending.Probability Require Import Ae OutputHeap PythSeq.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
@@ -80,6 +81,198 @@ Notation "⊨PythC ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄" :=
 Notation "⊨Pyth1 ⦃ pre ⦄ progL ≈( eps ) progR ⦃ post ⦄" :=
   (pythJudgment progL progR pre post [tuple eps])
   : PythNotations.
+
+Definition sampleRaw {out_t : choice_type} (D : {distr out_t / R})
+    : raw_code out_t :=
+  x <$ (existT _ out_t D) ;;
+  ret x.
+
+Lemma sampleRawE {out_t : choice_type} (D : {distr out_t / R}) mem :
+  Pr_code (sampleRaw D) mem =1 dmargin (fun y => (y, mem)) D.
+Proof.
+move=> y.
+rewrite /sampleRaw Pr_code_sample dmarginE.
+apply: eq_in_dlet; last by [].
+move=> x _ z.
+by rewrite Pr_code_ret.
+Qed.
+
+Lemma dmargin_comp
+    {A B C : choice_type} (f : B -> C) (g : A -> B)
+    (D : {distr A / R}) :
+  dmargin f (dmargin g D) =1 dmargin (fun x => f (g x)) D.
+Proof.
+move=> z.
+rewrite dmarginE __deprecated__dlet_dlet.
+transitivity ((\dlet_(x <- D) dunit (f (g x))) z).
+- apply: eq_in_dlet=> // x _ z'.
+  by rewrite dlet_unit.
+- by rewrite dmarginE.
+Qed.
+
+Lemma complete_ext {A : choice_type} (D E : {distr A / R}) :
+  D =1 E ->
+  complete D =1 complete E.
+Proof.
+move=> HDE [x|].
+- by rewrite !completeE /= HDE.
+rewrite !completeE /=.
+have Hdweight : dweight D = dweight E.
+  exact: (pr_ext D E predT HDE).
+by rewrite Hdweight.
+Qed.
+
+Lemma dmargin_some_complete
+    {A B : choice_type} (f : A -> B) (D : {distr A / R}) :
+  dweight D = 1 ->
+  dmargin (fun x => Some (f x)) D =1 complete (dmargin f D).
+Proof.
+move=> HD [y|].
+- rewrite completeE /= !dmargin_psumE.
+  apply/eq_psum=> x.
+  by rewrite /=.
+rewrite completeE /= dmargin_psumE.
+have -> : psum (fun x : A => (Some (f x) == None)%:R * D x) = 0.
+  apply/psum_eq0=> x.
+  by rewrite mul0r.
+by rewrite dmargin_dweight HD subrr.
+Qed.
+
+Lemma complete_output_heap_sampleRawE
+    {out_t : choice_type} (D : {distr out_t / R}) mem :
+  dweight D = 1 ->
+  dmargin (fun y => Some (pack_output_heap (y, mem))) D =1
+    complete_output_heap (Pr_code (sampleRaw D) mem).
+Proof.
+move=> HD z.
+rewrite /complete_output_heap.
+rewrite (dmargin_some_complete (fun y => pack_output_heap (y, mem)) D HD z).
+apply: complete_ext=> packed.
+rewrite (dmargin_ext (@pack_output_heap out_t)
+  (Pr_code (sampleRaw D) mem)
+  (dmargin (fun y => (y, mem)) D)
+  (sampleRawE D mem) packed).
+by rewrite (dmargin_comp (@pack_output_heap out_t)
+  (fun y => (y, mem)) D packed).
+Qed.
+
+Lemma klSampRule
+  {inL_t inR_t : choice_type} {out_t : choice_type}
+  (DL : inL_t -> {distr out_t / R})
+  (DR : inR_t -> {distr out_t / R})
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (post : pred (out_t * heap))
+  (ε : R) :
+  0 <= ε ->
+  (forall memL memR xL xR,
+    pre ((xL, memL), (xR, memR)) -> memL = memR) ->
+  (forall xL xR, finite_kl (DL xL) (DR xR)) ->
+  (forall xL, dweight (DL xL) = 1) ->
+  (forall xR, dweight (DR xR) = 1) ->
+  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
+    δ_KL (DL xL) (DR xR) <= ε) ->
+  (forall memL memR xL xR y,
+    pre ((xL, memL), (xR, memR)) -> y \in dinsupp (DL xL) -> post (y, memL)) ->
+  (forall memL memR xL xR y,
+    pre ((xL, memL), (xR, memR)) -> y \in dinsupp (DR xR) -> post (y, memR)) ->
+  ⊨Pyth ⦃ pre ⦄ (fun x => sampleRaw (DL x)) ≈( [tuple ε] )
+    (fun x => sampleRaw (DR x)) ⦃ post ⦄.
+Proof.
+move=> Heps Hsame Hfin HmassL HmassR Hkl HpostL HpostR.
+split; first by move=> i; rewrite [i]ord1.
+move=> memL memR xL xR Hpre.
+have Hmem : memL = memR := Hsame memL memR xL xR Hpre.
+subst memR.
+pose encL := dmargin (fun y => Some (pack_output_heap (y, memL))) (DL xL).
+pose encR := dmargin (fun y => Some (pack_output_heap (y, memL))) (DR xR).
+pose P := dmargin (@singleton_pyth_trace (option (nat * heap))) encL.
+pose Q := dmargin (@singleton_pyth_trace (option (nat * heap))) encR.
+exists P, Q.
+have Hfin_enc : finite_kl encL encR.
+  exact: finite_kl_dmargin.
+have Hkl_enc : δ_KL encL encR <= ε.
+  apply: (le_trans (kl_dmargin_data_processing
+    (fun y => Some (pack_output_heap (y, memL))) (DL xL) (DR xR)
+    (finite_kl_absolute_continuous _ _ (Hfin xL xR)))).
+  exact: (Hkl memL memL xL xR Hpre).
+split.
+- apply: pythDist_kl_singleton.
+  + exact: Heps.
+  + exact: Hfin_enc.
+  + by rewrite /encL dmargin_dweight.
+  + by rewrite /encR dmargin_dweight.
+  + exact: Hkl_enc.
+split.
+- move=> z.
+  rewrite [ord_max]ord1.
+  rewrite /P dmargin_singleton_pyth_trace_final /encL.
+  exact: (complete_output_heap_sampleRawE (DL xL) memL (HmassL xL) z).
+split.
+- move=> z.
+  rewrite [ord_max]ord1.
+  rewrite /Q dmargin_singleton_pyth_trace_final /encR.
+  exact: (complete_output_heap_sampleRawE (DR xR) memL (HmassR xR) z).
+split.
+- move=> y Hy.
+  have HyD : y \in dinsupp (dmargin (fun z => (z, memL)) (DL xL)).
+    by rewrite in_dinsupp -(sampleRawE (DL xL) memL y) -in_dinsupp.
+  rewrite dmarginE in HyD.
+  have [x Hx Hunit] := dinsupp_dlet HyD.
+  have -> : y = (x, memL) by exact: (in_dunit Hunit).
+  exact: (HpostL memL memL xL xR x Hpre Hx).
+- move=> y Hy.
+  have HyD : y \in dinsupp (dmargin (fun z => (z, memL)) (DR xR)).
+    by rewrite in_dinsupp -(sampleRawE (DR xR) memL y) -in_dinsupp.
+  rewrite dmarginE in HyD.
+  have [x Hx Hunit] := dinsupp_dlet HyD.
+  have -> : y = (x, memL) by exact: (in_dunit Hunit).
+  exact: (HpostR memL memL xL xR x Hpre Hx).
+Qed.
+
+Lemma klDgRule
+  (centerL centerR : chInt)
+  (stdev ε : R)
+  (pre : pred ((chUnit * heap) * (chUnit * heap)))
+  (post : pred (chInt * heap)) :
+  0 < stdev ->
+  ((int_of_Z centerR - int_of_Z centerL)%:~R) ^+ 2 / (2 * stdev ^ 2) <= ε ->
+  (forall memL memR,
+    pre ((tt, memL), (tt, memR)) -> memL = memR) ->
+  (forall memL memR,
+    pre ((tt, memL), (tt, memR)) ->
+    forall y, y \in dinsupp (ssp_dg centerL stdev) -> post (y, memL)) ->
+  (forall memL memR,
+    pre ((tt, memL), (tt, memR)) ->
+    forall y, y \in dinsupp (ssp_dg centerR stdev) -> post (y, memR)) ->
+  ⊨Pyth ⦃ pre ⦄ (fun _ : chUnit => sampleRaw (ssp_dg centerL stdev)) ≈( [tuple ε] )
+    (fun _ : chUnit => sampleRaw (ssp_dg centerR stdev)) ⦃ post ⦄.
+Proof.
+move=> Hstdev Hkl_bound Hsame HpostL HpostR.
+have Hfin := ssp_dg_finite_kl centerL centerR stdev Hstdev.
+apply: (klSampRule (fun _ : chUnit => ssp_dg centerL stdev)
+                   (fun _ : chUnit => ssp_dg centerR stdev)
+                   pre post ε).
+- have Hkl := kl_ssp_dg centerL centerR stdev Hstdev.
+  have Hnonneg : 0 <= δ_KL (ssp_dg centerL stdev) (ssp_dg centerR stdev) :=
+    kl_nonnegative _ _ (finite_kl_absolute_continuous _ _ Hfin)
+      (ssp_dg_mass1 centerL stdev Hstdev).
+  lra.
+- move=> memL memR [] [].
+  exact: Hsame.
+- move=> [] [].
+  exact: Hfin.
+- move=> [].
+  exact: ssp_dg_mass1.
+- move=> [].
+  exact: ssp_dg_mass1.
+- move=> memL memR [] [] Hpre.
+  have Hkl := kl_ssp_dg centerL centerR stdev Hstdev.
+  lra.
+- move=> memL memR [] [] y Hpre Hy.
+  exact: (HpostL memL memR Hpre y Hy).
+- move=> memL memR [] [] y Hpre Hy.
+  exact: (HpostR memL memR Hpre y Hy).
+Qed.
 
 Lemma pythReflRule
   {ℓ : nat}

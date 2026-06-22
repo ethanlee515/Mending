@@ -34,6 +34,11 @@ Lemma ssp_dg_absolute_continuous (m1 m2 : 'int) (s : R) :
   absolute_continuous (ssp_dg m1 s) (ssp_dg m2 s).
 Admitted.
 
+Lemma ssp_dg_finite_kl (m1 m2 : 'int) (s : R) :
+  0 < s ->
+  finite_kl (ssp_dg m1 s) (ssp_dg m2 s).
+Admitted.
+
 Lemma kl_ssp_dg (m1 m2 : 'int) (s : R) :
   0 < s ->
   δ_KL (ssp_dg m1 s) (ssp_dg m2 s) <=

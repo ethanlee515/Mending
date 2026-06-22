@@ -169,6 +169,141 @@ rewrite kl_self.
 exact: Heps i.
 Qed.
 
+Definition singleton_pyth_trace {A : choiceType} (x : A) : 1.-tuple A :=
+  [tuple x].
+
+Lemma dmargin_singleton_pyth_trace
+    {A : choiceType} (D : {distr A / R}) (x : A) :
+  dmargin (@singleton_pyth_trace A) D (singleton_pyth_trace x) = D x.
+Proof.
+rewrite dmargin_psumE.
+rewrite (realsum.psum_finseq (r := [:: x])).
+- by rewrite big_seq1 eqxx mul1r ger0_norm ?ge0_mu.
+- by [].
+move=> y.
+rewrite !inE.
+case Hyx: (y == x); first by rewrite (eqP Hyx).
+case Hsing : (singleton_pyth_trace y == singleton_pyth_trace x).
+- move/eqP: Hsing=> Hsing.
+  have Hy_eq : y = x.
+    move: (congr1 (fun t => tnth t ord0) Hsing).
+    by rewrite /singleton_pyth_trace !tnth0.
+  by rewrite Hy_eq eqxx in Hyx.
+by rewrite /= mul0r eqxx.
+Qed.
+
+Lemma dmargin_singleton_pyth_trace_final
+    {A : choiceType} (D : {distr A / R}) :
+  dmargin (fun omega : 1.-tuple A => tnth omega ord0)
+    (dmargin (@singleton_pyth_trace A) D) =1 D.
+Proof.
+move=> x.
+rewrite dmargin_psumE.
+rewrite (realsum.psum_finseq (r := [:: singleton_pyth_trace x])).
+- rewrite big_seq1 /singleton_pyth_trace tnth0 eqxx mul1r.
+  by rewrite dmargin_singleton_pyth_trace ger0_norm ?ge0_mu.
+- by [].
+move=> omega.
+rewrite !inE.
+case Homega : (omega == singleton_pyth_trace x); first by rewrite (eqP Homega).
+have Htnth : tnth omega ord0 != x.
+  apply/negP=> /eqP Hx.
+  have Homega_eq : omega = singleton_pyth_trace x.
+    apply: eq_from_tnth=> j.
+    by rewrite [j]ord1 /singleton_pyth_trace tnth0 Hx.
+  by rewrite Homega_eq eqxx in Homega.
+move/negbTE: Htnth=> Htnth0.
+by rewrite Htnth0 mul0r eqxx.
+Qed.
+
+Lemma pythDist_kl_singleton
+    {A : choiceType} (P Q : {distr A / R}) (eps : R) :
+  0 <= eps ->
+  finite_kl P Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  δ_KL P Q <= eps ->
+  pythDist
+    (dmargin (@singleton_pyth_trace A) P)
+    (dmargin (@singleton_pyth_trace A) Q)
+    [tuple eps].
+Proof.
+move=> Heps Hfin HP HQ Hkl.
+pose lift := @singleton_pyth_trace A.
+have Hcond (D : {distr A / R}) (HD : dweight D = 1) x :
+    forall a : 0.-tuple A,
+    @conditional_coordinate R 1 A (dmargin lift D) ord0 a x = D x.
+  move=> a.
+  rewrite /conditional_coordinate dmargin_psumE.
+  rewrite (realsum.psum_finseq (r := [:: lift x])).
+  - rewrite big_seq1.
+    have Htrue (omega : 1.-tuple A) :
+        @tuple_prefix_eq 1 A ord0 a omega.
+      by rewrite /tuple_prefix_eq; apply/forallP=> j; case: j.
+    have Hdcond :
+        dcond (dmargin lift D)
+          (fun omega => @tuple_prefix_eq 1 A ord0 a omega)
+          (lift x) = dmargin lift D (lift x).
+      rewrite dcondE /prc.
+      have -> : \P_[dmargin lift D]
+          (fun omega => (omega == lift x) &&
+            (@tuple_prefix_eq 1 A ord0 a omega)) =
+        \P_[dmargin lift D] (pred1 (lift x)).
+        apply: eq_pr=> omega.
+        rewrite /tuple_prefix_eq.
+        change (((omega == lift x) &&
+          [forall j : 'I_0,
+            tnth omega (widen_ord (ltnW (ltn_ord ord0)) j) ==
+              tnth a j]) = (omega == lift x)).
+        have -> : [forall j : 'I_0,
+            tnth omega (widen_ord (ltnW (ltn_ord ord0)) j) ==
+              tnth a j] = true.
+          by apply/forallP=> j; case: j.
+        by rewrite andbT.
+      have -> : \P_[dmargin lift D]
+          (fun omega => @tuple_prefix_eq 1 A ord0 a omega) =
+        \P_[dmargin lift D] predT.
+        apply: eq_pr=> omega.
+        by rewrite /tuple_prefix_eq; apply/forallP=> j; case: j.
+      by rewrite -pr_pred1 dmargin_dweight HD divr1.
+    rewrite Hdcond /lift /singleton_pyth_trace tnth0 eqxx mul1r.
+    by rewrite dmargin_singleton_pyth_trace ger0_norm ?ge0_mu.
+  - by [].
+  move=> omega.
+  rewrite !inE.
+  case Homega : (omega == lift x); first by rewrite (eqP Homega).
+  have Htnth : tnth omega ord0 != x.
+    apply/negP=> /eqP Hx.
+    have Homega_eq : omega = lift x.
+      apply: eq_from_tnth=> j.
+      by rewrite [j]ord1 /lift /singleton_pyth_trace tnth0 Hx.
+    by rewrite Homega_eq eqxx in Homega.
+  move/negbTE: Htnth=> Htnth0.
+  by rewrite Htnth0 mul0r eqxx.
+split.
+- by move=> i; rewrite [i]ord1.
+split.
+  by rewrite dmargin_dweight.
+split.
+  by rewrite dmargin_dweight.
+move=> i.
+rewrite [i]ord1.
+move=> a.
+split.
+- apply: (finite_kl_ext P
+    (conditional_coordinate (dmargin lift P) a) Q
+    (conditional_coordinate (dmargin lift Q) a)).
+  + move=> z; symmetry; exact: (Hcond P HP z a).
+  + move=> z; symmetry; exact: (Hcond Q HQ z a).
+  + exact: Hfin.
+- rewrite tnth0.
+  rewrite (kl_ext (conditional_coordinate (dmargin lift P) a) P
+    (conditional_coordinate (dmargin lift Q) a) Q).
+  + exact: Hkl.
+  + move=> z; exact: (Hcond P HP z a).
+  + move=> z; exact: (Hcond Q HQ z a).
+Qed.
+
 Fixpoint pythCallErrors (q : nat) (eps : R) : (q.*2).+3.-tuple R :=
   if q is q'.+1 then
     cat_tuple [tuple 0; eps] (pythCallErrors q' eps)
