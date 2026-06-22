@@ -240,7 +240,7 @@ split.
   exact: (HpostR memL memL xL xR x Hpre Hx).
 Qed.
 
-Lemma klDgRule
+Lemma closedKlDgRule
   (centerL centerR : chInt)
   (stdev ε : R)
   (pre : pred ((chUnit * heap) * (chUnit * heap)))
@@ -286,6 +286,51 @@ apply: (klSampRule (fun _ : chUnit => ssp_dg centerL stdev)
   exact: (HpostL memL memR Hpre y Hy).
 - move=> memL memR [] [] y Hpre Hy.
   exact: (HpostR memL memR Hpre y Hy).
+Qed.
+
+Lemma klDgRule
+  (stdev ε : R)
+  (pre : pred ((chInt * heap) * (chInt * heap)))
+  (post : pred (chInt * heap)) :
+  0 < stdev ->
+  0 <= ε ->
+  (forall memL memR centerL centerR,
+    pre ((centerL, memL), (centerR, memR)) ->
+    ((int_of_Z centerR - int_of_Z centerL)%:~R) ^+ 2 /
+      (2 * stdev ^ 2) <= ε) ->
+  (forall memL memR centerL centerR,
+    pre ((centerL, memL), (centerR, memR)) -> memL = memR) ->
+  (forall memL memR centerL centerR,
+    pre ((centerL, memL), (centerR, memR)) ->
+    forall y, y \in dinsupp (ssp_dg centerL stdev) -> post (y, memL)) ->
+  (forall memL memR centerL centerR,
+    pre ((centerL, memL), (centerR, memR)) ->
+    forall y, y \in dinsupp (ssp_dg centerR stdev) -> post (y, memR)) ->
+  ⊨Pyth ⦃ pre ⦄ (fun centerL : chInt => sampleRaw (ssp_dg centerL stdev))
+    ≈( [tuple ε] )
+    (fun centerR : chInt => sampleRaw (ssp_dg centerR stdev)) ⦃ post ⦄.
+Proof.
+move=> Hstdev Heps Hkl_bound Hsame HpostL HpostR.
+apply: (klSampRule (fun centerL : chInt => ssp_dg centerL stdev)
+                   (fun centerR : chInt => ssp_dg centerR stdev)
+                   pre post ε).
+- exact: Heps.
+- move=> memL memR centerL centerR Hpre.
+  exact: (Hsame memL memR centerL centerR Hpre).
+- move=> centerL centerR.
+  exact: (ssp_dg_finite_kl centerL centerR stdev Hstdev).
+- move=> centerL.
+  exact: ssp_dg_mass1.
+- move=> centerR.
+  exact: ssp_dg_mass1.
+- move=> memL memR centerL centerR Hpre.
+  have Hkl := kl_ssp_dg centerL centerR stdev Hstdev.
+  have Hbound := Hkl_bound memL memR centerL centerR Hpre.
+  lra.
+- move=> memL memR centerL centerR y Hpre Hy.
+  exact: (HpostL memL memR centerL centerR Hpre y Hy).
+- move=> memL memR centerL centerR y Hpre Hy.
+  exact: (HpostR memL memR centerL centerR Hpre y Hy).
 Qed.
 
 Lemma pythReflRule
