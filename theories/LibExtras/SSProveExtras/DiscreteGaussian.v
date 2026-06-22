@@ -29,21 +29,45 @@ rewrite /ssp_dg dmargin_dweight.
 exact: discrete_gaussian_mass1.
 Qed.
 
-Lemma ssp_dg_absolute_continuous (m1 m2 : 'int) (s : R) :
-  0 < s ->
-  absolute_continuous (ssp_dg m1 s) (ssp_dg m2 s).
-Admitted.
+Lemma Z_of_int_injective : injective Z_of_int.
+Proof.
+move=> x y Hxy.
+by rewrite -(Z_of_intK x) Hxy Z_of_intK.
+Qed.
 
 Lemma ssp_dg_finite_kl (m1 m2 : 'int) (s : R) :
   0 < s ->
   finite_kl (ssp_dg m1 s) (ssp_dg m2 s).
-Admitted.
+Proof.
+move=> Hs.
+rewrite /ssp_dg.
+apply: finite_kl_dmargin_injective.
+- exact: Z_of_int_injective.
+exact: finite_kl_discrete_gaussian.
+Qed.
+
+Lemma ssp_dg_absolute_continuous (m1 m2 : 'int) (s : R) :
+  0 < s ->
+  absolute_continuous (ssp_dg m1 s) (ssp_dg m2 s).
+Proof.
+move=> Hs.
+exact: (finite_kl_absolute_continuous _ _ (ssp_dg_finite_kl m1 m2 s Hs)).
+Qed.
 
 Lemma kl_ssp_dg (m1 m2 : 'int) (s : R) :
   0 < s ->
   δ_KL (ssp_dg m1 s) (ssp_dg m2 s) <=
     ((int_of_Z m2 - int_of_Z m1)%:~R) ^+ 2 / (2 * s ^ 2).
-Admitted.
+Proof.
+move=> Hs.
+rewrite /ssp_dg.
+rewrite (@kl_dmargin_injective R int 'int Z_of_int
+  (discrete_gaussian (int_of_Z m1) s)
+  (discrete_gaussian (int_of_Z m2) s)).
+- by rewrite kl_discrete_gaussian.
+- exact: Z_of_int_injective.
+- exact: finite_kl_discrete_gaussian.
+Qed.
 
 Fixpoint discrete_gaussians_aux {n : nat} (s : R)
   : chVec 'int n -> distr R (chVec 'int n) :=

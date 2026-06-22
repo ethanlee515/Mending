@@ -151,6 +151,17 @@ rewrite /discrete_gaussian dmargin_dweight.
 exact: centered_discrete_gaussian_mass1.
 Qed.
 
+Lemma discrete_gaussian_gt0 (center : int) (s : R) (x : int) :
+  s > 0 ->
+  0 < discrete_gaussian center s x.
+Proof.
+move=> gt0_s.
+rewrite discrete_gaussianE // gaussian_pdfE //.
+apply: divr_gt0.
+- by rewrite /gaussian; exact: expR_gt0.
+exact: gt0_weight_gaussian.
+Qed.
+
 (** Fourth layer: pointwise logarithm algebra for equal-variance Gaussians. *)
 
 Lemma ln_discrete_gaussian_ratio (mu nu : int) (s : R) (x : int) :
@@ -180,6 +191,38 @@ Lemma quadratic_gap_centered mu nu x :
 Proof.
 rewrite /quadratic_gap !rmorphB /=.
 lra.
+Qed.
+
+Lemma finite_kl_discrete_gaussian (mu nu : int) (s : R) :
+  s > 0 ->
+  finite_kl (discrete_gaussian mu s) (discrete_gaussian nu s).
+Proof.
+move=> gt0_s.
+split.
+- move=> x Hx0.
+  have Hxpos := discrete_gaussian_gt0 nu s x gt0_s.
+  lra.
+- pose c := (1 / (2 * s ^ 2)) * ((mu - nu)%:~R) ^+ 2.
+  pose d := (1 / (2 * s ^ 2)) * 2 * (mu - nu)%:~R.
+  apply: (eq_summable
+    (S1 := (fun x : int => c * discrete_gaussian mu s x) \+
+           (fun x : int =>
+              (d * centered_difference mu x) * discrete_gaussian mu s x))).
+  + move=> x /=.
+    rewrite ln_discrete_gaussian_ratio // quadratic_gap_centered.
+    have Hgap :
+        (((mu - nu)%:~R) ^+ 2 +
+          2 * (x - mu)%:~R * (mu - nu)%:~R) / (2 * s ^ 2) =
+        c + d * centered_difference mu x.
+      rewrite /c /d /centered_difference.
+      lra.
+    rewrite Hgap mulrDr.
+    by rewrite [discrete_gaussian mu s x * c]mulrC
+      [discrete_gaussian mu s x * (d * centered_difference mu x)]mulrC.
+  apply: summableD.
+  + exact: has_expC.
+  apply: has_expZ.
+  exact: discrete_gaussian_centered_difference_has_exp.
 Qed.
 
 Theorem kl_discrete_gaussian (mu nu : int) (s : R) :

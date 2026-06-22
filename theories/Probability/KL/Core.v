@@ -1,5 +1,5 @@
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format,-notation-incompatible-prefix".
-From mathcomp Require Import all_boot all_order all_algebra all_reals distr.
+From mathcomp Require Import all_boot all_order all_algebra all_reals distr boolp.
 From mathcomp Require Import realseq realsum exp interval_inference convex xfinmap.
 From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format,notation-incompatible-prefix".
@@ -301,11 +301,158 @@ apply: (@summable_kernel_weighted_pair_nonneg T U
 - exact: (proj2 (summable_abs F) smF).
 Qed.
 
+Lemma dmargin_injectiveE {T U : choiceType}
+    (f : T -> U) (P : {distr T / R}) :
+  injective f ->
+  forall x, dmargin f P (f x) = P x.
+Proof.
+move=> Hf x.
+rewrite dmargin_psumE.
+rewrite (psum_finseq (r := [:: x])).
+- by rewrite big_seq1 eqxx mul1r ger0_norm ?ge0_mu.
+- by [].
+move=> z.
+rewrite inE.
+case Hfz : (f z == f x); last by rewrite mul0r eqxx.
+rewrite mul1r=> _.
+have Hzx : z = x := Hf _ _ (eqP Hfz).
+by move: Hzx=> ->; rewrite inE.
+Qed.
+
+Lemma finite_kl_dmargin_injective {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  injective f ->
+  finite_kl P Q ->
+  finite_kl (dmargin f P) (dmargin f Q).
+Proof.
+move=> Hf Hfin.
+split.
+- move=> y.
+  rewrite !dmargin_psumE=> HQy0.
+  apply: psum_eq0=> x.
+  case Hfx : (f x == y); last by rewrite mul0r.
+  rewrite mul1r.
+  have Hfiber_summable : summable (fun x => (f x == y)%:R * Q x).
+    exact: summable_condl.
+  have HQx0 : Q x = 0.
+    have := eq0_psum Hfiber_summable HQy0 x.
+    by rewrite Hfx mul1r.
+  by rewrite (finite_kl_absolute_continuous P Q Hfin x HQx0).
+- pose F := fun x : T => P x * ln (P x / Q x).
+  pose G := fun y : U =>
+    dmargin f P y * ln (dmargin f P y / dmargin f Q y).
+  have HFsm : summable F := finite_kl_summable P Q Hfin.
+  have HFabssm : summable (fun x => `|F x|).
+    exact: (proj2 (summable_abs F) HFsm).
+  have Hfiber_sm y :
+      summable (fun x : T => (f x == y)%:R * `|F x|).
+    exact: summable_condl.
+  have G_notin_image y :
+      ~~ `[< exists x : T, f x == y >] -> G y = 0.
+    move=> Hy.
+    have Hd : dmargin f P y = 0.
+      rewrite dmargin_psumE.
+      apply: psum_eq0=> x.
+      case Hfx : (f x == y); last by rewrite mul0r.
+      move: Hy=> /negP Hy.
+      case: Hy; apply/asboolP.
+      by exists x.
+    by rewrite /G Hd mul0r.
+  have Hbound y :
+      `|G y| <=
+      psum (fun x : T => (f x == y)%:R * `|F x|).
+    case Hy : `[< exists x : T, f x == y >].
+    - move/asboolP: Hy=> [x Hfx].
+      have HGy : G y = F x.
+        by rewrite /G /F -(eqP Hfx) !dmargin_injectiveE.
+      rewrite HGy.
+      have Hle := @gerfinseq_psum R T
+        (fun x0 : T => (f x0 == y)%:R * `|F x0|) [:: x]
+        (isT : uniq [:: x]) (Hfiber_sm y).
+      apply: (le_trans _ Hle).
+      rewrite big_seq1 Hfx mul1r.
+      by rewrite normr_id ?normr_ge0.
+    - have Hnot : ~~ `[< exists x : T, f x == y >] by rewrite Hy.
+      rewrite (G_notin_image y Hnot) normr0.
+      exact: ge0_psum.
+  apply/summable_abs.
+  apply: (le_summable
+    (F2 := fun y => psum (fun x : T => (f x == y)%:R * `|F x|))).
+  - move=> y; apply/andP; split; first exact: normr_ge0.
+    exact: Hbound.
+  apply: summable_fiber_psum.
+  - move=> x; exact: normr_ge0.
+  exact: HFabssm.
+Qed.
+
 Lemma kl_dmargin_injective {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :
   injective f ->
+  finite_kl P Q ->
   δ_KL (dmargin f P) (dmargin f Q) = δ_KL P Q.
-Admitted.
+Proof.
+move=> Hf _.
+pose G := fun y : U =>
+  dmargin f P y * ln (dmargin f P y / dmargin f Q y).
+pose F := fun x : T => P x * ln (P x / Q x).
+pose Img : pred U := fun y => `[< exists x : T, f x == y >].
+pose inv y : option T :=
+  if pselect (exists x : T, f x == y) is left Hy
+  then Some (xchoose Hy) else None.
+have invK y : y \in Img -> omap f (inv y) = Some y.
+  rewrite /Img /inv => /asboolP Hy.
+  case: pselect=> [Hy'|nHy] /=.
+    by rewrite (eqP (xchooseP Hy')).
+  by case: nHy.
+have inv_fK x : inv (f x) = Some x.
+  rewrite /inv.
+  case: pselect=> [Hy|nHy] /=.
+    congr Some.
+    apply: Hf.
+    by apply/eqP; exact: (xchooseP Hy).
+  by case: nHy; exists x.
+have G_notin_image y : ~~ (y \in Img) -> G y = 0.
+  move=> Hy.
+  have Hd : dmargin f P y = 0.
+    rewrite dmargin_psumE.
+    apply: psum_eq0=> x.
+    case Hfx : (f x == y); last by rewrite mul0r.
+    move: Hy; rewrite /Img=> /negP Hy.
+    case: Hy; apply/asboolP.
+    by exists x.
+  by rewrite /G Hd mul0r.
+have fposG_support y : fpos G y != 0 -> y \in Img.
+  apply: contraR=> Hy.
+  have -> : fpos G y = 0.
+    by rewrite /fpos (G_notin_image y Hy) maxxx normr0.
+  by rewrite eqxx.
+have fnegG_support y : fneg G y != 0 -> y \in Img.
+  apply: contraR=> Hy.
+  have -> : fneg G y = 0.
+    by rewrite /fneg (G_notin_image y Hy) minxx normr0.
+  by rewrite eqxx.
+have reindex_fpos :
+    psum (fpos G) = psum (fun x : T => fpos G (f x)).
+  apply: (@reindex_psum_onto R U T (fpos G) Img f inv).
+  - exact: fposG_support.
+  - exact: invK.
+  - by move=> x _; rewrite inv_fK.
+have reindex_fneg :
+    psum (fneg G) = psum (fun x : T => fneg G (f x)).
+  apply: (@reindex_psum_onto R U T (fneg G) Img f inv).
+  - exact: fnegG_support.
+  - exact: invK.
+  - by move=> x _; rewrite inv_fK.
+have GF x : G (f x) = F x.
+  by rewrite /G /F !dmargin_injectiveE.
+rewrite /δ_KL /esp.
+rewrite (eq_sum (F2 := G)); last by move=> y; rewrite /G mulrC.
+rewrite (eq_sum (F2 := F)); last by move=> x; rewrite /F mulrC.
+rewrite /sum reindex_fpos reindex_fneg.
+congr (_ - _).
+- by apply/eq_psum=> x; rewrite /fpos GF.
+- by apply/eq_psum=> x; rewrite /fneg GF.
+Qed.
 
 Lemma dmargin_absolute_continuous {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :

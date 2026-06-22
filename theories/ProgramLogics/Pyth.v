@@ -156,6 +156,15 @@ by rewrite (dmargin_comp (@pack_output_heap out_t)
   (fun y => (y, mem)) D packed).
 Qed.
 
+Lemma sample_output_encoding_injective
+    {out_t : choice_type} (mem : heap) :
+  injective (fun y : out_t => Some (pack_output_heap (y, mem))).
+Proof.
+move=> y1 y2 Hsome.
+move: Hsome=> [= Hpack].
+exact: (pcan_inj pickleK Hpack).
+Qed.
+
 Lemma klSampRule
   {inL_t inR_t : choice_type} {out_t : choice_type}
   (DL : inL_t -> {distr out_t / R})
@@ -185,16 +194,18 @@ have Hmem : memL = memR := Hsame memL memR xL xR Hpre.
 subst memR.
 pose encL := dmargin (fun y => Some (pack_output_heap (y, memL))) (DL xL).
 pose encR := dmargin (fun y => Some (pack_output_heap (y, memL))) (DR xR).
-pose P := dmargin (@singleton_pyth_trace (option (nat * heap))) encL.
-pose Q := dmargin (@singleton_pyth_trace (option (nat * heap))) encR.
-exists P, Q.
-have Hfin_enc : finite_kl encL encR.
-  exact: finite_kl_dmargin.
-have Hkl_enc : δ_KL encL encR <= ε.
-  apply: (le_trans (kl_dmargin_data_processing
-    (fun y => Some (pack_output_heap (y, memL))) (DL xL) (DR xR)
-    (finite_kl_absolute_continuous _ _ (Hfin xL xR)))).
-  exact: (Hkl memL memL xL xR Hpre).
+  pose P := dmargin (@singleton_pyth_trace (option (nat * heap))) encL.
+  pose Q := dmargin (@singleton_pyth_trace (option (nat * heap))) encR.
+  exists P, Q.
+  have Henc_inj := @sample_output_encoding_injective out_t memL.
+  have Hfin_enc : finite_kl encL encR.
+    exact: (finite_kl_dmargin_injective _ _ _ Henc_inj (Hfin xL xR)).
+  have Hkl_enc : δ_KL encL encR <= ε.
+    rewrite /encL /encR.
+    rewrite (@kl_dmargin_injective R out_t (option (nat * heap))
+      (fun y => Some (pack_output_heap (y, memL)))
+      (DL xL) (DR xR) Henc_inj (Hfin xL xR)).
+    exact: (Hkl memL memL xL xR Hpre).
 split.
 - apply: pythDist_kl_singleton.
   + exact: Heps.
@@ -249,14 +260,17 @@ Lemma klDgRule
 Proof.
 move=> Hstdev Hkl_bound Hsame HpostL HpostR.
 have Hfin := ssp_dg_finite_kl centerL centerR stdev Hstdev.
+have Hdg_bound_nonneg :
+    0 <= ((int_of_Z centerR - int_of_Z centerL)%:~R) ^+ 2 /
+      (2 * stdev ^ 2).
+  apply: divr_ge0; first exact: sqr_ge0.
+  apply: mulr_ge0; first by rewrite ler0n.
+  apply: exprn_ge0.
+  exact: ltW.
 apply: (klSampRule (fun _ : chUnit => ssp_dg centerL stdev)
                    (fun _ : chUnit => ssp_dg centerR stdev)
                    pre post ε).
-- have Hkl := kl_ssp_dg centerL centerR stdev Hstdev.
-  have Hnonneg : 0 <= δ_KL (ssp_dg centerL stdev) (ssp_dg centerR stdev) :=
-    kl_nonnegative _ _ (finite_kl_absolute_continuous _ _ Hfin)
-      (ssp_dg_mass1 centerL stdev Hstdev).
-  lra.
+- lra.
 - move=> memL memR [] [].
   exact: Hsame.
 - move=> [] [].
