@@ -7,6 +7,34 @@ Import GRing.Theory Num.Theory Order.Theory.
 
 Local Open Scope ring_scope.
 
+Lemma cat_tuple_singleton_cons {n : nat} {A : Type}
+    (x : A) (xs : n.-tuple A) :
+  cat_tuple [tuple x] xs = cons_tuple x xs.
+Proof.
+by apply: val_inj.
+Qed.
+
+Lemma mktuple_const_nseq {n : nat} {A : Type} (x : A) :
+  [tuple x | i < n] = [tuple of nseq n x].
+Proof.
+apply: eq_from_tnth=> i.
+by rewrite tnth_mktuple tnth_nseq.
+Qed.
+
+Lemma mktuple_const_1 {A : Type} (x : A) :
+  [tuple x | i < 1] = [tuple x].
+Proof.
+apply: eq_from_tnth=> i.
+by rewrite [i]ord1 tnth_mktuple tnth0.
+Qed.
+
+Lemma cat_tuple_singleton_const {n : nat} {A : Type} (x : A) :
+  cat_tuple [tuple x] [tuple x | i < n] = [tuple x | i < n.+1].
+Proof.
+rewrite !mktuple_const_nseq.
+by apply: val_inj.
+Qed.
+
 Section TupleExtras.
 
 Context {R : realType}.

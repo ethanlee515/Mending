@@ -7,7 +7,7 @@ From mathcomp Require Import lra.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.Probability.KL Require Import Core Pinsker ChainPointwise.
-From Mending.Probability Require Import ConditionalCoordinate.
+From Mending.Probability Require Import ConditionalCoordinate DletTuple.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 
 Import GRing.Theory Num.Theory Order.Theory.
@@ -167,6 +167,168 @@ split.
   exact: finite_kl_refl.
 rewrite kl_self.
 exact: Heps i.
+Qed.
+
+Lemma pythDist_ext
+  {n : nat} {A : choiceType}
+  (P P' Q Q' : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  P =1 P' ->
+  Q =1 Q' ->
+  pythDist P Q eps ->
+  pythDist P' Q' eps.
+Proof.
+move=> HP HQ [Heps [HPmass [HQmass Hcond]]].
+split; first exact: Heps.
+split.
+- rewrite (pr_ext P' P predT); first exact: HPmass.
+  by move=> x; symmetry; exact: HP.
+split.
+- rewrite (pr_ext Q' Q predT); first exact: HQmass.
+  by move=> x; symmetry; exact: HQ.
+move=> i a.
+have HcondP :=
+  conditional_coordinate_dist_ext P P' i a HP.
+have HcondQ :=
+  conditional_coordinate_dist_ext Q Q' i a HQ.
+have [Hfin Hkl] := Hcond i a.
+split.
+- exact: (finite_kl_ext _ _ _ _ HcondP HcondQ Hfin).
+rewrite -(kl_ext
+  (conditional_coordinate P a)
+  (conditional_coordinate P' a)
+  (conditional_coordinate Q a)
+  (conditional_coordinate Q' a) HcondP HcondQ).
+exact: Hkl.
+Qed.
+
+Lemma pythDist_dlet_cat_const
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (P0 Q0 : {distr ((ℓ1.+1).-tuple A) / R})
+  (P1 Q1 : {distr ((ℓ2.+1).-tuple A) / R})
+  (s1 : (ℓ1.+1).-tuple R)
+  (s2 : (ℓ2.+1).-tuple R) :
+  pythDist P0 Q0 s1 ->
+  pythDist P1 Q1 s2 ->
+  pythDist
+    (\dlet_(omega0 <- P0)
+     \dlet_(omega1 <- P1)
+       dunit (cat_tuple omega0 omega1))
+    (\dlet_(omega0 <- Q0)
+     \dlet_(omega1 <- Q1)
+       dunit (cat_tuple omega0 omega1))
+    (cat_tuple s1 s2).
+Proof.
+move=> Hdist0 Hdist1.
+move: Hdist0=> [Hs1 [HP0 [HQ0 Hcond0]]].
+move: Hdist1=> [Hs2 [HP1 [HQ1 Hcond1]]].
+have Hdist0 : pythDist P0 Q0 s1.
+  by split; first exact: Hs1; split; first exact: HP0;
+     split; first exact: HQ0.
+have Hdist1 : pythDist P1 Q1 s2.
+  by split; first exact: Hs2; split; first exact: HP1;
+     split; first exact: HQ1.
+pose P :=
+  \dlet_(omega0 <- P0)
+  \dlet_(omega1 <- P1)
+    dunit (cat_tuple omega0 omega1).
+pose Q :=
+  \dlet_(omega0 <- Q0)
+  \dlet_(omega1 <- Q1)
+    dunit (cat_tuple omega0 omega1).
+change (pythDist P Q (cat_tuple s1 s2)).
+split.
+- move=> i.
+  apply: (cat_tuple_nonneg s1 s2 i).
+  + exact: Hs1.
+  + exact: Hs2.
+split.
+- rewrite /P.
+  rewrite (pr_dlet_cat_prefix_lift_eq P0 (fun _ => P1)
+    predT predT (fun _ => HP1)); last by move=> omega0 omega1.
+  exact: HP0.
+split.
+- rewrite /Q.
+  rewrite (pr_dlet_cat_prefix_lift_eq Q0 (fun _ => Q1)
+    predT predT (fun _ => HQ1)); last by move=> omega0 omega1.
+  exact: HQ0.
+move=> i a.
+split.
+- case: (ltnP i ℓ1.+1)=> Hi.
+  + pose i0 : 'I_(ℓ1.+1) := Ordinal Hi.
+    have Hfin0 := pythDist_cond_finite_kl P0 Q0 s1 Hdist0 i0 a.
+    apply: (finite_kl_ext _ _ _ _ _ _ Hfin0).
+    * move=> x; symmetry.
+      exact: (conditional_coordinate_dlet_cat_prefix_eq
+        P0 (fun _ => P1) i a Hi (fun _ => HP1) x).
+    * move=> x; symmetry.
+      exact: (conditional_coordinate_dlet_cat_prefix_eq
+        Q0 (fun _ => Q1) i a Hi (fun _ => HQ1) x).
+  have Hzero_fin :
+      P0 (catTuplePrefix i Hi a) = 0 ->
+      finite_kl (conditional_coordinate P a)
+        (conditional_coordinate Q a).
+    move=> HP0z.
+    apply: finite_kl_left_dnull.
+    exact: (conditional_coordinate_dlet_cat_suffix_zero_prefix
+      P0 (fun _ => P1) i a Hi HP0z).
+  have Hac0 := pythDist_absolute_continuous P0 Q0 s1 Hdist0.
+  case HP0z: (P0 (catTuplePrefix i Hi a) == 0).
+    exact: Hzero_fin (eqP HP0z).
+  have HP0pos : 0 < P0 (catTuplePrefix i Hi a).
+    by rewrite lt_def ge0_mu HP0z.
+  have HQ0pos : 0 < Q0 (catTuplePrefix i Hi a).
+    exact: (absolute_continuous_positive P0 Q0 _ Hac0 HP0pos).
+  have Hfin1 := pythDist_cond_finite_kl P1 Q1 s2 Hdist1
+    (catTupleSuffixIndex i Hi) (catTupleSuffixAssignment i Hi a).
+  apply: (finite_kl_ext _ _ _ _ _ _ Hfin1).
+  + move=> x; symmetry.
+    exact: (conditional_coordinate_dlet_cat_suffix_eq
+      P0 (fun _ => P1) i a Hi
+      (catTuplePrefix i Hi a) erefl HP0pos x).
+  + move=> x; symmetry.
+    exact: (conditional_coordinate_dlet_cat_suffix_eq
+      Q0 (fun _ => Q1) i a Hi
+      (catTuplePrefix i Hi a) erefl HQ0pos x).
+case: (ltnP i ℓ1.+1)=> Hi.
+  pose i0 : 'I_(ℓ1.+1) := Ordinal Hi.
+  rewrite (kl_ext
+    (conditional_coordinate P a)
+    (@conditional_coordinate _ _ _ P0 i0 a)
+    (conditional_coordinate Q a)
+    (@conditional_coordinate _ _ _ Q0 i0 a)).
+  - rewrite (cat_tuple_tnth_prefix s1 s2 i Hi).
+    exact: (pythDist_cond_bound P0 Q0 s1 Hdist0 i0 a).
+  - exact: (conditional_coordinate_dlet_cat_prefix_eq
+      P0 (fun _ => P1) i a Hi (fun _ => HP1)).
+  - exact: (conditional_coordinate_dlet_cat_prefix_eq
+      Q0 (fun _ => Q1) i a Hi (fun _ => HQ1)).
+have Hac0 := pythDist_absolute_continuous P0 Q0 s1 Hdist0.
+case HP0z: (P0 (catTuplePrefix i Hi a) == 0).
+  rewrite (kl_left_dnull (conditional_coordinate P a)
+    (conditional_coordinate Q a)).
+  - rewrite (cat_tuple_tnth_suffix s1 s2 i Hi).
+    exact: Hs2.
+  exact: (conditional_coordinate_dlet_cat_suffix_zero_prefix
+    P0 (fun _ => P1) i a Hi (eqP HP0z)).
+have HP0pos : 0 < P0 (catTuplePrefix i Hi a).
+  by rewrite lt_def ge0_mu HP0z.
+have HQ0pos : 0 < Q0 (catTuplePrefix i Hi a).
+  exact: (absolute_continuous_positive P0 Q0 _ Hac0 HP0pos).
+rewrite (kl_ext
+  (conditional_coordinate P a)
+  (conditional_coordinate P1 (catTupleSuffixAssignment i Hi a))
+  (conditional_coordinate Q a)
+  (conditional_coordinate Q1 (catTupleSuffixAssignment i Hi a))).
+- rewrite (cat_tuple_tnth_suffix s1 s2 i Hi).
+  exact: (pythDist_cond_bound P1 Q1 s2 Hdist1
+    (catTupleSuffixIndex i Hi) (catTupleSuffixAssignment i Hi a)).
+- exact: (conditional_coordinate_dlet_cat_suffix_eq
+    P0 (fun _ => P1) i a Hi
+    (catTuplePrefix i Hi a) erefl HP0pos).
+- exact: (conditional_coordinate_dlet_cat_suffix_eq
+    Q0 (fun _ => Q1) i a Hi
+    (catTuplePrefix i Hi a) erefl HQ0pos).
 Qed.
 
 Definition singleton_pyth_trace {A : choiceType} (x : A) : 1.-tuple A :=

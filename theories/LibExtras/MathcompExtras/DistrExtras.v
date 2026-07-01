@@ -151,14 +151,55 @@ Lemma conditional_secondE {T U : choiceType}
   conditional_second P x y =
     if dmargin (fun xy : T * U => xy.1) P x == 0 then 0
     else P (x, y) / dmargin (fun xy : T * U => xy.1) P x.
-Admitted.
+Proof.
+rewrite /conditional_second pr_pred1 pr_dmargin pr_dcond /prc.
+have Hnum :
+    \P_[P] [predI [pred xy | xy.2 \in pred1 y] &
+                  [pred xy | xy.1 == x]] = P (x, y).
+  rewrite /pr (psum_finseq (r := [:: (x, y)])).
+  - rewrite big_seq1 /predI !inE /= !eqxx mul1r.
+    by rewrite ger0_norm ?ge0_mu.
+  - by [].
+  move=> [x' y'].
+  rewrite !inE /predI /=.
+  case Hy: (y' == y); last by rewrite /= mul0r eqxx.
+  case Hx: (x' == x); last by rewrite /= mul0r eqxx.
+  move=> _.
+  by rewrite (eqP Hx) (eqP Hy) eqxx.
+have Hden :
+    \P_[P] [pred xy | xy.1 == x] =
+    dmargin (fun xy : T * U => xy.1) P x.
+  rewrite pr_pred1 pr_dmargin.
+  by apply: eq_pr=> xy; rewrite inE.
+rewrite Hnum Hden.
+case Hden0: (dmargin (fun xy : T * U => xy.1) P x == 0);
+  first by rewrite (eqP Hden0) invr0 mulr0.
+by [].
+Qed.
 
 Lemma conditional_second_factorization {T U : choiceType}
     (P : {distr (T * U) / R}) (x : T) (y : U) :
   P (x, y) =
     dmargin (fun xy : T * U => xy.1) P x *
     conditional_second P x y.
-Admitted.
+Proof.
+rewrite conditional_secondE.
+case Hden0: (dmargin (fun xy : T * U => xy.1) P x == 0).
+- rewrite (eqP Hden0) mul0r.
+  apply/eqP.
+  have Hsum0 :
+      psum (fun xy : T * U => (xy.1 == x)%:R * P xy) = 0.
+    by move/eqP: Hden0; rewrite dmargin_psumE.
+  have Hsumm :
+      summable (fun xy : T * U => (xy.1 == x)%:R * P xy).
+    exact: summable_condl.
+  have Hpoint0 := eq0_psum Hsumm Hsum0 (x, y).
+  move: Hpoint0; rewrite /= eqxx mul1r => Hpoint0.
+  exact/eqP.
+rewrite mulrC.
+rewrite divfK //.
+by rewrite Hden0.
+Qed.
 
 Lemma expectation_ext {T : choiceType} (P : {distr T / R}) (f g : T -> R) :
   f =1 g ->
@@ -472,6 +513,54 @@ Lemma dunit_dweight {T : choiceType} (x : T) :
   dweight (dunit x : {distr T / R}) = 1.
 Proof.
 by rewrite pr_dunit.
+Qed.
+
+Lemma pr_pred1_eq1_dunit {T : choiceType}
+    (D : {distr T / R}) (x : T) :
+  \P_[D] (pred1 x) = 1 ->
+  D =1 dunit x.
+Proof.
+move=> Hx y.
+case Hyx: (y == x).
+  rewrite (eqP Hyx) dunit1E eqxx.
+  by rewrite pr_pred1 Hx.
+rewrite dunit1E eq_sym Hyx.
+apply/eqP.
+rewrite eq_le.
+apply/andP; split; last exact: ge0_mu.
+have Huniq : uniq [:: x; y].
+  apply/andP; split; last by [].
+  by rewrite inE eq_sym Hyx.
+have Hpsum_le : D x + D y <= psum D.
+  have H :=
+    gerfinseq_psum (S := D) (r := [:: x; y]) Huniq (summable_mu D).
+  by rewrite big_cons big_seq1 !ger0_norm ?ge0_mu in H.
+have HDx : D x = 1 by rewrite pr_pred1 Hx.
+have Hle1 : psum D <= 1 := le1_mu D.
+rewrite HDx in Hpsum_le.
+change (D y <= 0).
+lra.
+Qed.
+
+Lemma dweight_dlet_sum {T U : choiceType}
+    (D : {distr T / R}) (K : T -> {distr U / R}) :
+  dweight (\dlet_(x <- D) K x) =
+  psum (fun x => D x * dweight (K x)).
+Proof.
+pose b := true.
+pose B : {distr bool / R} := dunit b.
+have Hleft :
+    (\dlet_(_ <- \dlet_(x <- D) K x) B) b =
+    dweight (\dlet_(x <- D) K x).
+  rewrite dletC /B dunit1E eqxx.
+  by rewrite mulr1.
+rewrite -Hleft.
+rewrite (__deprecated__dlet_dlet K (fun _ : U => B) D b).
+rewrite dletE.
+apply/eq_psum=> x.
+congr (_ * _).
+rewrite dletC /B dunit1E eqxx.
+by rewrite mulr1.
 Qed.
 
 Lemma dmargin_add_intE center (P : {distr int / R}) x :

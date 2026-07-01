@@ -39,8 +39,12 @@ elim: n v.
 - move => v.
   by case: v.
 - move => n IH v /=.
-  admit.
-Admitted.
+  case: v => h tl /=.
+  have Htail : behead_tuple (cons_tuple h (fromVec tl)) = fromVec tl.
+    apply: val_inj.
+    by [].
+  by rewrite theadE Htail IH.
+Qed.
 
 Lemma fromVecK {t : choice_type} {n : nat} (v : n.-tuple t) :
   fromVec (toVec v) = v.
@@ -50,8 +54,24 @@ elim: n v.
   move => v.
   symmetry.
   exact: tuple0.
-- admit.
-Admitted.
+- move => n IH v /=.
+  rewrite IH.
+  by rewrite [RHS](tuple_eta v).
+Qed.
+
+Lemma toVec_injective {t : choice_type} {n : nat} :
+  injective (@toVec t n).
+Proof.
+move=> x y Hxy.
+by rewrite -(fromVecK x) Hxy fromVecK.
+Qed.
+
+Lemma fromVec_injective {t : choice_type} {n : nat} :
+  injective (@fromVec t n).
+Proof.
+move=> x y Hxy.
+by rewrite -(toVecK x) Hxy toVecK.
+Qed.
 
 (* Non-uniform tuples *)
 Definition rcons_choice {n : nat}

@@ -23,6 +23,7 @@ Module IndCpad(Import S: ApproxFheScheme).
   Definition sk_addr : Location := mkloc 102 (None : 'option sk_t).
   Definition bit_addr : Location := mkloc 103 false.
   Definition table_addr : Location := mkloc 104 (nil : challenger_table).
+  Definition decrypt_count_addr : Location := mkloc 105 0.
   (* Function labels *)
   Definition oracle_encrypt : nat := 200.
   Definition oracle_eval1 : nat := 202.
@@ -59,7 +60,8 @@ Module IndCpad(Import S: ApproxFheScheme).
       [oracle_decrypt] :{ 'nat ~> 'option message }
     ].
   Definition oracle_mem_spec : Locations :=
-    [fmap pk_addr; evk_addr; sk_addr; bit_addr; table_addr].
+    [fmap pk_addr; evk_addr; sk_addr; bit_addr; table_addr;
+      decrypt_count_addr].
 
   Definition IndCpadOracle (max_queries : nat) : IndCpaOracle_t :=
     [package oracle_mem_spec ;
@@ -113,6 +115,9 @@ Module IndCpad(Import S: ApproxFheScheme).
       } ;
       #def #[oracle_decrypt] (i: 'nat) : 'option 'message
       {
+        decrypt_count ← get decrypt_count_addr ;;
+        #assert (decrypt_count < max_queries) ;;
+        #put decrypt_count_addr := decrypt_count.+1 ;;
         table ← get table_addr ;;
         #assert (i < length table) as i_in_range ;;
         let '(m0, m1, c) := nth_valid table i i_in_range in

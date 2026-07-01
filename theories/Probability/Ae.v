@@ -81,6 +81,29 @@ rewrite (psum_option_split (complete D)).
 - exact: summable_mu.
 Qed.
 
+Lemma dmargin_omap_complete
+    {T U : choiceType} (f : T -> U) (D : {distr T / R}) :
+  dmargin (omap f) (complete D) =1 complete (dmargin f D).
+Proof.
+case=> [y|].
+- rewrite completeE /= !dmargin_psumE.
+  rewrite (psum_option_some_zero
+    (fun x : option T => (omap f x == Some y)%:R * complete D x)).
+    apply/eq_psum=> x.
+    by rewrite completeE /=.
+  by rewrite mul0r.
+rewrite completeE /= dmargin_psumE.
+rewrite (psum_finseq (r := [:: None])).
+- rewrite big_seq1 /= mul1r.
+  rewrite ger0_norm; last by rewrite subr_ge0 pr_predT; exact: le1_mu.
+  by rewrite dmargin_dweight.
+- by [].
+move=> x.
+rewrite !inE.
+case: x=> [x|] /=; last by [].
+by rewrite mul0r eqxx.
+Qed.
+
 Definition coupling_with_loss
   {outL_t outR_t : choiceType}
   (d : {distr (outL_t * outR_t) / R})
@@ -668,6 +691,76 @@ rewrite (expectation_ext (overlap_distr P Q)
   move=> x.
   by rewrite pr_dunit /= eqxx.
 by rewrite exp_cst mulr1.
+Qed.
+
+Lemma exact_coupling_eq_pr_le_overlap
+    {T : choiceType} (d : {distr (T * T) / R}) (P Q : {distr T / R}) :
+  dmargin fst d =1 P ->
+  dmargin snd d =1 Q ->
+  \P_[d] (fun xy => xy.1 == xy.2) <= dweight (overlap_distr P Q).
+Proof.
+move=> HdL HdR.
+have Hdiag_row x :
+    psum (fun y : T => (x == y)%:R * d (x, y)) = d (x, x).
+  rewrite (psum_finseq (r := [:: x])).
+  - by rewrite big_seq1 eqxx mul1r ger0_norm ?ge0_mu.
+  - by [].
+  move=> y.
+  rewrite !inE.
+  case Hxy: (x == y); last by rewrite mul0r eqxx.
+  by move/eqP: Hxy=> ->; rewrite eqxx.
+have Hpoint_left (a : T) : d (a, a) <= P a.
+  have Huniq_a : uniq [:: (a, a)] by [].
+  have H :=
+    gerfinseq_psum
+      (S := fun xy : T * T => (xy.1 == a)%:R * d xy)
+      (r := [:: (a, a)]) Huniq_a
+      (summable_pr (fun xy : T * T => xy.1 == a) d).
+  rewrite big_seq1 eqxx mul1r in H.
+  rewrite ger0_norm in H; last exact: ge0_mu.
+  rewrite -dmargin_psumE HdL in H.
+  exact: H.
+have Hpoint_right (b : T) : d (b, b) <= Q b.
+  have Huniq_b : uniq [:: (b, b)] by [].
+  have H :=
+    gerfinseq_psum
+      (S := fun xy : T * T => (xy.2 == b)%:R * d xy)
+      (r := [:: (b, b)]) Huniq_b
+      (summable_pr (fun xy : T * T => xy.2 == b) d).
+  rewrite big_seq1 eqxx mul1r in H.
+  rewrite ger0_norm in H; last exact: ge0_mu.
+  rewrite -dmargin_psumE HdR in H.
+  exact: H.
+have Hpr_diag :
+    \P_[d] (fun xy : T * T => xy.1 == xy.2) =
+      psum (fun xy : T * T => (xy.1 == xy.2)%:R * d xy).
+  by rewrite /pr.
+rewrite Hpr_diag.
+rewrite (@psum_pair R T T
+  (fun xy : T * T => (xy.1 == xy.2)%:R * d xy)
+  (summable_pr (fun xy : T * T => xy.1 == xy.2) d)).
+rewrite pr_predT.
+apply: le_psum; last exact: summable_mu.
+move=> x.
+apply/andP; split.
+  exact: ge0_psum.
+rewrite Hdiag_row overlap_distrE /overlap_mass.
+by rewrite le_min Hpoint_left Hpoint_right.
+Qed.
+
+Lemma exact_coupling_eq_pr_total_variation
+    {T : choiceType} (d : {distr (T * T) / R}) (P Q : {distr T / R}) ε :
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  dmargin fst d =1 P ->
+  dmargin snd d =1 Q ->
+  \P_[d] (fun xy => xy.1 == xy.2) >= 1 - ε ->
+  total_variation P Q <= ε.
+Proof.
+move=> HP HQ HdL HdR Heq.
+have Hoverlap := exact_coupling_eq_pr_le_overlap d P Q HdL HdR.
+rewrite (total_variation_overlap P Q HP HQ).
+lra.
 Qed.
 
 Lemma maximal_coupling_total_variation

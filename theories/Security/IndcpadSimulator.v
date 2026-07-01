@@ -15,12 +15,12 @@ From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import Adv.
 From SSProve Require Import NominalPrelude.
 From Mending.Schemes Require Import Indcpa Indcpad ApproxFHE.
-From mathcomp Require Import seq.
+From mathcomp Require Import seq ssrZ.
 From extructures Require Import ord fset fmap.
 From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.LibExtras.SSProveExtras Require Import ChoiceVector DiscreteGaussian.
-From Mending.LibExtras.MathcompExtras Require Import ListExtras.
+From Mending.LibExtras.MathcompExtras Require Import DTuple ListExtras.
 From SSProve Require Import choice_type.
 
 Import PackageNotation.
@@ -44,7 +44,8 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
   Definition pk_addr : Location := mkloc 1100 (None : 'option pk_t).
   Definition evk_addr : Location := mkloc 1101 (None : 'option evk_t).
   Definition ready_addr : Location := mkloc 1103 (false : 'bool).
-  Definition table_addr : Location := mkloc 1104 (nil : simulator_table).
+  Definition table_addr : Location := IndCpadGame.table_addr.
+  Definition decrypt_count_addr : Location := IndCpadGame.decrypt_count_addr.
   Definition message_pair := message × message.
   Definition adv_keys := pk_t × evk_t.
   Notation " 'adv_keys " := (adv_keys) (in custom pack_type at level 2).
@@ -69,10 +70,76 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
     ]
     (* Provides the IND-CPA-D oracle surface. *)
     IndCpadAdv_import.
-  Definition oracle_mem_spec : Locations := [fmap pk_addr; evk_addr; ready_addr; table_addr].
+  Definition oracle_mem_spec : Locations :=
+    [fmap pk_addr; evk_addr; ready_addr; table_addr; decrypt_count_addr].
 
   (* Bridge SSProve package integers to the MathComp integer vectors used by the metric. *)
-  Parameter toIntVec : forall {n : nat}, chVec chInt n -> n.-tuple int.
+  Fixpoint toIntVec {n : nat} : chVec chInt n -> n.-tuple int :=
+    match n with
+    | 0 => fun _ => [tuple]
+    | S n' => fun v =>
+      let '(h, t) := v in
+      cons_tuple (int_of_Z h) (toIntVec t)
+    end.
+
+  Fixpoint zeroChVec (n : nat) : chVec chInt n :=
+    match n with
+    | 0 => tt
+    | S n' => (BinNums.Z0, zeroChVec n')
+    end.
+
+  Lemma dmargin_toIntVec_discrete_gaussians_zero (n : nat) (s : R) :
+    dmargin (@toIntVec n) (discrete_gaussians (zeroChVec n) s) =1
+      n_dg n s.
+  Proof.
+    elim: n=> [|n IH] y.
+    - rewrite /discrete_gaussians /n_dg /nfold_distr /=.
+      by rewrite dmargin_dunit.
+    rewrite /discrete_gaussians /=.
+    transitivity
+      ((dlet (fun x : 'int =>
+          \dlet_(ys <- n_dg n s)
+            dunit (cons_tuple (int_of_Z x) ys))
+        (ssp_dg BinNums.Z0 s)) y).
+    - rewrite dmargin_dlet.
+      apply: eq_in_dlet=> // x _ z.
+      rewrite dmargin_dlet.
+      transitivity
+        ((\dlet_(ys <- dmargin (@toIntVec n)
+            (discrete_gaussians (zeroChVec n) s))
+          dunit (cons_tuple (int_of_Z x) ys)) z).
+      + transitivity
+          ((\dlet_(xs <- discrete_gaussians (zeroChVec n) s)
+            dunit (cons_tuple (int_of_Z x) (toIntVec xs))) z).
+        * apply: eq_in_dlet=> // xs _ w.
+          by rewrite dmargin_dunit.
+        rewrite -(dlet_dmargin (discrete_gaussians (zeroChVec n) s)
+          (@toIntVec n)
+          (fun ys => dunit (cons_tuple (int_of_Z x) ys)) z).
+        by [].
+      apply: eq_in_dlet.
+      + by move=> ys _ w.
+      exact: IH.
+    have Hscalar :
+        dmargin (fun z : 'int => int_of_Z z) (ssp_dg BinNums.Z0 s) =1
+          centered_discrete_gaussian s.
+      apply: dmargin_int_of_Z_ssp_dg_centered.
+      change (int_of_Z BinNums.Z0) with (0 : int).
+      by [].
+    rewrite -(dlet_dmargin (ssp_dg BinNums.Z0 s)
+      (fun z : 'int => int_of_Z z)
+      (fun x : int =>
+        \dlet_(ys <- n_dg n s) dunit (cons_tuple x ys)) y).
+    rewrite /n_dg /nfold_distr /=.
+    apply: eq_in_dlet.
+    - move=> x _ z.
+      have Hbehead :
+          behead_tuple (nseq_tuple n.+1 (centered_discrete_gaussian s)) =
+          nseq_tuple n (centered_discrete_gaussian s).
+        by apply: val_inj.
+      by rewrite Hbehead.
+    exact: Hscalar.
+  Qed.
 
   Definition IndCpadOracle (max_queries: nat) : IndCpaSim_t :=
     [package oracle_mem_spec ;
@@ -132,6 +199,9 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
       {
         ready ← get ready_addr ;;
         #assert ready ;;
+        decrypt_count ← get decrypt_count_addr ;;
+        #assert (decrypt_count < max_queries) ;;
+        #put decrypt_count_addr := decrypt_count.+1 ;;
         table ← get table_addr ;;
         #assert (i < length table) as i_in_range ;;
         let '(m0, m1, c) := nth_valid table i i_in_range in
@@ -139,7 +209,7 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
           #assert isSome c as c_valid ;;
           let '(_, error_bound) := getSome c c_valid in
           noise <$ (chVec chInt dim;
-            discrete_gaussians (@toVec chInt dim [tuple BinNums.Z0 | i < dim])
+            discrete_gaussians (zeroChVec dim)
               (noise_flooding_dg_stdev gaussian_width_multiplier error_bound)) ;;
           let res := inverse_isometry m0 (ivec_add (toIntVec noise) (isometry m0 m0)) in
           @ret ('option message) (Some res)

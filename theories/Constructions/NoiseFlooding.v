@@ -2,22 +2,159 @@
 
 From Stdlib Require Import Utf8 BinInt.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr.
+From mathcomp Require Import all_boot all_order all_algebra reals distr realsum.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import NominalPrelude.
 From Mending.Schemes Require Import ApproxFHE Indcpa Indcpad.
 From Mending.Schemes.Utils Require Import IntVec.
-From Mending.LibExtras.MathcompExtras Require Import DTuple.
-From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras DTuple
+  TupleExtras.
+From Mending.Probability.DiscreteGaussians Require Import
+  DiscreteGaussian DiscreteGaussianKL.
 From extructures Require Import ord fset fmap.
 Import PackageNotation.
+Import GRing.Theory.
 Local Open Scope package_scope.
 Local Open Scope sep_scope.
 Local Open Scope ring_scope.
 
 Definition n_dg (n : nat) (s : R) : distr R (n.-tuple int) :=
   nfold_distr n (centered_discrete_gaussian s).
+
+Fixpoint n_dg_shifted {n : nat}
+    : n.-tuple int -> R -> distr R (n.-tuple int) :=
+  match n with
+  | 0 => fun _ _ => dunit [tuple]
+  | S n' => fun center s =>
+    \dlet_(x <- discrete_gaussian (thead center) s)
+    \dlet_(xs <- n_dg_shifted (behead_tuple center) s)
+      dunit (cons_tuple x xs)
+  end.
+
+Lemma n_dg_shifted_cons_cat {n : nat}
+    (c : int) (center : n.-tuple int) (s : R) :
+  n_dg_shifted [tuple of c :: center] s =1
+    \dlet_(x <- discrete_gaussian c s)
+    \dlet_(xs <- n_dg_shifted center s)
+      dunit (cat_tuple [tuple x] xs).
+Proof.
+move=> y.
+rewrite /= theadE.
+have Hbehead : behead_tuple [tuple of c :: center] = center.
+  by apply: val_inj.
+rewrite Hbehead.
+apply: eq_in_dlet=> // x _ z.
+apply: eq_in_dlet=> // xs _ w.
+by rewrite cat_tuple_singleton_cons.
+Qed.
+
+Lemma centered_discrete_gaussian_shift_add (center : int) (s : R) :
+  dmargin (fun x : int => x + center) (centered_discrete_gaussian s) =1
+    discrete_gaussian center s.
+Proof.
+move=> y.
+rewrite /discrete_gaussian !dmargin_psumE.
+apply: eq_psum=> x.
+by rewrite addrC.
+Qed.
+
+Lemma n_dg_shiftedE {n : nat} (center : n.-tuple int) s :
+  dmargin (fun noise => ivec_add noise center) (n_dg n s) =1
+    n_dg_shifted center s.
+Proof.
+elim: n center=> [|n IH] center y.
+- rewrite /n_dg /nfold_distr /=.
+  rewrite [center](tuple0 center) [y](tuple0 y).
+  rewrite dmargin_dunit.
+  rewrite [ivec_add [tuple] [tuple]](tuple0 (ivec_add [tuple] [tuple])).
+  by [].
+case/tupleP: center=> c center.
+rewrite /n_dg /nfold_distr /=.
+transitivity
+  ((\dlet_(x <- discrete_gaussian c s)
+    \dlet_(xs <- n_dg_shifted center s)
+      dunit (cons_tuple x xs)) y).
+- rewrite dmargin_dlet.
+  transitivity
+    ((\dlet_(x <- centered_discrete_gaussian s)
+      \dlet_(xs <- n_dg_shifted center s)
+        dunit (cons_tuple (x + c) xs)) y).
+  + apply: eq_in_dlet=> // x _ z.
+    rewrite dmargin_dlet.
+    transitivity
+      ((\dlet_(xs <- dmargin (fun noise => ivec_add noise center)
+          (n_dg n s))
+        dunit (cons_tuple (x + c) xs)) z).
+    * transitivity
+        ((\dlet_(xs <- n_dg n s)
+          dunit (cons_tuple (x + c) (ivec_add xs center))) z).
+      -- apply: eq_in_dlet.
+         ++ move=> xs _ w.
+            by rewrite dmargin_dunit ivec_add_cons.
+         rewrite /n_dg /nfold_distr /=.
+         have Hbehead :
+             behead_tuple (nseq_tuple n.+1 (centered_discrete_gaussian s)) =
+             nseq_tuple n (centered_discrete_gaussian s).
+           by apply: val_inj.
+         by rewrite Hbehead.
+      rewrite -(dlet_dmargin (n_dg n s)
+        (fun noise => ivec_add noise center)
+        (fun xs => dunit (cons_tuple (x + c) xs)) z).
+      by [].
+    apply: eq_in_dlet.
+    * by move=> xs _ w.
+    exact: IH.
+  rewrite -(dlet_dmargin (centered_discrete_gaussian s)
+    (fun x : int => x + c)
+    (fun x => \dlet_(xs <- n_dg_shifted center s)
+      dunit (cons_tuple x xs)) y).
+  apply: eq_in_dlet.
+  + by move=> x _ z.
+  exact: centered_discrete_gaussian_shift_add.
+rewrite theadE.
+have Hbehead : behead_tuple [tuple of c :: center] = center.
+  by apply: val_inj.
+by rewrite Hbehead.
+Qed.
+
+Lemma n_dg_shifted_mass1 {n : nat} (center : n.-tuple int) s :
+  0 < s ->
+  dweight (n_dg_shifted center s) = 1.
+Proof.
+elim: n center=> [|n IH] center Hs.
+- by rewrite /= dunit_dweight.
+case/tupleP: center=> c center.
+rewrite /= dweight_dlet_sum.
+rewrite (eq_psum
+  (F2 := fun x : int => discrete_gaussian c s x * 1)); last first.
+  move=> x.
+  congr (_ * _).
+  rewrite dweight_dlet_sum.
+  rewrite (eq_psum
+    (F2 := fun xs : n.-tuple int => n_dg_shifted center s xs * 1));
+    last first.
+      move=> xs.
+      have Hbehead : behead_tuple [tuple of c :: center] = center.
+        by apply: val_inj.
+      by rewrite Hbehead dunit_dweight.
+  rewrite (eq_psum (F2 := n_dg_shifted center s)); last
+    by move=> xs; rewrite mulr1.
+  by rewrite -pr_predT IH.
+rewrite (eq_psum (F2 := discrete_gaussian c s)); last
+  by move=> x; rewrite mulr1.
+by rewrite -pr_predT discrete_gaussian_mass1.
+Qed.
+
+Lemma n_dg_mass1 n s :
+  0 < s ->
+  dweight (n_dg n s) = 1.
+Proof.
+move=> Hs.
+rewrite /n_dg.
+apply: nfold_distr_mass1.
+exact: centered_discrete_gaussian_mass1.
+Qed.
 
 Definition noise_flooding_dg_stdev
     (gaussian_width_multiplier : R) (error_bound : nat) : R :=
