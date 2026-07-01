@@ -32,6 +32,7 @@ Local Open Scope sep_scope.
 Local Open Scope seq_scope.
 Local Open Scope ring_scope.
 Local Open Scope AeNotations.
+Local Open Scope HoareNotations.
 Local Open Scope PythNotations.
 
 (* Conservative per-query KL budget for a [dim]-dimensional Gaussian vector.
@@ -59,7 +60,7 @@ End NoiseFloodingIsIndCpad.
 Module NoiseFloodingSecure
   (Import Scheme : ApproxFheScheme)
   (Import Metric : ApproxFheMetric(Scheme))
-  (Import Correctness : ApproxCorrectness(Scheme)(Metric))
+  (Import Correctness : ApproxCorrectnessPerfect(Scheme)(Metric))
   (Import IndCpaSecurity : IsIndCpa(Scheme))
   (Import Params : NoiseFloodingParams)
   : NoiseFloodingIsIndCpad(Scheme)(Metric)(Params).
@@ -803,10 +804,419 @@ Module NoiseFloodingSecure
     let '(outL, outR) := outs in
     eq_op outL outR.
 
+  Definition selected_plaintext
+      (b : bool) (row : IndCpadGame.challenger_table_row) : message :=
+    let '(m0, m1, _) := row in if b then m1 else m0.
+
+  Definition row_valid_for_branch
+      (sk : sk_t) (b : bool)
+      (row : IndCpadGame.challenger_table_row) : bool :=
+    let '(_, _, c) := row in
+    is_underlying_plaintext sk c (selected_plaintext b row).
+
+  Definition table_valid_for_branch
+      (sk : sk_t) (b : bool) (table : IndCpadGame.challenger_table) : bool :=
+    all (row_valid_for_branch sk b) table.
+
+  Definition challenge_heap_valid (mem : heap) : bool :=
+    let b := get_heap mem IndCpadGame.bit_addr in
+    let table := get_heap mem IndCpadGame.table_addr in
+    match get_heap mem IndCpadGame.pk_addr,
+          get_heap mem IndCpadGame.evk_addr,
+          get_heap mem IndCpadGame.sk_addr with
+    | Some pk, Some evk, Some sk =>
+        good_keys pk evk sk && table_valid_for_branch sk b table
+    | None, None, None => table == [::]
+    | _, _, _ => false
+    end.
+
+  Lemma challenge_heap_valid_empty :
+    challenge_heap_valid empty_heap.
+  Proof.
+    rewrite /challenge_heap_valid !get_empty_heap /=.
+    by rewrite eqxx.
+  Qed.
+
+  Definition challenge_initialized_heap
+      (b : bool) (pk : pk_t) (evk : evk_t) (sk : sk_t) : heap :=
+    set_heap
+      (set_heap
+        (set_heap
+          (set_heap empty_heap IndCpadGame.bit_addr b)
+          IndCpadGame.pk_addr (Some pk))
+        IndCpadGame.evk_addr (Some evk))
+      IndCpadGame.sk_addr (Some sk).
+
+  Lemma challenge_heap_valid_initialized b keys :
+    keys \in dinsupp keygen ->
+    let '(pk, evk, sk) := keys in
+    challenge_heap_valid (challenge_initialized_heap b pk evk sk).
+  Proof.
+    case: keys=> [[pk evk] sk] Hkeys /=.
+    rewrite /challenge_heap_valid /challenge_initialized_heap.
+    repeat first [
+      rewrite get_set_heap_eq
+    | rewrite get_set_heap_neq; [| neq_loc_auto]
+    | rewrite get_empty_heap
+    ].
+    rewrite /=.
+    rewrite (keygen_support_good (pk, evk, sk) Hkeys) /=.
+    by [].
+  Qed.
+
+  Lemma challenge_heap_valid_depends_only_on_oracle_mem_spec :
+    heap_pred_depends_only_on
+      IndCpadGame.oracle_mem_spec challenge_heap_valid.
+  Proof.
+    rewrite /heap_pred_depends_only_on /heap_eq_on /challenge_heap_valid.
+    move=> mem0 mem1 Heq.
+    have -> : get_heap mem0 IndCpadGame.bit_addr =
+              get_heap mem1 IndCpadGame.bit_addr
+      by apply: Heq; fmap_solve.
+    have -> : get_heap mem0 IndCpadGame.table_addr =
+              get_heap mem1 IndCpadGame.table_addr
+      by apply: Heq; fmap_solve.
+    have -> : get_heap mem0 IndCpadGame.pk_addr =
+              get_heap mem1 IndCpadGame.pk_addr
+      by apply: Heq; fmap_solve.
+    have -> : get_heap mem0 IndCpadGame.evk_addr =
+              get_heap mem1 IndCpadGame.evk_addr
+      by apply: Heq; fmap_solve.
+    have -> : get_heap mem0 IndCpadGame.sk_addr =
+              get_heap mem1 IndCpadGame.sk_addr
+      by apply: Heq; fmap_solve.
+    by [].
+  Qed.
+
+  Lemma table_valid_for_branch_nth sk b table i
+      (i_in_range : (i < length table)%N) :
+    table_valid_for_branch sk b table ->
+    row_valid_for_branch sk b (nth_valid table i i_in_range).
+  Proof.
+    rewrite /table_valid_for_branch=> /allP Hall.
+    apply: Hall.
+    exact: nth_valid_in.
+  Qed.
+
+  Lemma table_valid_for_branch_rcons_encrypt
+      pk evk sk b table m0 m1 c :
+    good_keys pk evk sk ->
+    table_valid_for_branch sk b table ->
+    c \in dinsupp (encrypt pk (if b then m1 else m0)) ->
+    table_valid_for_branch sk b (table ++ [:: (m0, m1, c)]).
+  Proof.
+    move=> Hkeys Htable Hc.
+    rewrite /table_valid_for_branch in Htable *.
+    rewrite all_cat Htable /= andbT.
+    rewrite /row_valid_for_branch /selected_plaintext /=.
+    exact: (encrypt_support_underlying pk evk sk
+      (if b then m1 else m0) c Hkeys Hc).
+  Qed.
+
+  Lemma table_valid_for_branch_rcons_eval1
+      pk evk sk b table gate r (r_in_range : (r < length table)%N) c' :
+    good_keys pk evk sk ->
+    table_valid_for_branch sk b table ->
+    c' \in dinsupp
+      (let '(_, _, c) := nth_valid table r r_in_range in
+       eval1 evk gate c) ->
+    table_valid_for_branch sk b
+      (table ++
+        [:: let '(m0, m1, _) := nth_valid table r r_in_range in
+            (interpret_unary gate m0, interpret_unary gate m1, c')]).
+  Proof.
+    move=> Hkeys Htable Hc'.
+    have Hrow :=
+      table_valid_for_branch_nth sk b table r r_in_range Htable.
+    case Hnth: (nth_valid table r r_in_range)=> [[m0 m1] c] /= in Hrow Hc' *.
+    rewrite /table_valid_for_branch in Htable *.
+    rewrite all_cat Htable /= andbT.
+    rewrite /row_valid_for_branch /selected_plaintext /=.
+    rewrite -[if b then interpret_unary gate m1 else interpret_unary gate m0]
+      (fun_if (interpret_unary gate)).
+    exact: (eval1_support_underlying pk evk sk gate c
+      (if b then m1 else m0) c' Hkeys Hrow Hc').
+  Qed.
+
+  Lemma table_valid_for_branch_rcons_eval2
+      pk evk sk b table gate ri rj
+      (ri_in_range : (ri < length table)%N)
+      (rj_in_range : (rj < length table)%N) c' :
+    good_keys pk evk sk ->
+    table_valid_for_branch sk b table ->
+    c' \in dinsupp
+      (let '(_, _, ci) := nth_valid table ri ri_in_range in
+       let '(_, _, cj) := nth_valid table rj rj_in_range in
+       eval2 evk gate ci cj) ->
+    table_valid_for_branch sk b
+      (table ++
+        [:: let '(m0i, m1i, _) := nth_valid table ri ri_in_range in
+            let '(m0j, m1j, _) := nth_valid table rj rj_in_range in
+            (interpret_binary gate m0i m0j,
+             interpret_binary gate m1i m1j, c')]).
+  Proof.
+    move=> Hkeys Htable Hc'.
+    have Hrow_i :=
+      table_valid_for_branch_nth sk b table ri ri_in_range Htable.
+    have Hrow_j :=
+      table_valid_for_branch_nth sk b table rj rj_in_range Htable.
+    case Hnthi: (nth_valid table ri ri_in_range)=> [[m0i m1i] ci]
+      /= in Hrow_i Hc' *.
+    case Hnthj: (nth_valid table rj rj_in_range)=> [[m0j m1j] cj]
+      /= in Hrow_j Hc' *.
+    rewrite /table_valid_for_branch in Htable *.
+    rewrite all_cat Htable /= andbT.
+    rewrite /row_valid_for_branch /selected_plaintext /=.
+    case: b Htable Hrow_i Hrow_j Hc'=>
+      /= Htable Hrow_i Hrow_j Hc'.
+    - exact: (eval2_support_underlying pk evk sk gate ci cj
+        m1i m1j c' Hkeys Hrow_i Hrow_j Hc').
+    - exact: (eval2_support_underlying pk evk sk gate ci cj
+        m0i m0j c' Hkeys Hrow_i Hrow_j Hc').
+  Qed.
+
+  Lemma table_valid_for_branch_decrypt_row sk b table i
+      (i_in_range : (i < length table)%N) m c :
+    table_valid_for_branch sk b table ->
+    nth_valid table i i_in_range = (m, m, c) ->
+    is_underlying_plaintext sk c m.
+  Proof.
+    move=> Htable Hnth.
+    have Hrow :=
+      table_valid_for_branch_nth sk b table i i_in_range Htable.
+    clear Htable.
+    move: Hrow.
+    by rewrite Hnth /row_valid_for_branch /selected_plaintext /=; case: b.
+  Qed.
+
+  Lemma challenge_heap_valid_set_decrypt_count mem n :
+    challenge_heap_valid mem ->
+    challenge_heap_valid
+      (set_heap mem IndCpadGame.decrypt_count_addr n).
+  Proof.
+    rewrite /challenge_heap_valid.
+    rewrite !get_set_heap_neq; try neq_loc_auto.
+  Qed.
+
+  Lemma challenge_heap_valid_good_keys mem pk evk sk :
+    challenge_heap_valid mem ->
+    get_heap mem IndCpadGame.pk_addr = Some pk ->
+    get_heap mem IndCpadGame.evk_addr = Some evk ->
+    get_heap mem IndCpadGame.sk_addr = Some sk ->
+    good_keys pk evk sk.
+  Proof.
+    rewrite /challenge_heap_valid=> Hinv Hpk Hevk Hsk.
+    move: Hinv.
+    rewrite Hpk Hevk Hsk=> /andP [].
+    by [].
+  Qed.
+
+  Lemma challenge_heap_valid_table_for_branch mem pk evk sk :
+    challenge_heap_valid mem ->
+    get_heap mem IndCpadGame.pk_addr = Some pk ->
+    get_heap mem IndCpadGame.evk_addr = Some evk ->
+    get_heap mem IndCpadGame.sk_addr = Some sk ->
+    table_valid_for_branch sk
+      (get_heap mem IndCpadGame.bit_addr)
+      (get_heap mem IndCpadGame.table_addr).
+  Proof.
+    rewrite /challenge_heap_valid=> Hinv Hpk Hevk Hsk.
+    move: Hinv.
+    rewrite Hpk Hevk Hsk=> /andP [].
+    by [].
+  Qed.
+
+  Lemma challenge_heap_valid_decrypt_row mem pk evk sk i
+      (i_in_range :
+        (i < length (get_heap mem IndCpadGame.table_addr))%N) m c :
+    challenge_heap_valid mem ->
+    get_heap mem IndCpadGame.pk_addr = Some pk ->
+    get_heap mem IndCpadGame.evk_addr = Some evk ->
+    get_heap mem IndCpadGame.sk_addr = Some sk ->
+    nth_valid (get_heap mem IndCpadGame.table_addr) i i_in_range =
+      (m, m, c) ->
+    is_underlying_plaintext sk c m.
+  Proof.
+    move=> Hinv Hpk Hevk Hsk Hnth.
+    have Htable := challenge_heap_valid_table_for_branch
+      mem pk evk sk Hinv Hpk Hevk Hsk.
+    exact: (table_valid_for_branch_decrypt_row
+      sk (get_heap mem IndCpadGame.bit_addr)
+      (get_heap mem IndCpadGame.table_addr) i i_in_range
+      m c Htable Hnth).
+  Qed.
+
+  Lemma challenge_heap_valid_set_table_encrypt
+      mem pk evk sk m0 m1 c :
+    challenge_heap_valid mem ->
+    get_heap mem IndCpadGame.pk_addr = Some pk ->
+    get_heap mem IndCpadGame.evk_addr = Some evk ->
+    get_heap mem IndCpadGame.sk_addr = Some sk ->
+    c \in dinsupp
+      (encrypt pk
+        (if get_heap mem IndCpadGame.bit_addr then m1 else m0)) ->
+    challenge_heap_valid
+      (set_heap mem IndCpadGame.table_addr
+        (get_heap mem IndCpadGame.table_addr ++ [:: (m0, m1, c)])).
+  Proof.
+    move=> Hinv Hpk Hevk Hsk Hc.
+    rewrite /challenge_heap_valid in Hinv *.
+    move: Hinv.
+    rewrite Hpk Hevk Hsk=> /andP [Hkeys Htable].
+    rewrite get_set_heap_eq.
+    rewrite !get_set_heap_neq; try neq_loc_auto.
+    rewrite Hpk Hevk Hsk Hkeys /=.
+    exact: (table_valid_for_branch_rcons_encrypt
+      pk evk sk (get_heap mem IndCpadGame.bit_addr)
+      (get_heap mem IndCpadGame.table_addr) m0 m1 c
+      Hkeys Htable Hc).
+  Qed.
+
+  Lemma challenge_heap_valid_set_table_eval1
+      mem pk evk sk gate r
+      (r_in_range :
+        (r < length (get_heap mem IndCpadGame.table_addr))%N) c' :
+    challenge_heap_valid mem ->
+    get_heap mem IndCpadGame.pk_addr = Some pk ->
+    get_heap mem IndCpadGame.evk_addr = Some evk ->
+    get_heap mem IndCpadGame.sk_addr = Some sk ->
+    c' \in dinsupp
+      (let '(_, _, c) :=
+        nth_valid (get_heap mem IndCpadGame.table_addr) r r_in_range in
+       eval1 evk gate c) ->
+    challenge_heap_valid
+      (set_heap mem IndCpadGame.table_addr
+        (get_heap mem IndCpadGame.table_addr ++
+          [:: let '(m0, m1, _) :=
+                nth_valid (get_heap mem IndCpadGame.table_addr)
+                  r r_in_range in
+              (interpret_unary gate m0, interpret_unary gate m1, c')])).
+  Proof.
+    move=> Hinv Hpk Hevk Hsk Hc'.
+    rewrite /challenge_heap_valid in Hinv *.
+    move: Hinv.
+    rewrite Hpk Hevk Hsk=> /andP [Hkeys Htable].
+    rewrite get_set_heap_eq.
+    rewrite !get_set_heap_neq; try neq_loc_auto.
+    rewrite Hpk Hevk Hsk Hkeys /=.
+    exact: (table_valid_for_branch_rcons_eval1
+      pk evk sk (get_heap mem IndCpadGame.bit_addr)
+      (get_heap mem IndCpadGame.table_addr) gate r r_in_range c'
+      Hkeys Htable Hc').
+  Qed.
+
+  Lemma challenge_heap_valid_set_table_eval2
+      mem pk evk sk gate ri rj
+      (ri_in_range :
+        (ri < length (get_heap mem IndCpadGame.table_addr))%N)
+      (rj_in_range :
+        (rj < length (get_heap mem IndCpadGame.table_addr))%N) c' :
+    challenge_heap_valid mem ->
+    get_heap mem IndCpadGame.pk_addr = Some pk ->
+    get_heap mem IndCpadGame.evk_addr = Some evk ->
+    get_heap mem IndCpadGame.sk_addr = Some sk ->
+    c' \in dinsupp
+      (let '(_, _, ci) :=
+        nth_valid (get_heap mem IndCpadGame.table_addr) ri ri_in_range in
+       let '(_, _, cj) :=
+        nth_valid (get_heap mem IndCpadGame.table_addr) rj rj_in_range in
+       eval2 evk gate ci cj) ->
+    challenge_heap_valid
+      (set_heap mem IndCpadGame.table_addr
+        (get_heap mem IndCpadGame.table_addr ++
+          [:: let '(m0i, m1i, _) :=
+                nth_valid (get_heap mem IndCpadGame.table_addr)
+                  ri ri_in_range in
+              let '(m0j, m1j, _) :=
+                nth_valid (get_heap mem IndCpadGame.table_addr)
+                  rj rj_in_range in
+              (interpret_binary gate m0i m0j,
+               interpret_binary gate m1i m1j, c')])).
+  Proof.
+    move=> Hinv Hpk Hevk Hsk Hc'.
+    rewrite /challenge_heap_valid in Hinv *.
+    move: Hinv.
+    rewrite Hpk Hevk Hsk=> /andP [Hkeys Htable].
+    rewrite get_set_heap_eq.
+    rewrite !get_set_heap_neq; try neq_loc_auto.
+    rewrite Hpk Hevk Hsk Hkeys /=.
+    exact: (table_valid_for_branch_rcons_eval2
+      pk evk sk (get_heap mem IndCpadGame.bit_addr)
+      (get_heap mem IndCpadGame.table_addr) gate ri rj
+      ri_in_range rj_in_range c' Hkeys Htable Hc').
+  Qed.
+
+  Definition ind_cpad_real_encrypt_code
+      (max_queries : nat) (x : message * message) : raw_code ciphertext :=
+    let '(m0, m1) := x in
+    b ← get IndCpadGame.bit_addr ;;
+    let m := if b then m1 else m0 in
+    o ← get IndCpadGame.pk_addr ;;
+    #assert isSome o as opk ;;
+    let pk := getSome o opk in
+    c <$ (ciphertext; encrypt pk m) ;;
+    table ← get IndCpadGame.table_addr ;;
+    let updated_table := table ++ [:: (m0, m1, c)] in
+    #assert ((length updated_table <= max_queries)%N) ;;
+    #put IndCpadGame.table_addr := updated_table ;;
+    ret c.
+
+  Lemma ind_cpad_real_encrypt_code_preserves_challenge_heap_valid
+      max_queries :
+    ⊨Hoare ⦃ fun in_mem => challenge_heap_valid in_mem.2 ⦄
+      (ind_cpad_real_encrypt_code max_queries)
+    ⦃ fun out_mem => challenge_heap_valid out_mem.2 ⦄.
+  Proof.
+    rewrite /hoareJudgment=> [[m0 m1] mem Hinv] out Hout.
+    rewrite /ind_cpad_real_encrypt_code in Hout.
+    rewrite Pr_code_get in Hout.
+    rewrite Pr_code_get in Hout.
+    case Hpk: (get_heap mem IndCpadGame.pk_addr)=> [pk|].
+    - case Hevk: (get_heap mem IndCpadGame.evk_addr)=> [evk|].
+      + case Hsk: (get_heap mem IndCpadGame.sk_addr)=> [sk|].
+        * rewrite Hpk /assertD /= in Hout.
+          rewrite Pr_code_sample in Hout.
+          have [c Hc Hinner] := @dinsupp_dlet R _ _ _ _ _ Hout.
+          rewrite Pr_code_get in Hinner.
+          case Hlen:
+              (length (get_heap mem IndCpadGame.table_addr ++
+                [:: (m0, m1, c)]) <= max_queries)%N.
+          -- rewrite /assertD Hlen /= in Hinner.
+             rewrite Pr_code_put Pr_code_ret in Hinner.
+             have -> :
+                 out =
+                 (c, set_heap mem IndCpadGame.table_addr
+                   (get_heap mem IndCpadGame.table_addr ++
+                    [:: (m0, m1, c)])).
+               exact: in_dunit Hinner.
+             exact: (challenge_heap_valid_set_table_encrypt
+               mem pk evk sk m0 m1 c Hinv Hpk Hevk Hsk Hc).
+          -- rewrite /assertD Hlen Pr_code_fail in Hinner.
+             by move/dinsuppP: Hinner; rewrite dnullE.
+        * move: Hinv.
+          rewrite /challenge_heap_valid Hpk Hevk Hsk.
+          by [].
+      + move: Hinv.
+        rewrite /challenge_heap_valid Hpk Hevk.
+        by case: (get_heap mem IndCpadGame.sk_addr).
+    - rewrite Hpk /assertD /= Pr_code_fail in Hout.
+      by move/dinsuppP: Hout; rewrite dnullE.
+  Qed.
+
   Definition ind_cpad_open_game_code
       (A : nom_package) (_ : chUnit) : raw_code bool :=
     resolve ((IndCpadGame.IndCpadChallenger ∘ A)%sep)
       (IndCpadGame.main, ('unit, 'bool)) tt.
+
+  Definition ind_cpad_moved_adversary (A : nom_package) : nom_package :=
+    move (IndCpadGame.IndCpadChallenger : nom_package) A.
+
+  Definition ind_cpad_open_guess_code
+      (A : nom_package) (input : bool * (pk_t * evk_t)) : raw_code bool :=
+    let '(b, (pk, evk)) := input in
+    b' ← resolve (ind_cpad_moved_adversary A)
+      (mkopsig IndCpadGame.guess (chProd pk_t evk_t) chBool) (pk, evk) ;;
+    ret (eq_op b' b).
 
   Definition IndCpadMain_export :=
     [interface [IndCpadGame.main] : { 'unit ~> 'bool }].
@@ -840,6 +1250,16 @@ Module NoiseFloodingSecure
     fmap_solve.
   Qed.
 
+  Lemma ind_cpad_moved_adversary_separate (A : nom_package) :
+    fseparate IndCpadGame.oracle_mem_spec
+      (loc (ind_cpad_moved_adversary A)).
+  Proof.
+    rewrite fseparate_disj /ind_cpad_moved_adversary.
+    change (disj (IndCpadGame.IndCpadChallenger : nom_package)
+      (move (IndCpadGame.IndCpadChallenger : nom_package) A)).
+    exact: move_disj.
+  Qed.
+
   Definition ind_cpad_compiled_real_game_code
       (A : nom_package) (max_queries : nat) (_ : chUnit) :
       raw_code bool :=
@@ -849,6 +1269,13 @@ Module NoiseFloodingSecure
         (IndCpadGame.IndCpadOracle max_queries)
         IndCpadGame.oracle_decrypt
         (ind_cpad_open_game_code A tt))
+      (IndCpadGame.IndCpadOracle max_queries).
+
+  Definition ind_cpad_linked_real_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    code_link
+      (ind_cpad_open_game_code A tt)
       (IndCpadGame.IndCpadOracle max_queries).
 
   Definition ind_cpad_compiled_sim_decrypt_game_code
@@ -861,6 +1288,100 @@ Module NoiseFloodingSecure
         IndCpadGame.oracle_decrypt
         (ind_cpad_open_game_code A tt))
       (IndCpadGame.IndCpadOracle max_queries).
+
+  (* Same compiled code as [ind_cpad_compiled_sim_decrypt_game_code], but
+     linked against the replacement oracle itself.  This should be an exact
+     bridge to the uncompiled sim-decrypt game by [compile_calls_correct]. *)
+  Definition ind_cpad_compiled_sim_decrypt_self_link_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    code_link
+      (compile_calls max_queries
+        (X := nat) (Y := chOption message)
+        (IndCpadSimDecryptOracle max_queries)
+        IndCpadGame.oracle_decrypt
+        (ind_cpad_open_game_code A tt))
+      (IndCpadSimDecryptOracle max_queries).
+
+  (* Uncompiled first hybrid: real encrypt/eval code and simulated decrypt,
+     before reshaping it into the existing IND-CPA reduction. *)
+  Definition ind_cpad_linked_sim_decrypt_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    code_link
+      (ind_cpad_open_game_code A tt)
+      (IndCpadSimDecryptOracle max_queries).
+
+  Definition ind_cpad_sim_decrypt_game_package
+      (A : nom_package) (max_queries : nat) : nom_package :=
+    ((IndCpadGame.IndCpadChallenger ∘ A)%sep ∘
+      IndCpadSimDecryptOracle max_queries)%share.
+
+  Definition ind_cpad_sim_decrypt_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    resolve (ind_cpad_sim_decrypt_game_package A max_queries)
+      (IndCpadGame.main, ('unit, 'bool)) tt.
+
+  Lemma ind_cpad_compiled_real_linked_correct
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    forall x,
+      ind_cpad_compiled_real_game_code A max_queries x =
+      ind_cpad_linked_real_game_code A max_queries x.
+  Proof.
+    move=> A_valid x.
+    rewrite /ind_cpad_compiled_real_game_code
+      /ind_cpad_linked_real_game_code.
+    rewrite (@compile_calls_correct_code_link max_queries
+      nat (chOption message) bool
+      (loc ((IndCpadGame.IndCpadChallenger ∘ A)%sep))
+      IndCpadGame.oracle_mem_spec IndCpadGame.IndCpadAdv_import
+      (IndCpadGame.IndCpadOracle max_queries)
+      IndCpadGame.oracle_decrypt
+      (ind_cpad_open_game_code A tt)
+      (IndCpadRealOracle_valid max_queries)
+      ind_cpad_decrypt_in_adv_import
+      (ind_cpad_open_game_code_valid A A_valid tt)).
+    by [].
+  Qed.
+
+  Lemma ind_cpad_compiled_sim_decrypt_self_link_correct
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    forall x,
+      ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries x =
+      ind_cpad_linked_sim_decrypt_game_code A max_queries x.
+  Proof.
+    move=> A_valid x.
+    rewrite /ind_cpad_compiled_sim_decrypt_self_link_game_code
+      /ind_cpad_linked_sim_decrypt_game_code.
+    rewrite (@compile_calls_correct_code_link max_queries
+      nat (chOption message) bool
+      (loc ((IndCpadGame.IndCpadChallenger ∘ A)%sep))
+      IndCpadGame.oracle_mem_spec IndCpadGame.IndCpadAdv_import
+      (IndCpadSimDecryptOracle max_queries)
+      IndCpadGame.oracle_decrypt
+      (ind_cpad_open_game_code A tt)
+      (IndCpadSimDecryptOracle_valid max_queries)
+      ind_cpad_decrypt_in_adv_import
+      (ind_cpad_open_game_code_valid A A_valid tt)).
+    by [].
+  Qed.
+
+  Lemma ind_cpad_sim_decrypt_game_code_linked
+      (A : nom_package) max_queries x :
+    ind_cpad_sim_decrypt_game_code A max_queries x =
+    ind_cpad_linked_sim_decrypt_game_code A max_queries x.
+  Proof.
+    rewrite /ind_cpad_sim_decrypt_game_code
+      /ind_cpad_sim_decrypt_game_package
+      /ind_cpad_linked_sim_decrypt_game_code
+      /ind_cpad_open_game_code.
+    by rewrite resolve_link.
+  Qed.
 
   Lemma ind_cpad_compiled_decrypt_replacement_from_compile
       (A : nom_package) max_queries
@@ -1038,6 +1559,15 @@ Module NoiseFloodingSecure
     resolve (IndCpadGame.IndCpadGame max_queries A)
       (IndCpadGame.main, ('unit, 'bool)) tt.
 
+  Lemma ind_cpad_game_code_linked (A : nom_package) max_queries x :
+    ind_cpad_game_code A max_queries x =
+    ind_cpad_linked_real_game_code A max_queries x.
+  Proof.
+    rewrite /ind_cpad_game_code /ind_cpad_linked_real_game_code
+      /ind_cpad_open_game_code /IndCpadGame.IndCpadGame.
+    by rewrite resolve_link.
+  Qed.
+
   Definition ind_cpa_reduction_game_code
     (A : nom_package) (max_queries : nat) (_ : chUnit) :
     raw_code bool :=
@@ -1045,6 +1575,37 @@ Module NoiseFloodingSecure
       (IndCpaSecurity.IndCpaGame.IndCpaGame
         (ind_cpa_reduction A max_queries))
       (IndCpaSecurity.IndCpaGame.main, ('unit, 'bool)) tt.
+
+  (* The same right endpoint split at the outer IND-CPA encryption oracle.
+     These names make the intended item-5 chain explicit: first relate the
+     simulated-decrypt IND-CPAD game to the reduction-shaped open game, then
+     close it with the real IND-CPA oracle. *)
+  Definition ind_cpa_reduction_open_game_code
+    (A : nom_package) (max_queries : nat) (_ : chUnit) :
+    raw_code bool :=
+    resolve
+      ((IndCpaSecurity.IndCpaGame.IndCpaChallenger ∘
+        ind_cpa_reduction A max_queries)%sep)
+      (IndCpaSecurity.IndCpaGame.main, ('unit, 'bool)) tt.
+
+  Definition ind_cpa_reduction_linked_game_code
+    (A : nom_package) (max_queries : nat) (_ : chUnit) :
+    raw_code bool :=
+    code_link
+      (ind_cpa_reduction_open_game_code A max_queries tt)
+      IndCpaSecurity.IndCpaGame.IndCpaOracle.
+
+  Lemma ind_cpa_reduction_game_code_linked
+      (A : nom_package) max_queries x :
+    ind_cpa_reduction_game_code A max_queries x =
+    ind_cpa_reduction_linked_game_code A max_queries x.
+  Proof.
+    rewrite /ind_cpa_reduction_game_code
+      /ind_cpa_reduction_linked_game_code
+      /ind_cpa_reduction_open_game_code
+      /IndCpaSecurity.IndCpaGame.IndCpaGame.
+    by rewrite resolve_link.
+  Qed.
 
   Definition game_initial_pre :
     pred ((chUnit * heap) * (chUnit * heap)) :=

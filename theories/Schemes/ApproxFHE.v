@@ -173,3 +173,130 @@ Module Type ApproxCorrectness (Import Scheme: ApproxFheScheme) (Import M: Approx
     in
     \P_[ eval2 evk op c1 c2 ] bad_eval < p_gate_error.
 End ApproxCorrectness.
+
+(* A support-level correctness interface for proofs that want to separate the
+   cryptographic argument from approximate-correctness error accounting.
+   Unlike [ApproxCorrectness], bad key/encryption/evaluation events have
+   probability exactly zero, so sampled outputs can be treated as valid on
+   support. *)
+Module Type ApproxCorrectnessPerfect
+  (Import Scheme: ApproxFheScheme) (Import M: ApproxFheMetric(Scheme)).
+  (* For simplicity, we consider only pure and deterministic decryption. *)
+  Parameter (dec' : sk_t → ciphertext → message).
+  Axiom dec'_correct :
+    ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => ((dec_out == (dec' sk c)) : bool)) = 1.
+  Definition is_underlying_plaintext sk (c : ciphertext) m :=
+    match c with
+    | None => false
+    | Some (data, error_bound) => Order.le (metric (dec' sk c) m) error_bound
+    end.
+  Parameter (good_keys : pk_t → evk_t → sk_t → bool).
+  Axiom keygen_perfect_correct :
+    let bad_keys (keys : pk_t × evk_t × sk_t) :=
+      let '(pk, evk, sk) := keys in ~~ (good_keys pk evk sk)
+    in
+    \P_[ keygen ] bad_keys = 0.
+  Axiom encrypt_perfect_correct :
+    ∀ pk evk sk m,
+    good_keys pk evk sk →
+    let bad_encryption c :=
+        ~~ (is_underlying_plaintext sk c m)
+    in
+    \P_[ encrypt pk m ] bad_encryption = 0.
+  Axiom eval1_perfect_correct :
+    ∀ pk evk sk op c m,
+    good_keys pk evk sk →
+    is_underlying_plaintext sk c m →
+    let bad_eval eval_out :=
+      ~~ (is_underlying_plaintext sk eval_out (interpret_unary op m)) in
+    \P_[ eval1 evk op c ] bad_eval = 0.
+  Axiom eval2_perfect_correct :
+    ∀ pk evk sk op c1 c2 m1 m2,
+    good_keys pk evk sk →
+    is_underlying_plaintext sk c1 m1 →
+    is_underlying_plaintext sk c2 m2 →
+    let bad_eval eval_out :=
+      ~~ (is_underlying_plaintext sk eval_out (interpret_binary op m1 m2))
+    in
+    \P_[ eval2 evk op c1 c2 ] bad_eval = 0.
+
+  Lemma keygen_support_good keys :
+    keys \in dinsupp keygen ->
+    let '(pk, evk, sk) := keys in good_keys pk evk sk.
+  Proof.
+    case: keys=> [[pk evk] sk] Hsupp /=.
+    case Hgood: (good_keys pk evk sk)=> //.
+    have Hbad : ~~ good_keys pk evk sk by rewrite Hgood.
+    have Hzero :=
+      pr_eq0
+        (mu := keygen)
+        (E := fun keys : pk_t × evk_t × sk_t =>
+          let '(pk, evk, sk) := keys in ~~ good_keys pk evk sk)
+        keygen_perfect_correct (x := (pk, evk, sk)) Hbad.
+    by move: Hsupp; rewrite in_dinsupp Hzero eqxx.
+  Qed.
+
+  Lemma encrypt_support_underlying pk evk sk m c :
+    good_keys pk evk sk ->
+    c \in dinsupp (encrypt pk m) ->
+    is_underlying_plaintext sk c m.
+  Proof.
+    move=> Hkeys Hsupp.
+    case Hplain: (is_underlying_plaintext sk c m)=> //.
+    have Hbad : ~~ is_underlying_plaintext sk c m by rewrite Hplain.
+    have Hzero :=
+      pr_eq0
+        (mu := encrypt pk m)
+        (E := fun c => ~~ is_underlying_plaintext sk c m)
+        (encrypt_perfect_correct pk evk sk m Hkeys) (x := c) Hbad.
+    by move: Hsupp; rewrite in_dinsupp Hzero eqxx.
+  Qed.
+
+  Lemma eval1_support_underlying pk evk sk op c m eval_out :
+    good_keys pk evk sk ->
+    is_underlying_plaintext sk c m ->
+    eval_out \in dinsupp (eval1 evk op c) ->
+    is_underlying_plaintext sk eval_out (interpret_unary op m).
+  Proof.
+    move=> Hkeys Hc Hsupp.
+    case Hplain:
+      (is_underlying_plaintext sk eval_out (interpret_unary op m))=> //.
+    have Hbad :
+        ~~ is_underlying_plaintext sk eval_out (interpret_unary op m).
+      by rewrite Hplain.
+    have Hzero :=
+      pr_eq0
+        (mu := eval1 evk op c)
+        (E := fun eval_out =>
+          ~~ is_underlying_plaintext sk eval_out (interpret_unary op m))
+        (eval1_perfect_correct pk evk sk op c m Hkeys Hc)
+        (x := eval_out) Hbad.
+    by move: Hsupp; rewrite in_dinsupp Hzero eqxx.
+  Qed.
+
+  Lemma eval2_support_underlying pk evk sk op c1 c2 m1 m2 eval_out :
+    good_keys pk evk sk ->
+    is_underlying_plaintext sk c1 m1 ->
+    is_underlying_plaintext sk c2 m2 ->
+    eval_out \in dinsupp (eval2 evk op c1 c2) ->
+    is_underlying_plaintext sk eval_out (interpret_binary op m1 m2).
+  Proof.
+    move=> Hkeys Hc1 Hc2 Hsupp.
+    case Hplain:
+      (is_underlying_plaintext sk eval_out (interpret_binary op m1 m2))=> //.
+    have Hbad :
+        ~~ is_underlying_plaintext sk eval_out
+          (interpret_binary op m1 m2).
+      by rewrite Hplain.
+    have Hzero :=
+      pr_eq0
+        (mu := eval2 evk op c1 c2)
+        (E := fun eval_out =>
+          ~~ is_underlying_plaintext sk eval_out
+            (interpret_binary op m1 m2))
+        (eval2_perfect_correct pk evk sk op c1 c2 m1 m2
+          Hkeys Hc1 Hc2)
+        (x := eval_out) Hbad.
+    by move: Hsupp; rewrite in_dinsupp Hzero eqxx.
+  Qed.
+End ApproxCorrectnessPerfect.

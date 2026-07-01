@@ -147,6 +147,43 @@ Lemma additiveErrorTvdEqRule
       (y_1 == y_2) && (m_1' == m_2') ⦄.
 Admitted.
 
+Definition same_output_heap_opt {out_t : choice_type}
+    (outs : option (out_t * heap) * option (out_t * heap)) : bool :=
+  outs.1 == outs.2.
+
+Lemma additiveErrorOptSameOutputTvdEqRule
+  {inL_t inR_t out_t : choice_type}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (ε : R) :
+  0 <= ε ->
+  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
+    total_variation
+      (complete (Pr_code (progL xL) memL))
+      (complete (Pr_code (progR xR) memR)) <= ε) ->
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_output_heap_opt ⦄.
+Proof.
+move=> Heps Htv.
+split; first exact: Heps.
+move=> memL memR xL xR Hpre.
+set out1 := Pr_code (progL xL) memL.
+set out2 := Pr_code (progR xR) memR.
+have [d [HdL [HdR Hprob]]] :=
+  maximal_coupling_total_variation (complete out1) (complete out2) ε
+    (complete_dweight out1) (complete_dweight out2) (Htv _ _ _ _ Hpre).
+exists d.
+split.
+- split.
+  + apply: distr_ext=> x.
+    by rewrite /lmg dmarginE.
+  + apply: distr_ext=> x.
+    by rewrite /rmg dmarginE.
+- rewrite (eq_pr (B := fun xy => xy.1 == xy.2)).
+    exact: Hprob.
+  by case=> outL outR.
+Qed.
+
 Lemma additiveErrorCompletedOutputHeapTvdEqRule
   {inL_t inR_t out_t : choice_type}
   (progL : inL_t -> raw_code out_t)
@@ -184,6 +221,72 @@ split.
 - rewrite (eq_pr (B := fun xy => xy.1 == xy.2)).
     exact: Hprob.
   by case=> outL outR.
+Qed.
+
+Lemma additiveErrorOptSameOutputTvBound
+  {inL_t inR_t out_t : choice_type}
+  (progL : inL_t -> raw_code out_t)
+  (progR : inR_t -> raw_code out_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (ε : R) memL memR xL xR :
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_output_heap_opt ⦄ ->
+  pre ((xL, memL), (xR, memR)) ->
+  total_variation
+    (complete (Pr_code (progL xL) memL))
+    (complete (Pr_code (progR xR) memR)) <= ε.
+Proof.
+move=> [_ Hae] Hpre.
+set outL := Pr_code (progL xL) memL.
+set outR := Pr_code (progR xR) memR.
+have [d [Hd Hprob]] := Hae memL memR xL xR Hpre.
+have [HdL HdR] := Hd.
+have HdL' : dmargin fst d =1 complete outL.
+  move=> z.
+  by rewrite -HdL.
+have HdR' : dmargin snd d =1 complete outR.
+  move=> z.
+  by rewrite -HdR.
+rewrite /same_output_heap_opt in Hprob.
+apply: (exact_coupling_eq_pr_total_variation d
+  (complete outL) (complete outR) ε).
+- exact: complete_dweight.
+- exact: complete_dweight.
+- exact: HdL'.
+- exact: HdR'.
+- exact: Hprob.
+Qed.
+
+Lemma additiveErrorOptSameOutputTriangleRule
+  {in_t out_t : choice_type}
+  (progL progM progR : in_t -> raw_code out_t)
+  (pre : pred ((in_t * heap) * (in_t * heap)))
+  (ε ε' : R) :
+  (forall memL memR xL xR,
+    pre ((xL, memL), (xR, memR)) -> xL = xR /\ memL = memR) ->
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progM ⦃ same_output_heap_opt ⦄ ->
+  ⊨AE_opt ⦃ pre ⦄ progM ≈( ε' ) progR ⦃ same_output_heap_opt ⦄ ->
+  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε + ε' ) progR ⦃ same_output_heap_opt ⦄.
+Proof.
+move=> Hsame HLM HMR.
+apply: additiveErrorOptSameOutputTvdEqRule.
+- have Heps := additiveErrorOptEpsNonneg _ _ _ _ _ HLM.
+  have Heps' := additiveErrorOptEpsNonneg _ _ _ _ _ HMR.
+  lra.
+- move=> memL memR xL xR Hpre.
+  have [Hx Hmem] := Hsame memL memR xL xR Hpre.
+  subst xR; subst memR.
+  have HtvLM :=
+    additiveErrorOptSameOutputTvBound
+      progL progM pre ε memL memL xL xL HLM Hpre.
+  have HtvMR :=
+    additiveErrorOptSameOutputTvBound
+      progM progR pre ε' memL memL xL xL HMR Hpre.
+  have Htri := total_variation_triangle
+    (complete (Pr_code (progL xL) memL))
+    (complete (Pr_code (progM xL) memL))
+    (complete (Pr_code (progR xL) memL)).
+  apply: (le_trans Htri).
+  lra.
 Qed.
 
 Lemma additiveErrorTvdEqPostRule

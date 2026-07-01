@@ -18,6 +18,17 @@ Context {R : realType}.
 Definition total_variation {T : choiceType} (P Q : {distr T / R}) : R :=
   (1 / 2) * sum (fun x => `| P x - Q x |).
 
+Lemma summable_abs_distr_diff {T : choiceType}
+    (P Q : {distr T / R}) :
+  summable (fun x => `|P x - Q x|).
+Proof.
+apply/summable_abs.
+apply: (eq_summable (S1 := fun x : T => P x + - Q x)).
+  by move=> x; ring.
+apply: summableD; first exact: summable_mu.
+exact: summableN; exact: summable_mu.
+Qed.
+
 Lemma fposDfneg_norm {T : choiceType} (F : T -> R) x :
   fpos F x + fneg F x = `|F x|.
 Proof.
@@ -286,6 +297,31 @@ rewrite psumD in H; try solve [move=> x; rewrite addr_ge0 ?ge0_fpos ?ge0_fneg].
 all: try by move=> x; rewrite ?addr_ge0 ?ge0_fpos ?ge0_fneg.
 all: try by apply: summableD.
 all: done.
+Qed.
+
+Lemma total_variation_triangle {T : choiceType}
+    (P Q M : {distr T / R}) :
+  total_variation P M <= total_variation P Q + total_variation Q M.
+Proof.
+rewrite /total_variation.
+pose FPQ := fun x : T => `|P x - Q x|.
+pose FQM := fun x : T => `|Q x - M x|.
+pose FPM := fun x : T => `|P x - M x|.
+have HsmPQ : summable FPQ by exact: summable_abs_distr_diff.
+have HsmQM : summable FQM by exact: summable_abs_distr_diff.
+have HsmPM : summable FPM by exact: summable_abs_distr_diff.
+have HsmPQQM : summable (FPQ \+ FQM) by exact: summableD.
+have Hpoint x : FPM x <= (FPQ \+ FQM) x.
+  rewrite /FPM /FPQ /FQM /=.
+  have -> : P x - M x = (P x - Q x) + (Q x - M x) by ring.
+  exact: ler_normD.
+have Hle : sum FPM <= sum (FPQ \+ FQM).
+  exact: le_sum.
+apply: (le_trans _).
+  apply: ler_wpM2l; first by lra.
+  exact: Hle.
+rewrite (@sumD T FPQ FQM HsmPQ HsmQM).
+lra.
 Qed.
 
 Lemma summable_fiber_psum_nonneg {T U : choiceType}
