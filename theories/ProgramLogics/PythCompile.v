@@ -282,6 +282,27 @@ Proof.
 by rewrite /invalid_trace_code /=.
 Qed.
 
+Lemma Pr_code_bind_invalid_trace_code
+    (A B : choice_type) (cont : A -> raw_code B) mem :
+  Pr_code (x ← invalid_trace_code (A := A) ;; cont x) mem =
+  Pr_code (invalid_trace_code (A := B)) mem.
+Proof.
+rewrite Pr_code_bind /invalid_trace_code !Pr_code_sample.
+by rewrite !dlet_null_ext.
+Qed.
+
+Lemma Pr_code_link_bind_invalid_trace_code
+    (A B : choice_type) (cont : A -> raw_code B)
+    (P_link : raw_package) mem :
+  Pr_code (code_link (x ← invalid_trace_code (A := A) ;; cont x) P_link)
+    mem =
+  Pr_code (invalid_trace_code (A := B)) mem.
+Proof.
+rewrite code_link_bind.
+rewrite Pr_code_bind_invalid_trace_code.
+exact: Pr_code_bind_invalid_trace_code.
+Qed.
+
 Lemma pythCallAtRule
   (X Y : choice_type)
   (P' P'' : raw_package) (fn : ident)
@@ -453,6 +474,77 @@ case: s=> [[x|a] packed_local_trace] /=.
   by rewrite bind_assoc.
 - by [].
 Qed.
+
+Lemma codeLinkClosedPrefixBind
+    (A B : choice_type) (L : Locations) (P_link : raw_package)
+    (prefix : raw_code A) (cont : A -> raw_code B) :
+  ValidCode L [interface] prefix ->
+  code_link (bind prefix cont) P_link =
+  bind prefix (fun x => code_link (cont x) P_link).
+Proof.
+move=> Hvalid.
+move: cont.
+elim: Hvalid=> [a|o x k Ho Hk IH|l k Hl Hk IH
+    |l v k Hl Hk IH|op k Hk IH] cont /=.
+- by [].
+- exfalso.
+  exact: (fhas_empty _ Ho).
+- f_equal.
+  apply functional_extensionality=> y.
+  exact: (IH y cont).
+- f_equal.
+  exact: (IH cont).
+- f_equal.
+  apply functional_extensionality=> y.
+  exact: (IH y cont).
+Qed.
+
+Lemma codeLinkCompileCalls0
+    (X Y A : choice_type) (p P_link : raw_package)
+    (fn : ident) (prog : raw_code A) :
+  code_link (compile_calls 0 (X := X) (Y := Y) p fn prog) P_link =
+  code_link prog P_link.
+Proof.
+by rewrite /compile_calls /compile_calls_from_trace /factor_calls_aux /=
+  continue_from_trace_nil.
+Qed.
+
+Lemma codeLinkCompileCallsClosedPrefix0
+    (X Y A B : choice_type)
+    (L : Locations) (p P_link : raw_package) (fn : ident)
+    (prefix : raw_code A) (cont : A -> raw_code B) :
+  ValidCode L [interface] prefix ->
+  code_link
+    (compile_calls 0 (X := X) (Y := Y) p fn
+      (bind prefix cont))
+    P_link =
+  bind prefix (fun x =>
+    code_link
+      (compile_calls 0 (X := X) (Y := Y) p fn (cont x))
+      P_link).
+Proof.
+move=> Hvalid.
+rewrite codeLinkCompileCalls0.
+rewrite (codeLinkClosedPrefixBind A B L P_link prefix cont Hvalid).
+f_equal.
+apply functional_extensionality=> x.
+by rewrite codeLinkCompileCalls0.
+Qed.
+
+Lemma codeLinkCompileCallsClosedPrefix
+    (q : nat) (X Y A B : choice_type)
+    (L : Locations) (p P_link : raw_package) (fn : ident)
+    (prefix : raw_code A) (cont : A -> raw_code B) :
+  ValidCode L [interface] prefix ->
+  code_link
+    (compile_calls q (X := X) (Y := Y) p fn
+      (bind prefix cont))
+    P_link =
+  bind prefix (fun x =>
+    code_link
+      (compile_calls q (X := X) (Y := Y) p fn (cont x))
+      P_link).
+Admitted.
 
 (** Base-case continuation after the shared search: either no [fn] call remains,
     the packed call input is invalid, or we spend the single call budget and
@@ -1622,4 +1714,3 @@ exact: (MicciancioWalterRule _ _ _ _ _
   (pythCompileCallsRule q X Y A B K L L' L'' M P' P'' fn prog eps
     call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall)).
 Qed.
-

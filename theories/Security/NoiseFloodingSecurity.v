@@ -1246,6 +1246,19 @@ Module NoiseFloodingSecure
     let '(outL, outR) := outs in
     eq_op outL outR.
 
+  Definition same_game_result_opt
+    (outs : option (bool * heap) * option (bool * heap)) : bool :=
+    let '(outL, outR) := outs in
+    omap fst outL == omap fst outR.
+
+  Lemma same_game_output_result_opt outs :
+    same_game_output_opt outs -> same_game_result_opt outs.
+  Proof.
+    case: outs=> [outL outR].
+    rewrite /same_game_output_opt /same_game_result_opt /=.
+    by move/eqP=> ->; rewrite eqxx.
+  Qed.
+
   Definition selected_plaintext
       (b : bool) (row : IndCpadGame.challenger_table_row) : message :=
     let '(m0, m1, _) := row in if b then m1 else m0.
@@ -1288,6 +1301,39 @@ Module NoiseFloodingSecure
           IndCpadGame.pk_addr (Some pk))
         IndCpadGame.evk_addr (Some evk))
       IndCpadGame.sk_addr (Some sk).
+
+  Definition reduction_initialized_heap
+      (b : bool) (pk : pk_t) (evk : evk_t) : heap :=
+    set_heap
+      (set_heap
+        (set_heap
+          (set_heap
+            (set_heap
+              (set_heap empty_heap IndCpaSecurity.IndCpaGame.bit_addr b)
+              IndCpaSecurity.IndCpaGame.pk_addr (Some pk))
+            IndCpaSecurity.IndCpaGame.evk_addr (Some evk))
+          IndCpaDSim.ready_addr true)
+        IndCpaDSim.pk_addr (Some pk))
+      IndCpaDSim.evk_addr (Some evk).
+
+  Definition sim_decrypt_reduction_heap_rel
+      (memL memR : heap) : bool :=
+    challenge_heap_valid memL &&
+    (get_heap memR IndCpaDSim.ready_addr == true) &&
+    (get_heap memL IndCpadGame.bit_addr ==
+      get_heap memR IndCpaSecurity.IndCpaGame.bit_addr) &&
+    (get_heap memL IndCpadGame.pk_addr ==
+      get_heap memR IndCpaSecurity.IndCpaGame.pk_addr) &&
+    (get_heap memL IndCpadGame.evk_addr ==
+      get_heap memR IndCpaSecurity.IndCpaGame.evk_addr) &&
+    (get_heap memL IndCpadGame.pk_addr ==
+      get_heap memR IndCpaDSim.pk_addr) &&
+    (get_heap memL IndCpadGame.evk_addr ==
+      get_heap memR IndCpaDSim.evk_addr) &&
+    (get_heap memL IndCpadGame.table_addr ==
+      get_heap memR IndCpaDSim.table_addr) &&
+    (get_heap memL IndCpadGame.decrypt_count_addr ==
+      get_heap memR IndCpaDSim.decrypt_count_addr).
 
   Lemma challenge_initialized_heap_bit b pk evk sk :
     get_heap (challenge_initialized_heap b pk evk sk)
@@ -1385,6 +1431,199 @@ Module NoiseFloodingSecure
     case: keys=> [[pk evk] sk] Hkeys /=.
     apply: challenge_heap_valid_initialized_good_keys.
     exact: (keygen_support_good (pk, evk, sk) Hkeys).
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_initialized b pk evk sk :
+    good_keys pk evk sk ->
+    sim_decrypt_reduction_heap_rel
+      (challenge_initialized_heap b pk evk sk)
+      (reduction_initialized_heap b pk evk).
+  Proof.
+    move=> Hkeys.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    rewrite (challenge_heap_valid_initialized_good_keys _ _ _ _ Hkeys).
+    rewrite /reduction_initialized_heap.
+    rewrite challenge_initialized_heap_bit
+      challenge_initialized_heap_pk
+      challenge_initialized_heap_evk
+      challenge_initialized_heap_table
+      challenge_initialized_heap_decrypt_count.
+    repeat first [
+      rewrite get_set_heap_eq
+    | rewrite get_set_heap_neq; [| neq_loc_auto]
+    | rewrite get_empty_heap
+    ].
+    by rewrite !eqxx.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_challenge_valid memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    challenge_heap_valid memL.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    by move/andP=> [].
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_ready memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memR IndCpaDSim.ready_addr = true.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [/eqP Hready _].
+    exact: Hready.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_bit memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.bit_addr =
+      get_heap memR IndCpaSecurity.IndCpaGame.bit_addr.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [/eqP Hbit _].
+    exact: Hbit.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_pk_outer memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.pk_addr =
+      get_heap memR IndCpaSecurity.IndCpaGame.pk_addr.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [/eqP Hpk _].
+    exact: Hpk.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_evk_outer memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.evk_addr =
+      get_heap memR IndCpaSecurity.IndCpaGame.evk_addr.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [/eqP Hevk _].
+    exact: Hevk.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_pk_sim memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.pk_addr =
+      get_heap memR IndCpaDSim.pk_addr.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [/eqP Hpk _].
+    exact: Hpk.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_evk_sim memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.evk_addr =
+      get_heap memR IndCpaDSim.evk_addr.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [/eqP Hevk _].
+    exact: Hevk.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_table memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.table_addr =
+      get_heap memR IndCpaDSim.table_addr.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [/eqP Htable _].
+    exact: Htable.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_decrypt_count memL memR :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.decrypt_count_addr =
+      get_heap memR IndCpaDSim.decrypt_count_addr.
+  Proof.
+    rewrite /sim_decrypt_reduction_heap_rel.
+    move/andP=> [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    move: H=> /andP [_ H].
+    by move/eqP.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_table memL memR table :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    challenge_heap_valid
+      (set_heap memL IndCpadGame.table_addr table) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.table_addr table)
+      (set_heap memR IndCpaDSim.table_addr table).
+  Proof.
+    move=> Hrel Hvalid.
+    rewrite /sim_decrypt_reduction_heap_rel Hvalid /=.
+    have Hready := sim_decrypt_reduction_heap_rel_ready Hrel.
+    have Hbit := sim_decrypt_reduction_heap_rel_bit Hrel.
+    have Hpk_outer := sim_decrypt_reduction_heap_rel_pk_outer Hrel.
+    have Hevk_outer := sim_decrypt_reduction_heap_rel_evk_outer Hrel.
+    have Hpk_sim := sim_decrypt_reduction_heap_rel_pk_sim Hrel.
+    have Hevk_sim := sim_decrypt_reduction_heap_rel_evk_sim Hrel.
+    have Hcount := sim_decrypt_reduction_heap_rel_decrypt_count Hrel.
+    repeat first [
+      rewrite get_set_heap_eq
+    | rewrite get_set_heap_neq; [| neq_loc_auto]
+    ].
+    by rewrite Hready Hbit Hpk_outer Hevk_outer Hpk_sim Hevk_sim Hcount !eqxx.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_decrypt_count memL memR n :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    challenge_heap_valid
+      (set_heap memL IndCpadGame.decrypt_count_addr n) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.decrypt_count_addr n)
+      (set_heap memR IndCpaDSim.decrypt_count_addr n).
+  Proof.
+    move=> Hrel Hvalid.
+    rewrite /sim_decrypt_reduction_heap_rel Hvalid /=.
+    have Hready := sim_decrypt_reduction_heap_rel_ready Hrel.
+    have Hbit := sim_decrypt_reduction_heap_rel_bit Hrel.
+    have Hpk_outer := sim_decrypt_reduction_heap_rel_pk_outer Hrel.
+    have Hevk_outer := sim_decrypt_reduction_heap_rel_evk_outer Hrel.
+    have Hpk_sim := sim_decrypt_reduction_heap_rel_pk_sim Hrel.
+    have Hevk_sim := sim_decrypt_reduction_heap_rel_evk_sim Hrel.
+    have Htable := sim_decrypt_reduction_heap_rel_table Hrel.
+    repeat first [
+      rewrite get_set_heap_eq
+    | rewrite get_set_heap_neq; [| neq_loc_auto]
+    ].
+    by rewrite Hready Hbit Hpk_outer Hevk_outer Hpk_sim Hevk_sim Htable !eqxx.
   Qed.
 
   Lemma challenge_heap_valid_depends_only_on_oracle_mem_spec :
@@ -1532,6 +1771,20 @@ Module NoiseFloodingSecure
   Proof.
     rewrite /challenge_heap_valid.
     rewrite !get_set_heap_neq; try neq_loc_auto.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_decrypt_count_valid
+      memL memR n :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.decrypt_count_addr n)
+      (set_heap memR IndCpaDSim.decrypt_count_addr n).
+  Proof.
+    move=> Hrel.
+    apply: sim_decrypt_reduction_heap_rel_set_decrypt_count.
+    - exact: Hrel.
+    - apply: challenge_heap_valid_set_decrypt_count.
+      exact: (sim_decrypt_reduction_heap_rel_challenge_valid Hrel).
   Qed.
 
   Lemma challenge_heap_valid_good_keys mem pk evk sk :
@@ -1745,6 +1998,284 @@ Module NoiseFloodingSecure
       ri_in_range rj_in_range c' Hkeys Htable Hc').
   Qed.
 
+  Lemma sim_decrypt_reduction_heap_rel_set_table_encrypt
+      memL memR pk evk sk m0 m1 c :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.pk_addr = Some pk ->
+    get_heap memL IndCpadGame.evk_addr = Some evk ->
+    get_heap memL IndCpadGame.sk_addr = Some sk ->
+    c \in dinsupp
+      (encrypt pk
+        (if get_heap memL IndCpadGame.bit_addr then m1 else m0)) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.table_addr
+        (get_heap memL IndCpadGame.table_addr ++ [:: (m0, m1, c)]))
+      (set_heap memR IndCpaDSim.table_addr
+        (get_heap memR IndCpaDSim.table_addr ++ [:: (m0, m1, c)])).
+  Proof.
+    move=> Hrel Hpk Hevk Hsk Hc.
+    have Htable := sim_decrypt_reduction_heap_rel_table Hrel.
+    rewrite -Htable.
+    apply: sim_decrypt_reduction_heap_rel_set_table.
+    - exact: Hrel.
+    - exact: (challenge_heap_valid_set_table_encrypt
+        memL pk evk sk m0 m1 c
+        (sim_decrypt_reduction_heap_rel_challenge_valid Hrel)
+        Hpk Hevk Hsk Hc).
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_table_encrypt_right
+      memL memR pk evk sk m0 m1 c :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memR IndCpaSecurity.IndCpaGame.pk_addr = Some pk ->
+    get_heap memL IndCpadGame.evk_addr = Some evk ->
+    get_heap memL IndCpadGame.sk_addr = Some sk ->
+    c \in dinsupp
+      (encrypt pk
+        (if get_heap memR IndCpaSecurity.IndCpaGame.bit_addr then m1 else m0)) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.table_addr
+        (get_heap memL IndCpadGame.table_addr ++ [:: (m0, m1, c)]))
+      (set_heap memR IndCpaDSim.table_addr
+        (get_heap memR IndCpaDSim.table_addr ++ [:: (m0, m1, c)])).
+  Proof.
+    move=> Hrel HpkR Hevk Hsk Hc.
+    have HpkL : get_heap memL IndCpadGame.pk_addr = Some pk.
+      have Hpk := sim_decrypt_reduction_heap_rel_pk_outer Hrel.
+      by rewrite Hpk HpkR.
+    have HcL :
+        c \in dinsupp
+          (encrypt pk
+            (if get_heap memL IndCpadGame.bit_addr then m1 else m0)).
+      have Hbit := sim_decrypt_reduction_heap_rel_bit Hrel.
+      by rewrite Hbit.
+    exact: (sim_decrypt_reduction_heap_rel_set_table_encrypt
+      memL memR pk evk sk m0 m1 c Hrel HpkL Hevk Hsk HcL).
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_table_eval1
+      memL memR pk evk sk gate r
+      (r_in_range :
+        (r < length (get_heap memL IndCpadGame.table_addr))%N) c' :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.pk_addr = Some pk ->
+    get_heap memL IndCpadGame.evk_addr = Some evk ->
+    get_heap memL IndCpadGame.sk_addr = Some sk ->
+    c' \in dinsupp
+      (let '(_, _, c) :=
+        nth_valid (get_heap memL IndCpadGame.table_addr) r r_in_range in
+       eval1 evk gate c) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.table_addr
+        (get_heap memL IndCpadGame.table_addr ++
+          [:: let '(m0, m1, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr)
+                  r r_in_range in
+              (interpret_unary gate m0, interpret_unary gate m1, c')]))
+      (set_heap memR IndCpaDSim.table_addr
+        (get_heap memL IndCpadGame.table_addr ++
+          [:: let '(m0, m1, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr)
+                  r r_in_range in
+              (interpret_unary gate m0, interpret_unary gate m1, c')])).
+  Proof.
+    move=> Hrel Hpk Hevk Hsk Hc'.
+    apply: sim_decrypt_reduction_heap_rel_set_table.
+    - exact: Hrel.
+    - exact: (challenge_heap_valid_set_table_eval1
+        memL pk evk sk gate r r_in_range c'
+        (sim_decrypt_reduction_heap_rel_challenge_valid Hrel)
+        Hpk Hevk Hsk Hc').
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_table_eval2
+      memL memR pk evk sk gate ri rj
+      (ri_in_range :
+        (ri < length (get_heap memL IndCpadGame.table_addr))%N)
+      (rj_in_range :
+        (rj < length (get_heap memL IndCpadGame.table_addr))%N) c' :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.pk_addr = Some pk ->
+    get_heap memL IndCpadGame.evk_addr = Some evk ->
+    get_heap memL IndCpadGame.sk_addr = Some sk ->
+    c' \in dinsupp
+      (let '(_, _, ci) :=
+        nth_valid (get_heap memL IndCpadGame.table_addr) ri ri_in_range in
+       let '(_, _, cj) :=
+        nth_valid (get_heap memL IndCpadGame.table_addr) rj rj_in_range in
+       eval2 evk gate ci cj) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.table_addr
+        (get_heap memL IndCpadGame.table_addr ++
+          [:: let '(m0i, m1i, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr)
+                  ri ri_in_range in
+              let '(m0j, m1j, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr)
+                  rj rj_in_range in
+              (interpret_binary gate m0i m0j,
+               interpret_binary gate m1i m1j, c')]))
+      (set_heap memR IndCpaDSim.table_addr
+        (get_heap memL IndCpadGame.table_addr ++
+          [:: let '(m0i, m1i, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr)
+                  ri ri_in_range in
+              let '(m0j, m1j, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr)
+                  rj rj_in_range in
+              (interpret_binary gate m0i m0j,
+               interpret_binary gate m1i m1j, c')])).
+  Proof.
+    move=> Hrel Hpk Hevk Hsk Hc'.
+    apply: sim_decrypt_reduction_heap_rel_set_table.
+    - exact: Hrel.
+    - exact: (challenge_heap_valid_set_table_eval2
+        memL pk evk sk gate ri rj ri_in_range rj_in_range c'
+        (sim_decrypt_reduction_heap_rel_challenge_valid Hrel)
+        Hpk Hevk Hsk Hc').
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_eval1_row
+      memL memR r
+      (rL : (r < length (get_heap memL IndCpadGame.table_addr))%N)
+      (rR : (r < length (get_heap memR IndCpaDSim.table_addr))%N) :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    nth_valid (get_heap memR IndCpaDSim.table_addr) r rR =
+    nth_valid (get_heap memL IndCpadGame.table_addr) r rL.
+  Proof.
+    move=> Hrel.
+    have Htable := sim_decrypt_reduction_heap_rel_table Hrel.
+    move: rR.
+    rewrite -Htable=> rR.
+    exact: nth_valid_irrel.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_eval2_row_i
+      memL memR ri
+      (riL : (ri < length (get_heap memL IndCpadGame.table_addr))%N)
+      (riR : (ri < length (get_heap memR IndCpaDSim.table_addr))%N) :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    nth_valid (get_heap memR IndCpaDSim.table_addr) ri riR =
+    nth_valid (get_heap memL IndCpadGame.table_addr) ri riL.
+  Proof.
+    exact: sim_decrypt_reduction_heap_rel_eval1_row.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_eval2_row_j
+      memL memR rj
+      (rjL : (rj < length (get_heap memL IndCpadGame.table_addr))%N)
+      (rjR : (rj < length (get_heap memR IndCpaDSim.table_addr))%N) :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    nth_valid (get_heap memR IndCpaDSim.table_addr) rj rjR =
+    nth_valid (get_heap memL IndCpadGame.table_addr) rj rjL.
+  Proof.
+    exact: sim_decrypt_reduction_heap_rel_eval1_row.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_evk_from_sim memL memR evk :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memR IndCpaDSim.evk_addr = Some evk ->
+    get_heap memL IndCpadGame.evk_addr = Some evk.
+  Proof.
+    move=> Hrel Hevk.
+    have H := sim_decrypt_reduction_heap_rel_evk_sim Hrel.
+    by rewrite H Hevk.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_pk_from_sim memL memR pk :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memR IndCpaDSim.pk_addr = Some pk ->
+    get_heap memL IndCpadGame.pk_addr = Some pk.
+  Proof.
+    move=> Hrel Hpk.
+    have H := sim_decrypt_reduction_heap_rel_pk_sim Hrel.
+    by rewrite H Hpk.
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_table_eval1_right
+      memL memR pk evk sk gate r
+      (rL : (r < length (get_heap memL IndCpadGame.table_addr))%N)
+      (rR : (r < length (get_heap memR IndCpaDSim.table_addr))%N) c' :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.pk_addr = Some pk ->
+    get_heap memR IndCpaDSim.evk_addr = Some evk ->
+    get_heap memL IndCpadGame.sk_addr = Some sk ->
+    c' \in dinsupp
+      (let '(_, _, c) :=
+        nth_valid (get_heap memR IndCpaDSim.table_addr) r rR in
+       eval1 evk gate c) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.table_addr
+        (get_heap memL IndCpadGame.table_addr ++
+          [:: let '(m0, m1, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr) r rL in
+              (interpret_unary gate m0, interpret_unary gate m1, c')]))
+      (set_heap memR IndCpaDSim.table_addr
+        (get_heap memR IndCpaDSim.table_addr ++
+          [:: let '(m0, m1, _) :=
+                nth_valid (get_heap memR IndCpaDSim.table_addr) r rR in
+              (interpret_unary gate m0, interpret_unary gate m1, c')])).
+  Proof.
+    move=> Hrel Hpk HevkR Hsk Hc'.
+    have Hevk := sim_decrypt_reduction_heap_rel_evk_from_sim Hrel HevkR.
+    have Hrow := sim_decrypt_reduction_heap_rel_eval1_row rL rR Hrel.
+    rewrite Hrow in Hc' *.
+    have Hbase := sim_decrypt_reduction_heap_rel_set_table_eval1
+      memL memR pk evk sk gate r rL c' Hrel Hpk Hevk Hsk Hc'.
+    move: Hbase.
+    have Htable := sim_decrypt_reduction_heap_rel_table Hrel.
+    rewrite -Htable Hrow.
+    by [].
+  Qed.
+
+  Lemma sim_decrypt_reduction_heap_rel_set_table_eval2_right
+      memL memR pk evk sk gate ri rj
+      (riL : (ri < length (get_heap memL IndCpadGame.table_addr))%N)
+      (rjL : (rj < length (get_heap memL IndCpadGame.table_addr))%N)
+      (riR : (ri < length (get_heap memR IndCpaDSim.table_addr))%N)
+      (rjR : (rj < length (get_heap memR IndCpaDSim.table_addr))%N) c' :
+    sim_decrypt_reduction_heap_rel memL memR ->
+    get_heap memL IndCpadGame.pk_addr = Some pk ->
+    get_heap memR IndCpaDSim.evk_addr = Some evk ->
+    get_heap memL IndCpadGame.sk_addr = Some sk ->
+    c' \in dinsupp
+      (let '(_, _, ci) :=
+        nth_valid (get_heap memR IndCpaDSim.table_addr) ri riR in
+       let '(_, _, cj) :=
+        nth_valid (get_heap memR IndCpaDSim.table_addr) rj rjR in
+       eval2 evk gate ci cj) ->
+    sim_decrypt_reduction_heap_rel
+      (set_heap memL IndCpadGame.table_addr
+        (get_heap memL IndCpadGame.table_addr ++
+          [:: let '(m0i, m1i, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr) ri riL in
+              let '(m0j, m1j, _) :=
+                nth_valid (get_heap memL IndCpadGame.table_addr) rj rjL in
+              (interpret_binary gate m0i m0j,
+               interpret_binary gate m1i m1j, c')]))
+      (set_heap memR IndCpaDSim.table_addr
+        (get_heap memR IndCpaDSim.table_addr ++
+          [:: let '(m0i, m1i, _) :=
+                nth_valid (get_heap memR IndCpaDSim.table_addr) ri riR in
+              let '(m0j, m1j, _) :=
+                nth_valid (get_heap memR IndCpaDSim.table_addr) rj rjR in
+              (interpret_binary gate m0i m0j,
+               interpret_binary gate m1i m1j, c')])).
+  Proof.
+    move=> Hrel Hpk HevkR Hsk Hc'.
+    have Hevk := sim_decrypt_reduction_heap_rel_evk_from_sim Hrel HevkR.
+    have Hrow_i := sim_decrypt_reduction_heap_rel_eval2_row_i riL riR Hrel.
+    have Hrow_j := sim_decrypt_reduction_heap_rel_eval2_row_j rjL rjR Hrel.
+    rewrite Hrow_i Hrow_j in Hc' *.
+    have Hbase := sim_decrypt_reduction_heap_rel_set_table_eval2
+      memL memR pk evk sk gate ri rj riL rjL c'
+      Hrel Hpk Hevk Hsk Hc'.
+    move: Hbase.
+    have Htable := sim_decrypt_reduction_heap_rel_table Hrel.
+    rewrite -Htable Hrow_i Hrow_j.
+    by [].
+  Qed.
+
   Definition ind_cpad_real_encrypt_code
       (max_queries : nat) (x : message * message) : raw_code ciphertext :=
     let '(m0, m1) := x in
@@ -1783,6 +2314,33 @@ Module NoiseFloodingSecure
     case: x=> m0 m1.
     rewrite /ind_cpad_real_encrypt_code
       /IndCpadSimDecryptOracle /=.
+    rewrite !resolve_set /=.
+    rewrite coerce_kleisliE /=.
+    by [].
+  Qed.
+
+  Definition ind_cpa_reduction_sim_encrypt_code
+      (max_queries : nat) (x : message * message) : raw_code ciphertext :=
+    let '(m0, m1) := x in
+    ready ← get IndCpaDSim.ready_addr ;;
+    #assert ready ;;
+    c ← call [ IndCpaSecurity.IndCpaGame.oracle_encrypt ] :
+      { chProd message message ~> ciphertext } (m0, m1) ;;
+    table ← get IndCpaDSim.table_addr ;;
+    let updated_table := table ++ [:: (m0, m1, c)] in
+    #assert ((length updated_table <= max_queries)%N) ;;
+    #put IndCpaDSim.table_addr := updated_table ;;
+    ret c.
+
+  Lemma ind_cpa_reduction_sim_encrypt_resolveE max_queries x :
+    resolve (IndCpaDSim.IndCpadOracle max_queries)
+      (mkopsig IndCpadGame.oracle_encrypt
+        (chProd message message) ciphertext) x =
+    ind_cpa_reduction_sim_encrypt_code max_queries x.
+  Proof.
+    case: x=> m0 m1.
+    rewrite /ind_cpa_reduction_sim_encrypt_code
+      /IndCpaDSim.IndCpadOracle /=.
     rewrite !resolve_set /=.
     rewrite coerce_kleisliE /=.
     by [].
@@ -2030,6 +2588,39 @@ Module NoiseFloodingSecure
       max_queries x mem Hinv out Hout).
   Qed.
 
+  Definition ind_cpa_reduction_sim_eval1_code
+      (max_queries : nat) (x : unary_gate * nat) : raw_code ciphertext :=
+    let '(gate, r) := x in
+    ready ← get IndCpaDSim.ready_addr ;;
+    #assert ready ;;
+    table ← get IndCpaDSim.table_addr ;;
+    #assert (r < length table)%N as r_in_range ;;
+    let '(m0, m1, c) := nth_valid table r r_in_range in
+    o ← get IndCpaDSim.evk_addr ;;
+    #assert isSome o as oevk ;;
+    let evk := getSome o oevk in
+    let m0' := interpret_unary gate m0 in
+    let m1' := interpret_unary gate m1 in
+    c' <$ (ciphertext; eval1 evk gate c) ;;
+    let updated_table := table ++ [:: (m0', m1', c')] in
+    #assert ((length updated_table <= max_queries)%N) ;;
+    #put IndCpaDSim.table_addr := updated_table ;;
+    ret c'.
+
+  Lemma ind_cpa_reduction_sim_eval1_resolveE max_queries x :
+    resolve (IndCpaDSim.IndCpadOracle max_queries)
+      (mkopsig IndCpadGame.oracle_eval1
+        (chProd unary_gate nat) ciphertext) x =
+    ind_cpa_reduction_sim_eval1_code max_queries x.
+  Proof.
+    case: x=> gate r.
+    rewrite /ind_cpa_reduction_sim_eval1_code
+      /IndCpaDSim.IndCpadOracle /=.
+    rewrite !resolve_set /=.
+    rewrite coerce_kleisliE /=.
+    by [].
+  Qed.
+
   Lemma ind_cpad_real_eval2_code_preserves_challenge_heap_valid
       max_queries :
     ⊨Hoare ⦃ fun in_mem => challenge_heap_valid in_mem.2 ⦄
@@ -2112,6 +2703,42 @@ Module NoiseFloodingSecure
     rewrite ind_cpad_sim_decrypt_eval2_resolveE in Hout.
     exact: (ind_cpad_real_eval2_code_preserves_challenge_heap_valid
       max_queries x mem Hinv out Hout).
+  Qed.
+
+  Definition ind_cpa_reduction_sim_eval2_code
+      (max_queries : nat)
+      (x : (binary_gate * nat) * nat) : raw_code ciphertext :=
+    let '((gate, ri), rj) := x in
+    ready ← get IndCpaDSim.ready_addr ;;
+    #assert ready ;;
+    table ← get IndCpaDSim.table_addr ;;
+    #assert (ri < length table)%N as ri_in_range ;;
+    #assert (rj < length table)%N as rj_in_range ;;
+    let '(m0i, m1i, ci) := nth_valid table ri ri_in_range in
+    let '(m0j, m1j, cj) := nth_valid table rj rj_in_range in
+    let m0' := interpret_binary gate m0i m0j in
+    let m1' := interpret_binary gate m1i m1j in
+    o ← get IndCpaDSim.evk_addr ;;
+    #assert isSome o as oevk ;;
+    let evk := getSome o oevk in
+    c' <$ (ciphertext; eval2 evk gate ci cj) ;;
+    let updated_table := table ++ [:: (m0', m1', c')] in
+    #assert ((length updated_table <= max_queries)%N) ;;
+    #put IndCpaDSim.table_addr := updated_table ;;
+    ret c'.
+
+  Lemma ind_cpa_reduction_sim_eval2_resolveE max_queries x :
+    resolve (IndCpaDSim.IndCpadOracle max_queries)
+      (mkopsig IndCpadGame.oracle_eval2
+        (chProd (chProd binary_gate nat) nat) ciphertext) x =
+    ind_cpa_reduction_sim_eval2_code max_queries x.
+  Proof.
+    case: x=> [[gate ri] rj].
+    rewrite /ind_cpa_reduction_sim_eval2_code
+      /IndCpaDSim.IndCpadOracle /=.
+    rewrite !resolve_set /=.
+    rewrite coerce_kleisliE /=.
+    by [].
   Qed.
 
   Definition ind_cpad_decrypt_prefix_code
@@ -2319,6 +2946,52 @@ Module NoiseFloodingSecure
     symmetry.
     exact: (ind_cpad_decrypt_prefix_bind_contE
       max_queries i ind_cpad_sim_decrypt_cont mem out).
+  Qed.
+
+  Lemma ind_cpad_real_decrypt_code_over_bound_null max_queries i mem :
+    ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N ->
+    Pr_code (ind_cpad_real_decrypt_code max_queries i) mem =1 dnull.
+  Proof.
+    move=> Hcount out.
+    rewrite /ind_cpad_real_decrypt_code.
+    rewrite Pr_code_get /assertD (negbTE Hcount) /=.
+    by rewrite Pr_code_fail dlet_null_ext.
+  Qed.
+
+  Lemma ind_cpad_sim_decrypt_code_over_bound_null max_queries i mem :
+    ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N ->
+    Pr_code (ind_cpad_sim_decrypt_code max_queries i) mem =1 dnull.
+  Proof.
+    move=> Hcount out.
+    rewrite /ind_cpad_sim_decrypt_code.
+    rewrite Pr_code_get /assertD (negbTE Hcount) /=.
+    by rewrite Pr_code_fail dlet_null_ext.
+  Qed.
+
+  Lemma ind_cpad_real_decrypt_resolve_over_bound_null max_queries i mem :
+    ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N ->
+    Pr_code
+      (resolve (IndCpadGame.IndCpadOracle max_queries)
+        (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
+      mem =1 dnull.
+  Proof.
+    move=> Hcount.
+    rewrite ind_cpad_real_decrypt_resolveE.
+    exact: (ind_cpad_real_decrypt_code_over_bound_null
+      max_queries i mem Hcount).
+  Qed.
+
+  Lemma ind_cpad_sim_decrypt_resolve_over_bound_null max_queries i mem :
+    ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N ->
+    Pr_code
+      (resolve (IndCpadSimDecryptOracle max_queries)
+        (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
+      mem =1 dnull.
+  Proof.
+    move=> Hcount.
+    rewrite ind_cpad_sim_decrypt_resolveE.
+    exact: (ind_cpad_sim_decrypt_code_over_bound_null
+      max_queries i mem Hcount).
   Qed.
 
   Lemma ind_cpad_decrypt_prefix_code_preserves_challenge_heap_valid
@@ -3215,11 +3888,62 @@ Module NoiseFloodingSecure
     move (IndCpadGame.IndCpadChallenger : nom_package) A.
 
   Definition ind_cpad_open_guess_code
-      (A : nom_package) (input : bool * (pk_t * evk_t)) : raw_code bool :=
+      (A : nom_package) (input : (bool * (pk_t * evk_t))%type) :
+      raw_code bool :=
     let '(b, (pk, evk)) := input in
     b' ← resolve (ind_cpad_moved_adversary A)
       (mkopsig IndCpadGame.guess (chProd pk_t evk_t) chBool) (pk, evk) ;;
     ret (eq_op b' b).
+
+  Definition ind_cpad_challenge_init_code (_ : chUnit) :
+      raw_code (bool * (pk_t * evk_t))%type :=
+    b <$ ('bool; dflip (1 / 2)) ;;
+    keys <$ (pk_t × evk_t × sk_t; keygen) ;;
+    let '(pk, evk, sk) := keys in
+    #put IndCpadGame.bit_addr := b ;;
+    #put IndCpadGame.pk_addr := Some pk ;;
+    #put IndCpadGame.evk_addr := Some evk ;;
+    #put IndCpadGame.sk_addr := Some sk ;;
+    ret (b, (pk, evk)).
+
+  Definition ind_cpad_factored_open_game_code
+      (A : nom_package) (_ : chUnit) : raw_code bool :=
+    init ← ind_cpad_challenge_init_code tt ;;
+    ind_cpad_open_guess_code A init.
+
+  Definition ind_cpad_compiled_real_guess_code
+      (A : nom_package) (max_queries : nat)
+      (input : (bool * (pk_t * evk_t))%type) : raw_code bool :=
+    code_link
+      (compile_calls max_queries
+        (X := nat) (Y := chOption message)
+        (IndCpadGame.IndCpadOracle max_queries)
+        IndCpadGame.oracle_decrypt
+        (ind_cpad_open_guess_code A input))
+      (IndCpadGame.IndCpadOracle max_queries).
+
+  Definition ind_cpad_compiled_sim_decrypt_guess_code
+      (A : nom_package) (max_queries : nat)
+      (input : (bool * (pk_t * evk_t))%type) : raw_code bool :=
+    code_link
+      (compile_calls max_queries
+        (X := nat) (Y := chOption message)
+        (IndCpadSimDecryptOracle max_queries)
+        IndCpadGame.oracle_decrypt
+        (ind_cpad_open_guess_code A input))
+      (IndCpadGame.IndCpadOracle max_queries).
+
+  Definition ind_cpad_factored_compiled_real_guess_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    init ← ind_cpad_challenge_init_code tt ;;
+    ind_cpad_compiled_real_guess_code A max_queries init.
+
+  Definition ind_cpad_factored_compiled_sim_decrypt_guess_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    init ← ind_cpad_challenge_init_code tt ;;
+    ind_cpad_compiled_sim_decrypt_guess_code A max_queries init.
 
   Lemma ind_cpad_guess_in_adv_export :
     fhas IndCpadGame.IndCpadAdv_export
@@ -3249,6 +3973,37 @@ Module NoiseFloodingSecure
       (pk, evk)
       (fun b' => eq_op b' b)
       A_valid ind_cpad_guess_in_adv_export).
+  Qed.
+
+  Lemma ind_cpad_open_game_code_factored (A : nom_package) :
+    forall x,
+      ind_cpad_open_game_code A x =
+      ind_cpad_factored_open_game_code A x.
+  Proof.
+    move=> [].
+    rewrite /ind_cpad_open_game_code /ind_cpad_factored_open_game_code
+      /ind_cpad_challenge_init_code /ind_cpad_open_guess_code
+      /ind_cpad_moved_adversary.
+    by rewrite resolve_set /=.
+  Qed.
+
+  Lemma ind_cpad_challenge_init_code_empty_valid out :
+    out \in
+      dinsupp (Pr_code (ind_cpad_challenge_init_code tt) empty_heap) ->
+    let '(_, mem) := out in challenge_heap_valid mem.
+  Proof.
+    rewrite /ind_cpad_challenge_init_code.
+    rewrite !Pr_code_bind Pr_code_sample.
+    move=> Hout.
+    have [b Hb Hout_b] := @dinsupp_dlet R _ _ _ _ _ Hout.
+    rewrite Pr_code_sample in Hout_b.
+    have [keys Hkeys Hout_keys] := @dinsupp_dlet R _ _ _ _ _ Hout_b.
+    case: keys Hkeys Hout_keys=> [[pk evk] sk] Hkeys.
+    rewrite !Pr_code_put Pr_code_ret.
+    move=> Hout_ret.
+    have -> : out = ((b, (pk, evk)), challenge_initialized_heap b pk evk sk).
+      exact: in_dunit Hout_ret.
+    exact: (challenge_heap_valid_initialized b (pk, evk, sk) Hkeys).
   Qed.
 
   Definition IndCpadMain_export :=
@@ -3304,6 +4059,76 @@ Module NoiseFloodingSecure
         (ind_cpad_open_game_code A tt))
       (IndCpadGame.IndCpadOracle max_queries).
 
+  Definition ind_cpad_compiled_real_factored_open_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    code_link
+      (compile_calls max_queries
+        (X := nat) (Y := chOption message)
+        (IndCpadGame.IndCpadOracle max_queries)
+        IndCpadGame.oracle_decrypt
+        (ind_cpad_factored_open_game_code A tt))
+      (IndCpadGame.IndCpadOracle max_queries).
+
+  Lemma ind_cpad_compiled_real_game_code_factored
+      (A : nom_package) max_queries x :
+    ind_cpad_compiled_real_game_code A max_queries x =
+    ind_cpad_compiled_real_factored_open_game_code A max_queries x.
+  Proof.
+    rewrite /ind_cpad_compiled_real_game_code
+      /ind_cpad_compiled_real_factored_open_game_code.
+    by rewrite ind_cpad_open_game_code_factored.
+  Qed.
+
+  Lemma ind_cpad_compiled_real_factored_open_game_code_guess
+      (A : nom_package) max_queries x :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    ind_cpad_compiled_real_factored_open_game_code A max_queries x =
+    ind_cpad_factored_compiled_real_guess_game_code A max_queries x.
+  Proof.
+    move=> A_valid.
+    case: x=> [].
+    rewrite /ind_cpad_compiled_real_factored_open_game_code
+      /ind_cpad_factored_compiled_real_guess_game_code.
+    have Hfactored_valid :
+        ValidCode (loc ((IndCpadGame.IndCpadChallenger ∘ A)%sep))
+          IndCpadGame.IndCpadAdv_import
+          (ind_cpad_factored_open_game_code A tt).
+      rewrite -ind_cpad_open_game_code_factored.
+      exact: (ind_cpad_open_game_code_valid A A_valid tt).
+    rewrite (@compile_calls_correct_code_link max_queries
+      nat (chOption message) bool
+      (loc ((IndCpadGame.IndCpadChallenger ∘ A)%sep))
+      IndCpadGame.oracle_mem_spec IndCpadGame.IndCpadAdv_import
+      (IndCpadGame.IndCpadOracle max_queries)
+      IndCpadGame.oracle_decrypt
+      (ind_cpad_factored_open_game_code A tt)
+      (IndCpadRealOracle_valid max_queries)
+      ind_cpad_decrypt_in_adv_import
+      Hfactored_valid).
+    rewrite /ind_cpad_factored_open_game_code code_link_bind.
+    rewrite (_ : code_link (ind_cpad_challenge_init_code tt)
+        (IndCpadGame.IndCpadOracle max_queries) =
+      ind_cpad_challenge_init_code tt).
+    - f_equal.
+      apply functional_extensionality=> init.
+      rewrite /ind_cpad_compiled_real_guess_code.
+      rewrite (@compile_calls_correct_code_link max_queries
+        nat (chOption message) bool
+        (loc (ind_cpad_moved_adversary A))
+        IndCpadGame.oracle_mem_spec IndCpadGame.IndCpadAdv_import
+        (IndCpadGame.IndCpadOracle max_queries)
+        IndCpadGame.oracle_decrypt
+        (ind_cpad_open_guess_code A init)
+        (IndCpadRealOracle_valid max_queries)
+        ind_cpad_decrypt_in_adv_import
+        (ind_cpad_open_guess_code_valid A A_valid init)).
+      by [].
+    rewrite /ind_cpad_challenge_init_code /=.
+    by [].
+  Qed.
+
   Definition ind_cpad_linked_real_game_code
       (A : nom_package) (max_queries : nat) (_ : chUnit) :
       raw_code bool :=
@@ -3321,6 +4146,52 @@ Module NoiseFloodingSecure
         IndCpadGame.oracle_decrypt
         (ind_cpad_open_game_code A tt))
       (IndCpadGame.IndCpadOracle max_queries).
+
+  Definition ind_cpad_compiled_sim_decrypt_factored_open_game_code
+      (A : nom_package) (max_queries : nat) (_ : chUnit) :
+      raw_code bool :=
+    code_link
+      (compile_calls max_queries
+        (X := nat) (Y := chOption message)
+        (IndCpadSimDecryptOracle max_queries)
+        IndCpadGame.oracle_decrypt
+        (ind_cpad_factored_open_game_code A tt))
+      (IndCpadGame.IndCpadOracle max_queries).
+
+  Lemma ind_cpad_compiled_sim_decrypt_game_code_factored
+      (A : nom_package) max_queries x :
+    ind_cpad_compiled_sim_decrypt_game_code A max_queries x =
+    ind_cpad_compiled_sim_decrypt_factored_open_game_code A max_queries x.
+  Proof.
+    rewrite /ind_cpad_compiled_sim_decrypt_game_code
+      /ind_cpad_compiled_sim_decrypt_factored_open_game_code.
+    by rewrite ind_cpad_open_game_code_factored.
+  Qed.
+
+  Lemma ind_cpad_compiled_sim_decrypt_factored_open_game_code_guess
+      (A : nom_package) max_queries x :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    ind_cpad_compiled_sim_decrypt_factored_open_game_code A max_queries x =
+    ind_cpad_factored_compiled_sim_decrypt_guess_game_code A max_queries x.
+  Proof.
+    move=> A_valid.
+    case: x=> [].
+    rewrite /ind_cpad_compiled_sim_decrypt_factored_open_game_code
+      /ind_cpad_factored_compiled_sim_decrypt_guess_game_code
+      /ind_cpad_factored_open_game_code.
+    rewrite (@codeLinkCompileCallsClosedPrefix max_queries
+      nat (chOption message) (chProd chBool (chProd pk_t evk_t)) bool
+      IndCpadGame.oracle_mem_spec
+      (IndCpadSimDecryptOracle max_queries)
+      (IndCpadGame.IndCpadOracle max_queries)
+      IndCpadGame.oracle_decrypt
+      (ind_cpad_challenge_init_code tt)
+      (ind_cpad_open_guess_code A)).
+    - by [].
+    rewrite /ind_cpad_challenge_init_code.
+    typeclasses eauto with ssprove_valid_db.
+  Qed.
 
   (* Same compiled code as [ind_cpad_compiled_sim_decrypt_game_code], but
      linked against the replacement oracle itself.  This should be an exact
@@ -3611,6 +4482,43 @@ Module NoiseFloodingSecure
       Hcall).
   Qed.
 
+  Lemma ind_cpad_compiled_guess_decrypt_replacement_from_compile
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    ⊨AE_opt ⦃ same_input_invariant_pre challenge_heap_valid ⦄
+      (ind_cpad_compiled_real_guess_code A max_queries)
+      ≈( compile_security_error max_queries )
+      (ind_cpad_compiled_sim_decrypt_guess_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    move=> A_valid.
+    rewrite /ind_cpad_compiled_real_guess_code
+      /ind_cpad_compiled_sim_decrypt_guess_code
+      /compile_security_error.
+    exact: (compileRule max_queries nat (chOption message)
+      (chProd chBool (chProd pk_t evk_t)) bool
+      IndCpadGame.oracle_mem_spec
+      (loc (ind_cpad_moved_adversary A))
+      IndCpadGame.oracle_mem_spec IndCpadGame.oracle_mem_spec
+      IndCpadGame.IndCpadAdv_import
+      (IndCpadGame.IndCpadOracle max_queries)
+      (IndCpadSimDecryptOracle max_queries)
+      IndCpadGame.oracle_decrypt
+      (ind_cpad_open_guess_code A)
+      (noise_flooding_per_query_epsilon dim gaussian_width_multiplier)
+      challenge_heap_valid
+      (ind_cpad_open_guess_code_valid A A_valid)
+      (IndCpadRealOracle_valid max_queries)
+      (IndCpadSimDecryptOracle_valid max_queries)
+      (ind_cpad_moved_adversary_separate A)
+      challenge_heap_valid_depends_only_on_oracle_mem_spec
+      (ind_cpad_real_oracle_preserves_challenge_heap_valid_except_decrypt
+        max_queries)
+      ind_cpad_decrypt_in_adv_import
+      (ind_cpad_decrypt_resolve_pyth_short max_queries)).
+  Qed.
+
   Definition ind_cpa_reduction (A : nom_package)
     (max_queries : nat) :=
     IndCpaDSim.IndCpaReduction A max_queries.
@@ -3677,6 +4585,453 @@ Module NoiseFloodingSecure
     pred ((chUnit * heap) * (chUnit * heap)) :=
     pred1 ((tt, empty_heap), (tt, empty_heap)).
 
+  Lemma total_variation_refl_le0
+      {T : choiceType} (P : {distr T / R}) :
+    total_variation P P <= 0.
+  Proof.
+    rewrite /total_variation.
+    rewrite (_ : sum (fun y => `|P y - P y|) = 0).
+      by rewrite mulr0 lexx.
+    rewrite -(@sum0 R T).
+    apply/eq_sum=> y.
+    by rewrite subrr normr0.
+  Qed.
+
+  Lemma ind_cpa_reduction_game_code_linked_ae
+      (A : nom_package) max_queries :
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpa_reduction_game_code A max_queries)
+      ≈( 0 )
+      (ind_cpa_reduction_linked_game_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    apply: (additiveErrorOptConseqRule
+      (ind_cpa_reduction_game_code A max_queries)
+      (ind_cpa_reduction_linked_game_code A max_queries)
+      game_initial_pre game_initial_pre
+      same_output_heap_opt same_game_output_opt
+      0 0).
+    - by [].
+    - move=> outs.
+      rewrite /same_output_heap_opt /same_game_output_opt.
+      by [].
+    - by [].
+    apply: additiveErrorOptSameOutputTvdEqRule.
+    - exact: lexx.
+    - move=> memL memR xL xR Hpre.
+      rewrite /game_initial_pre in Hpre.
+      move/eqP: Hpre=> Hpre.
+      inversion Hpre; subst.
+      rewrite ind_cpa_reduction_game_code_linked.
+      exact: total_variation_refl_le0.
+  Qed.
+
+  Lemma ind_cpa_reduction_linked_game_code_ae
+      (A : nom_package) max_queries :
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpa_reduction_linked_game_code A max_queries)
+      ≈( 0 )
+      (ind_cpa_reduction_game_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    apply: (additiveErrorOptConseqRule
+      (ind_cpa_reduction_linked_game_code A max_queries)
+      (ind_cpa_reduction_game_code A max_queries)
+      game_initial_pre game_initial_pre
+      same_output_heap_opt same_game_output_opt
+      0 0).
+    - by [].
+    - move=> outs.
+      rewrite /same_output_heap_opt /same_game_output_opt.
+      by [].
+    - by [].
+    apply: additiveErrorOptSameOutputTvdEqRule.
+    - exact: lexx.
+    - move=> memL memR xL xR Hpre.
+      rewrite /game_initial_pre in Hpre.
+      move/eqP: Hpre=> Hpre.
+      inversion Hpre; subst.
+      rewrite -ind_cpa_reduction_game_code_linked.
+      exact: total_variation_refl_le0.
+  Qed.
+
+  Lemma ind_cpad_challenge_init_code_ae :
+    ⊨AE ⦃ game_initial_pre ⦄
+      ind_cpad_challenge_init_code
+      ≈( 0 )
+      ind_cpad_challenge_init_code
+    ⦃ same_input_invariant_pre challenge_heap_valid ⦄.
+  Proof.
+    apply: (additiveErrorConseqRule
+      ind_cpad_challenge_init_code
+      ind_cpad_challenge_init_code
+      game_initial_pre game_initial_pre
+      (fun outs =>
+        let '((initL, memL), (initR, memR)) := outs in
+        challenge_heap_valid memL && (initL == initR) && (memL == memR))
+      (same_input_invariant_pre challenge_heap_valid)
+      0 0).
+    - by [].
+    - case=> [[initL memL] [initR memR]] /=.
+      move/andP=> [Hinv /andP [/eqP Hinit /eqP Hmem]].
+      subst initR; subst memR.
+      by rewrite /same_input_invariant_pre eqxx.
+    - by [].
+    apply: (additiveErrorTvdEqPostRule
+      ind_cpad_challenge_init_code
+      ind_cpad_challenge_init_code
+      game_initial_pre
+      (fun out => challenge_heap_valid out.2)
+      0).
+    - exact: lexx.
+    - move=> memL memR xL xR.
+      rewrite /game_initial_pre=> /eqP Hpre.
+      inversion Hpre; subst.
+      exact: total_variation_refl_le0.
+    - move=> memL memR xL xR y.
+      rewrite /game_initial_pre=> /eqP Hpre Hy.
+      inversion Hpre; subst.
+      exact: ind_cpad_challenge_init_code_empty_valid.
+  Qed.
+
+  Lemma ind_cpad_factored_compiled_guess_decrypt_replacement
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpad_factored_compiled_real_guess_game_code A max_queries)
+      ≈( compile_security_error max_queries )
+      (ind_cpad_factored_compiled_sim_decrypt_guess_game_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    move=> A_valid.
+    have -> : compile_security_error max_queries =
+        0 + compile_security_error max_queries by lra.
+    exact: (additiveErrorOptSeqRule
+      ind_cpad_challenge_init_code
+      ind_cpad_challenge_init_code
+      (ind_cpad_compiled_real_guess_code A max_queries)
+      (ind_cpad_compiled_sim_decrypt_guess_code A max_queries)
+      game_initial_pre
+      (same_input_invariant_pre challenge_heap_valid)
+      same_game_output_opt
+      0 (compile_security_error max_queries)
+      ind_cpad_challenge_init_code_ae
+      (ind_cpad_compiled_guess_decrypt_replacement_from_compile
+        A max_queries A_valid)).
+  Qed.
+
+  Lemma ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpad_compiled_real_game_code A max_queries)
+      ≈( compile_security_error max_queries )
+      (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    move=> A_valid.
+    have Hfactored :=
+      ind_cpad_factored_compiled_guess_decrypt_replacement
+        A max_queries A_valid.
+    split; first exact: Hfactored.1.
+    move=> memL memR xL xR Hpre.
+    have [d [Hd Hpost]] := Hfactored.2 memL memR xL xR Hpre.
+    exists d.
+    split; last exact: Hpost.
+    move: Hd.
+    rewrite -(ind_cpad_compiled_real_factored_open_game_code_guess
+      A max_queries xL A_valid).
+    rewrite -(ind_cpad_compiled_sim_decrypt_factored_open_game_code_guess
+      A max_queries xR A_valid).
+    rewrite -(ind_cpad_compiled_real_game_code_factored
+      A max_queries xL).
+    rewrite -(ind_cpad_compiled_sim_decrypt_game_code_factored
+      A max_queries xR).
+    by [].
+  Qed.
+
+  Lemma ind_cpad_game_to_compiled_sim_decrypt_additive_error
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpad_game_code A max_queries)
+      ≈( compile_security_error max_queries )
+      (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    move=> A_valid.
+    have Hcompiled :=
+      ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring
+        A max_queries A_valid.
+    split; first exact: Hcompiled.1.
+    move=> memL memR xL xR Hpre.
+    have [d [Hd Hpost]] := Hcompiled.2 memL memR xL xR Hpre.
+    exists d.
+    split; last exact: Hpost.
+    move: Hd.
+    rewrite -(ind_cpad_compiled_real_linked_correct A max_queries A_valid xL).
+    rewrite -ind_cpad_game_code_linked.
+    by [].
+  Qed.
+
+  Lemma ind_cpad_compiled_sim_decrypt_self_link_to_sim_decrypt_ae
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
+      ≈( 0 )
+      (ind_cpad_sim_decrypt_game_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    move=> A_valid.
+    apply: (additiveErrorOptConseqRule
+      (ind_cpad_linked_sim_decrypt_game_code A max_queries)
+      (ind_cpad_linked_sim_decrypt_game_code A max_queries)
+      game_initial_pre game_initial_pre
+      same_output_heap_opt same_game_output_opt
+      0 0).
+    - by [].
+    - move=> outs.
+      rewrite /same_output_heap_opt /same_game_output_opt.
+      by [].
+    - by [].
+    apply: additiveErrorOptSameOutputTvdEqRule.
+    - exact: lexx.
+    - move=> memL memR xL xR Hpre.
+      rewrite /game_initial_pre in Hpre.
+      move/eqP: Hpre=> Hpre.
+      inversion Hpre; subst.
+      rewrite -(ind_cpad_compiled_sim_decrypt_self_link_correct
+        A max_queries A_valid tt).
+      rewrite -ind_cpad_sim_decrypt_game_code_linked.
+      exact: total_variation_refl_le0.
+  Qed.
+
+  Lemma game_initial_pre_same_input memL memR xL xR :
+    game_initial_pre ((xL, memL), (xR, memR)) ->
+    xL = xR /\ memL = memR.
+  Proof.
+    rewrite /game_initial_pre=> /eqP Hpre.
+    by inversion Hpre.
+  Qed.
+
+  Lemma additiveErrorOptSameGameOutputTriangleRule
+      (progL progM progR : chUnit -> raw_code bool)
+      (ε ε' : R) :
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progL ≈( ε ) progM
+    ⦃ same_game_output_opt ⦄ ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progM ≈( ε' ) progR
+    ⦃ same_game_output_opt ⦄ ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progL ≈( ε + ε' ) progR
+    ⦃ same_game_output_opt ⦄.
+  Proof.
+    move=> HLM HMR.
+    apply: (additiveErrorOptConseqRule
+      progL progR
+      game_initial_pre game_initial_pre
+      same_output_heap_opt same_game_output_opt
+      (ε + ε') (ε + ε')).
+    - by [].
+    - move=> outs.
+      by rewrite /same_output_heap_opt /same_game_output_opt.
+    - exact: lexx.
+    apply: (additiveErrorOptSameOutputTriangleRule
+      progL progM progR game_initial_pre ε ε'
+      game_initial_pre_same_input).
+    - apply: (additiveErrorOptConseqRule
+        progL progM
+        game_initial_pre game_initial_pre
+        same_game_output_opt same_output_heap_opt
+        ε ε).
+      + by [].
+      + move=> outs.
+        by rewrite /same_game_output_opt /same_output_heap_opt.
+      + exact: lexx.
+      + exact: HLM.
+    - apply: (additiveErrorOptConseqRule
+        progM progR
+        game_initial_pre game_initial_pre
+        same_game_output_opt same_output_heap_opt
+        ε' ε').
+      + by [].
+      + move=> outs.
+        by rewrite /same_game_output_opt /same_output_heap_opt.
+      + exact: lexx.
+      + exact: HMR.
+  Qed.
+
+  Lemma additiveErrorOptSameGameResultTvdEqRule
+      (progL progR : chUnit -> raw_code bool)
+      (ε : R) :
+    0 <= ε ->
+    (forall memL memR xL xR,
+      game_initial_pre ((xL, memL), (xR, memR)) ->
+      total_variation
+        (complete (dmargin fst (Pr_code (progL xL) memL)))
+        (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε) ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progL ≈( ε ) progR
+    ⦃ same_game_result_opt ⦄.
+  Proof.
+    move=> Heps Htv.
+    split; first exact: Heps.
+    move=> memL memR xL xR Hpre.
+    set outL := Pr_code (progL xL) memL.
+    set outR := Pr_code (progR xR) memR.
+    pose strip (out : option (bool * heap)) : option bool := omap fst out.
+    have [d [HdL [HdR Hprob]]] :=
+      projected_total_variation_coupling strip
+        (complete outL) (complete outR) ε
+        (complete_dweight outL) (complete_dweight outR)
+        (Htv memL memR xL xR Hpre).
+    exists d.
+    split.
+    - split.
+      + exact: HdL.
+      + exact: HdR.
+    - rewrite (eq_pr (B := same_game_result_opt)).
+        exact: Hprob.
+      by case=> outL' outR'.
+  Qed.
+
+  Lemma additiveErrorOptSameGameResultReflRule
+      (prog : chUnit -> raw_code bool) :
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      prog ≈( 0 ) prog
+    ⦃ same_game_result_opt ⦄.
+  Proof.
+    apply: additiveErrorOptSameGameResultTvdEqRule.
+    - exact: lexx.
+    - move=> memL memR xL xR Hpre.
+      have [Hx Hmem] := game_initial_pre_same_input
+        memL memR xL xR Hpre.
+      subst xR; subst memR.
+      exact: total_variation_refl_le0.
+  Qed.
+
+  Lemma additiveErrorOptSameGameResultTriangleRule
+      (progL progM progR : chUnit -> raw_code bool)
+      (ε ε' : R) :
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progL ≈( ε ) progM
+    ⦃ same_game_result_opt ⦄ ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progM ≈( ε' ) progR
+    ⦃ same_game_result_opt ⦄ ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progL ≈( ε + ε' ) progR
+    ⦃ same_game_result_opt ⦄.
+  Proof.
+    move=> HLM HMR.
+    apply: additiveErrorOptSameGameResultTvdEqRule.
+    - have Heps := additiveErrorOptEpsNonneg _ _ _ _ _ HLM.
+      have Heps' := additiveErrorOptEpsNonneg _ _ _ _ _ HMR.
+      lra.
+    - move=> memL memR xL xR Hpre.
+      have [Hx Hmem] := game_initial_pre_same_input
+        memL memR xL xR Hpre.
+      subst xR; subst memR.
+      have HtvLM :=
+        additiveErrorOptResultTvBound
+          progL progM game_initial_pre ε memL memL xL xL HLM Hpre.
+      have HtvMR :=
+        additiveErrorOptResultTvBound
+          progM progR game_initial_pre ε' memL memL xL xL HMR Hpre.
+      have Htri := total_variation_triangle
+        (complete (dmargin fst (Pr_code (progL xL) memL)))
+        (complete (dmargin fst (Pr_code (progM xL) memL)))
+        (complete (dmargin fst (Pr_code (progR xL) memL))).
+      apply: (le_trans Htri).
+      lra.
+  Qed.
+
+  Lemma additiveErrorOptSameGameOutputToResult
+      (progL progR : chUnit -> raw_code bool) ε :
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progL ≈( ε ) progR
+    ⦃ same_game_output_opt ⦄ ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      progL ≈( ε ) progR
+    ⦃ same_game_result_opt ⦄.
+  Proof.
+    move=> Hae.
+    exact: (additiveErrorOptConseqRule
+      progL progR game_initial_pre game_initial_pre
+      same_game_output_opt same_game_result_opt ε ε
+      (fun _ H => H) same_game_output_result_opt lexx Hae).
+  Qed.
+
+  Lemma ind_cpad_compiled_sim_decrypt_mixed_to_self_link_ae
+      (A : nom_package) max_queries :
+    Package IndCpadGame.IndCpadAdv_import
+      IndCpadGame.IndCpadAdv_export A ->
+    (* The compiled calls already use [IndCpadSimDecryptOracle].  The only
+       difference between the two programs is the package used for residual
+       uncompiled decrypt calls.  The intended proof is that, once the first
+       [max_queries] selected decrypt calls have been compiled, any later
+       decrypt call assert-fails on both the real and simulator packages
+       because they share the same decrypt counter. *)
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
+      ≈( 0 )
+      (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
+    ⦃ same_game_output_opt ⦄.
+  Admitted.
+
+  Lemma ind_cpad_sim_decrypt_to_ind_cpa_reduction_linked_ae
+      (A : nom_package) max_queries :
+    Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpad_sim_decrypt_game_code A max_queries)
+      ≈( 0 )
+      (ind_cpa_reduction_linked_game_code A max_queries)
+    ⦃ same_game_result_opt ⦄.
+  Admitted.
+
+  Lemma ind_cpad_sim_decrypt_to_ind_cpa_reduction_ae
+      (A : nom_package) max_queries :
+    Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
+    ⊨AE_opt ⦃ game_initial_pre ⦄
+      (ind_cpad_sim_decrypt_game_code A max_queries)
+      ≈( 0 )
+      (ind_cpa_reduction_game_code A max_queries)
+    ⦃ same_game_result_opt ⦄.
+  Proof.
+    move=> A_valid.
+    have Hlinked :=
+      ind_cpad_sim_decrypt_to_ind_cpa_reduction_linked_ae
+        A max_queries A_valid.
+    have Houter :=
+      additiveErrorOptSameGameOutputToResult
+        (ind_cpa_reduction_linked_game_code A max_queries)
+        (ind_cpa_reduction_game_code A max_queries)
+        0
+        (ind_cpa_reduction_linked_game_code_ae A max_queries).
+    have H :=
+      additiveErrorOptSameGameResultTriangleRule
+        (ind_cpad_sim_decrypt_game_code A max_queries)
+        (ind_cpa_reduction_linked_game_code A max_queries)
+        (ind_cpa_reduction_game_code A max_queries)
+        0 0 Hlinked Houter.
+    apply: (additiveErrorOptConseqRule
+      (ind_cpad_sim_decrypt_game_code A max_queries)
+      (ind_cpa_reduction_game_code A max_queries)
+      game_initial_pre game_initial_pre
+      same_game_result_opt same_game_result_opt
+      (0 + 0) 0).
+    - by [].
+    - by [].
+    - lra.
+    - exact: H.
+  Qed.
+
   (* A singleton event is controlled by twice our TV convention
      (`total_variation` is defined as one half of the L1 distance). *)
   Lemma total_variation_point_bound2
@@ -3711,13 +5066,13 @@ Module NoiseFloodingSecure
     by rewrite !completeE /= in H.
   Qed.
 
-  Lemma additiveErrorOptTvBound
+  Lemma additiveErrorOptResultTvBound
     {inL_t inR_t : choice_type}
     (progL : inL_t -> raw_code bool)
     (progR : inR_t -> raw_code bool)
     (pre : pred ((inL_t * heap) * (inR_t * heap)))
     (ε : R) memL memR xL xR :
-    ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_output_opt ⦄ ->
+    ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_result_opt ⦄ ->
     pre ((xL, memL), (xR, memR)) ->
     total_variation (complete (dmargin fst (Pr_code (progL xL) memL)))
                     (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε.
@@ -3761,9 +5116,8 @@ Module NoiseFloodingSecure
       apply: subset_pr => xy Hxy.
       case: xy Hxy=> outL' outR' /= Hxy.
       move: Hxy.
-      rewrite inE /same_game_output_opt /= => /eqP ->.
-      change (eq_op (strip outR') (strip outR')).
-      by rewrite eqxx.
+      rewrite inE /same_game_result_opt /=.
+      by [].
     apply: (exact_coupling_eq_pr_total_variation
       d' (complete (dmargin fst outL)) (complete (dmargin fst outR)) ε).
     - exact: complete_dweight.
@@ -3771,6 +5125,29 @@ Module NoiseFloodingSecure
     - exact: Hd'L.
     - exact: Hd'R.
     - exact: Hpost'.
+  Qed.
+
+  Lemma additiveErrorOptTvBound
+    {inL_t inR_t : choice_type}
+    (progL : inL_t -> raw_code bool)
+    (progR : inR_t -> raw_code bool)
+    (pre : pred ((inL_t * heap) * (inR_t * heap)))
+    (ε : R) memL memR xL xR :
+    ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_output_opt ⦄ ->
+    pre ((xL, memL), (xR, memR)) ->
+    total_variation (complete (dmargin fst (Pr_code (progL xL) memL)))
+                    (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε.
+  Proof.
+    move=> Hae Hpre.
+    apply: (additiveErrorOptResultTvBound
+      progL progR pre ε memL memR xL xR).
+    - apply: (additiveErrorOptConseqRule
+        progL progR pre pre same_game_output_opt same_game_result_opt ε ε).
+      + by [].
+      + exact: same_game_output_result_opt.
+      + exact: lexx.
+      + exact: Hae.
+    - exact: Hpre.
   Qed.
 
   (* The package-level reduction preserves the IND-CPA adversary interface. *)
@@ -3792,7 +5169,7 @@ Module NoiseFloodingSecure
       (ind_cpad_game_code A max_queries)
       ≈( ε )
       (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄ ->
+    ⦃ same_game_result_opt ⦄ ->
     2 * ε <= security_loss max_queries ->
     IndCpadGame.winning_probability max_queries A <=
     IndCpaSecurity.IndCpaGame.winning_probability
@@ -3803,7 +5180,8 @@ Module NoiseFloodingSecure
     have Hpre : game_initial_pre ((tt, empty_heap), (tt, empty_heap)).
       by rewrite /game_initial_pre.
     have Htv :=
-      additiveErrorOptTvBound _ _ _ _ empty_heap empty_heap tt tt Hae Hpre.
+      additiveErrorOptResultTvBound
+        _ _ _ _ empty_heap empty_heap tt tt Hae Hpre.
     have Hpoint :
       `|IndCpadGame.success_probability max_queries A -
         IndCpaSecurity.IndCpaGame.success_probability
@@ -3865,10 +5243,10 @@ Module NoiseFloodingSecure
     - exact: (MicciancioWalterRule _ _ _ _ _ Hpyth).
   Qed.
 
-  (* The cryptographic core: instantiate [compileRule] for the decryption
-     oracle replacement.  The remaining work is to prove the one-call
-     Gaussian-vector Pyth judgment and the trace-compiler side conditions for
-     these concrete packages. *)
+  (* The cryptographic core: compose the compile-rule decrypt replacement
+     with the exact endpoint identifications.  The final endpoint uses the
+     value-only postcondition because the IND-CPA reduction presentation need
+     not share the same internal heap layout. *)
   Lemma ind_cpa_reduction_additive_error_from_compile
     (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
@@ -3876,8 +5254,52 @@ Module NoiseFloodingSecure
       (ind_cpad_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Admitted.
+    ⦃ same_game_result_opt ⦄.
+  Proof.
+    move=> A_valid.
+    have Hleft :=
+      ind_cpad_game_to_compiled_sim_decrypt_additive_error
+        A max_queries A_valid.
+    have Hmixed :=
+      ind_cpad_compiled_sim_decrypt_mixed_to_self_link_ae
+        A max_queries A_valid.
+    have Hself :=
+      ind_cpad_compiled_sim_decrypt_self_link_to_sim_decrypt_ae
+        A max_queries A_valid.
+    have Hred :=
+      ind_cpad_sim_decrypt_to_ind_cpa_reduction_ae
+        A max_queries A_valid.
+    have H1 := additiveErrorOptSameGameOutputTriangleRule
+      (ind_cpad_game_code A max_queries)
+      (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
+      (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
+      (compile_security_error max_queries) 0 Hleft Hmixed.
+    have H2 := additiveErrorOptSameGameOutputTriangleRule
+      (ind_cpad_game_code A max_queries)
+      (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
+      (ind_cpad_sim_decrypt_game_code A max_queries)
+      (compile_security_error max_queries + 0) 0 H1 Hself.
+    have H2_result := additiveErrorOptSameGameOutputToResult
+      (ind_cpad_game_code A max_queries)
+      (ind_cpad_sim_decrypt_game_code A max_queries)
+      (compile_security_error max_queries + 0 + 0) H2.
+    have H3 := additiveErrorOptSameGameResultTriangleRule
+      (ind_cpad_game_code A max_queries)
+      (ind_cpad_sim_decrypt_game_code A max_queries)
+      (ind_cpa_reduction_game_code A max_queries)
+      (compile_security_error max_queries + 0 + 0) 0 H2_result Hred.
+    apply: (additiveErrorOptConseqRule
+      (ind_cpad_game_code A max_queries)
+      (ind_cpa_reduction_game_code A max_queries)
+      game_initial_pre game_initial_pre
+      same_game_result_opt same_game_result_opt
+      ((compile_security_error max_queries + 0 + 0) + 0)
+      (compile_security_error max_queries)).
+    - by [].
+    - by [].
+    - lra.
+    - exact: H3.
+  Qed.
 
   (* Packages the compile-rule loss as the AE obligation expected downstream. *)
   Lemma ind_cpa_reduction_additive_error
@@ -3887,7 +5309,7 @@ Module NoiseFloodingSecure
       (ind_cpad_game_code A max_queries)
       ≈( security_loss max_queries / 2 )
       (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
+    ⦃ same_game_result_opt ⦄.
   Proof.
     move=> A_valid.
     rewrite security_loss_halfE.

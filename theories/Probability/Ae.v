@@ -679,6 +679,22 @@ case Hpx: (p x).
 by rewrite !mul0r.
 Qed.
 
+Lemma pr_eq1_of_support {A : choiceType}
+    (D : {distr A / R}) (p : pred A) :
+  dweight D = 1 ->
+  (forall x, x \in dinsupp D -> p x) ->
+  \P_[D] p = 1.
+Proof.
+move=> HD Hsupp.
+rewrite -HD pr_predT /pr.
+apply/eq_psum=> x.
+case Hpx: (p x); first by rewrite mul1r.
+rewrite mul0r.
+apply/esym/dinsuppPn.
+apply/negP=> Hx.
+by move: (Hsupp x Hx); rewrite Hpx.
+Qed.
+
 Lemma diagonal_overlap_eq_pr {T : choiceType}
     (P Q : {distr T / R}) :
   \P_[diagonal_overlap P Q] (fun xy => xy.1 == xy.2) =
@@ -810,6 +826,396 @@ case HQres0: (dweight (residual_distr Q P) == 0).
   apply: (le_trans _ Hdiag_le).
   rewrite diagonal_overlap_eq_pr.
   exact: Hoverlap_ge.
+Qed.
+
+Definition tagged_by {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) : {distr (U * T) / R} :=
+  dmargin (fun x => (f x, x)) P.
+
+Lemma tagged_byE {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) (u : U) (x : T) :
+  tagged_by f P (u, x) = if f x == u then P x else 0.
+Proof.
+rewrite /tagged_by dmargin_psumE.
+case Hfx: (f x == u).
+- rewrite (psum_finseq (r := [:: x])).
+  + rewrite big_seq1 (eqP Hfx) eqxx /= mul1r.
+    by rewrite ger0_norm ?ge0_mu.
+  + by [].
+  move=> y.
+  rewrite !inE.
+  case Hy: (y == x).
+    by rewrite (eqP Hy) (eqP Hfx) eqxx.
+  case Hpair: ((f y, y) == (u, x)); last by rewrite mul0r eqxx.
+  move/eqP: Hpair=> [_ Hyx].
+  by move: Hy; rewrite Hyx eqxx.
+- rewrite (eq_psum (F2 := fun _ : T => 0)); first exact: psum0.
+  move=> y.
+  case Hpair: ((f y, y) == (u, x)); last by rewrite mul0r.
+  move/eqP: Hpair=> [Hfy Hyx].
+  move: Hfx.
+  by rewrite -Hfy Hyx eqxx.
+Qed.
+
+Lemma tagged_by_margin_l {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) :
+  dmargin fst (tagged_by f P) =1 dmargin f P.
+Proof.
+move=> u.
+rewrite /tagged_by dmarginE __deprecated__dlet_dlet.
+transitivity ((\dlet_(x <- P) dunit (f x)) u).
+- apply: eq_in_dlet=> // x _ z.
+  by rewrite dlet_unit.
+- by rewrite dmarginE.
+Qed.
+
+Definition conditional_fiber {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) (u : U) : {distr T / R} :=
+  conditional_second (tagged_by f P) u.
+
+Lemma conditional_fiber_outside {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) (u : U) (x : T) :
+  f x != u ->
+  conditional_fiber f P u x = 0.
+Proof.
+move=> Hfx.
+rewrite /conditional_fiber conditional_secondE.
+case: ifP=> // _.
+by rewrite tagged_byE (negbTE Hfx) mul0r.
+Qed.
+
+Lemma conditional_fiber_dinsupp {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) (u : U) (x : T) :
+  x \in dinsupp (conditional_fiber f P u) ->
+  f x = u.
+Proof.
+move=> Hx.
+apply/eqP.
+case Hfx: (f x == u); first by [].
+have Hneq : f x != u by rewrite Hfx.
+move: Hx.
+by rewrite in_dinsupp (conditional_fiber_outside f P u x Hneq) eqxx.
+Qed.
+
+Lemma conditional_fiber_factorization {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) (x : T) :
+  P x = dmargin f P (f x) * conditional_fiber f P (f x) x.
+Proof.
+rewrite /conditional_fiber.
+have H :=
+  conditional_second_factorization (tagged_by f P) (f x) x.
+move: H.
+rewrite tagged_byE eqxx tagged_by_margin_l.
+by [].
+Qed.
+
+Lemma conditional_fiber_recompose {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) :
+  \dlet_(u <- dmargin f P) conditional_fiber f P u =1 P.
+Proof.
+move=> x.
+rewrite dletE.
+rewrite (psum_finseq (r := [:: f x])).
+- rewrite big_seq1.
+  rewrite ger0_norm; last by apply: mulr_ge0; exact: ge0_mu.
+  rewrite [RHS](@conditional_fiber_factorization T U f P x).
+  by [].
+- by [].
+- move=> u Hnz.
+  case Hfu: (f x == u).
+    move/eqP: Hfu=> <-.
+    by rewrite inE eqxx.
+  have Hneq : f x != u by rewrite Hfu.
+  move: Hnz.
+  by rewrite inE /= (conditional_fiber_outside f P u x Hneq)
+    mulr0 eqxx.
+Qed.
+
+Lemma dweight_tagged_by {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) :
+  dweight (tagged_by f P) = dweight P.
+Proof.
+by rewrite /tagged_by dmargin_dweight.
+Qed.
+
+Lemma conditional_fiber_mass1_on_support {T U : choiceType} (f : T -> U)
+    (P : {distr T / R}) (u : U) :
+  dweight P = 1 ->
+  0 < dmargin f P u ->
+  dweight (conditional_fiber f P u) = 1.
+Proof.
+move=> HP Hu.
+rewrite /conditional_fiber.
+apply: conditional_second_mass1_on_support.
+- by rewrite dweight_tagged_by.
+- by rewrite tagged_by_margin_l.
+Qed.
+
+Definition lift_projected_inner
+    {T U : choiceType} (f : T -> U)
+    (P Q : {distr T / R}) (uv : U * U) :
+    {distr (T * T) / R} :=
+  \dlet_(x <- conditional_fiber f P uv.1)
+    \dlet_(y <- conditional_fiber f Q uv.2)
+      dunit (x, y).
+
+Definition projected_pair_event
+    {T U : choiceType} (f : T -> U) : pred (T * T) :=
+  fun xy => f xy.1 == f xy.2.
+
+Definition lift_projected_inner_event_prob
+    {T U : choiceType} (f : T -> U)
+    (P Q : {distr T / R}) (uv : U * U) : R :=
+  \P_[lift_projected_inner f P Q uv] (projected_pair_event f).
+
+Definition lift_projected_coupling
+    {T U : choiceType} (f : T -> U)
+    (P Q : {distr T / R}) (d : {distr (U * U) / R}) :
+    {distr (T * T) / R} :=
+  \dlet_(uv <- d) lift_projected_inner f P Q uv.
+
+Lemma dmargin_dunit_pair_fst {T U : choiceType} (x : T) (y : U) :
+  dmargin fst (dunit (x, y) : {distr (T * U) / R}) =1 dunit x.
+Proof.
+move=> z.
+rewrite dmarginE dlet_unit.
+by [].
+Qed.
+
+Lemma dmargin_dunit_pair_snd {T U : choiceType} (x : T) (y : U) :
+  dmargin snd (dunit (x, y) : {distr (T * U) / R}) =1 dunit y.
+Proof.
+move=> z.
+rewrite dmarginE dlet_unit.
+by [].
+Qed.
+
+Lemma lift_projected_coupling_margin_l
+    {T U : choiceType} (f : T -> U)
+    (P Q : {distr T / R}) (d : {distr (U * U) / R}) :
+  dmargin fst d =1 dmargin f P ->
+  dmargin snd d =1 dmargin f Q ->
+  dweight Q = 1 ->
+  dmargin fst (lift_projected_coupling f P Q d) =1 P.
+Proof.
+move=> HdL HdR HQ x0.
+rewrite /lift_projected_coupling.
+rewrite __deprecated__dmargin_dlet.
+transitivity ((\dlet_(uv <- d) conditional_fiber f P uv.1) x0).
+- apply: eq_in_dlet=> // uv Huv z.
+  rewrite __deprecated__dmargin_dlet.
+  transitivity ((\dlet_(x <- conditional_fiber f P uv.1) dunit x) z).
+  + apply: eq_in_dlet=> // x _ z'.
+    rewrite __deprecated__dmargin_dlet.
+    transitivity ((\dlet_(y <- conditional_fiber f Q uv.2) dunit x) z').
+    * apply: eq_in_dlet=> // y _ w.
+      exact: dmargin_dunit_pair_fst.
+    * rewrite dlet_const_kernelE.
+      have Huv2 : uv.2 \in dinsupp (dmargin snd d).
+        exact: dmargin_dinsupp_image Huv.
+      have Hqv_pos : 0 < dmargin f Q uv.2.
+        rewrite lt_def.
+        apply/andP; split.
+        + by move: Huv2; rewrite in_dinsupp HdR.
+        + exact: ge0_mu.
+      rewrite (conditional_fiber_mass1_on_support f Q uv.2 HQ Hqv_pos).
+      by rewrite mul1r.
+  + by rewrite dlet_dunit_id.
+- transitivity ((\dlet_(u <- dmargin fst d) conditional_fiber f P u) x0).
+  + rewrite __deprecated__dlet_dmargin.
+    by [].
+  + transitivity ((\dlet_(u <- dmargin f P) conditional_fiber f P u) x0).
+    * rewrite !dletE.
+      apply/eq_psum=> u.
+      by rewrite HdL.
+    * exact: conditional_fiber_recompose.
+Qed.
+
+Lemma lift_projected_coupling_margin_r
+    {T U : choiceType} (f : T -> U)
+    (P Q : {distr T / R}) (d : {distr (U * U) / R}) :
+  dmargin fst d =1 dmargin f P ->
+  dmargin snd d =1 dmargin f Q ->
+  dweight P = 1 ->
+  dmargin snd (lift_projected_coupling f P Q d) =1 Q.
+Proof.
+move=> HdL HdR HP y0.
+rewrite /lift_projected_coupling.
+rewrite __deprecated__dmargin_dlet.
+transitivity ((\dlet_(uv <- d) conditional_fiber f Q uv.2) y0).
+- apply: eq_in_dlet=> // uv Huv z.
+  rewrite __deprecated__dmargin_dlet.
+  transitivity ((\dlet_(x <- conditional_fiber f P uv.1)
+      conditional_fiber f Q uv.2) z).
+  + apply: eq_in_dlet=> // x _ z'.
+    rewrite __deprecated__dmargin_dlet.
+    transitivity ((\dlet_(y <- conditional_fiber f Q uv.2) dunit y) z').
+    * apply: eq_in_dlet=> // y _ w.
+      exact: dmargin_dunit_pair_snd.
+    * by rewrite dlet_dunit_id.
+  + rewrite dlet_const_kernelE.
+    have Huv1 : uv.1 \in dinsupp (dmargin fst d).
+      exact: dmargin_dinsupp_image Huv.
+    have Hpv_pos : 0 < dmargin f P uv.1.
+      rewrite lt_def.
+      apply/andP; split.
+      * by move: Huv1; rewrite in_dinsupp HdL.
+      * exact: ge0_mu.
+    rewrite (conditional_fiber_mass1_on_support f P uv.1 HP Hpv_pos).
+    by rewrite mul1r.
+- transitivity ((\dlet_(u <- dmargin snd d) conditional_fiber f Q u) y0).
+  + rewrite __deprecated__dlet_dmargin.
+    by [].
+  + transitivity ((\dlet_(u <- dmargin f Q) conditional_fiber f Q u) y0).
+    * rewrite !dletE.
+      apply/eq_psum=> u.
+      by rewrite HdR.
+    * exact: conditional_fiber_recompose.
+Qed.
+
+Lemma lift_projected_coupling_inner_event_ge
+    {T U : choiceType} (f : T -> U)
+    (P Q : {distr T / R}) (d : {distr (U * U) / R}) :
+  dmargin fst d =1 dmargin f P ->
+  dmargin snd d =1 dmargin f Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  forall uv,
+  uv \in dinsupp d ->
+  (uv.1 == uv.2)%:R <=
+  \P_[\dlet_(x <- conditional_fiber f P uv.1)
+        \dlet_(y <- conditional_fiber f Q uv.2)
+          dunit (x, y)]
+    (fun xy => f xy.1 == f xy.2).
+Proof.
+move=> HdL HdR HP HQ uv Huv.
+case Huv_eq: (uv.1 == uv.2).
+- have Huv1 : uv.1 \in dinsupp (dmargin fst d).
+    exact: dmargin_dinsupp_image Huv.
+  have Huv2 : uv.2 \in dinsupp (dmargin snd d).
+    exact: dmargin_dinsupp_image Huv.
+  have Hpu_pos : 0 < dmargin f P uv.1.
+    rewrite lt_def.
+    apply/andP; split.
+    + by move: Huv1; rewrite in_dinsupp HdL.
+    + exact: ge0_mu.
+  have Hqu_pos : 0 < dmargin f Q uv.2.
+    rewrite lt_def.
+    apply/andP; split.
+    + by move: Huv2; rewrite in_dinsupp HdR.
+    + exact: ge0_mu.
+  set Pu := conditional_fiber f P uv.1.
+  set Qu := conditional_fiber f Q uv.2.
+  set inner := \dlet_(x <- Pu) \dlet_(y <- Qu) dunit (x, y).
+  have HPu : dweight Pu = 1.
+    rewrite /Pu.
+    exact: (conditional_fiber_mass1_on_support f P uv.1 HP Hpu_pos).
+  have HQu : dweight Qu = 1.
+    rewrite /Qu.
+    exact: (conditional_fiber_mass1_on_support f Q uv.2 HQ Hqu_pos).
+  have Hinner_weight : dweight inner = 1.
+    rewrite /inner dweight_dlet_sum.
+    transitivity (psum (fun x => Pu x * 1)).
+    + apply/eq_psum=> x.
+      congr (_ * _).
+      rewrite dweight_dlet_sum.
+      transitivity (psum (fun y => Qu y * 1)).
+      * apply/eq_psum=> y.
+        by rewrite dunit_dweight.
+      * transitivity (psum Qu).
+          apply/eq_psum=> y.
+          by rewrite mulr1.
+        by rewrite -pr_predT HQu.
+    + transitivity (psum Pu).
+        apply/eq_psum=> x.
+        by rewrite mulr1.
+      by rewrite -pr_predT HPu.
+  rewrite (pr_eq1_of_support inner); last first.
+    move=> xy Hxy.
+    have [x Hx Hinner] := @dinsupp_dlet R _ _ _ _ _ Hxy.
+    have [y Hy Hunit] := @dinsupp_dlet R _ _ _ _ _ Hinner.
+    have Hxy_eq : xy = (x, y) by exact: in_dunit Hunit.
+    subst xy.
+    have Hfx : f x = uv.1.
+      exact: (conditional_fiber_dinsupp f P uv.1 x Hx).
+    have Hfy : f y = uv.2.
+      exact: (conditional_fiber_dinsupp f Q uv.2 y Hy).
+    by rewrite Hfx Hfy (eqP Huv_eq) eqxx.
+  by rewrite Hinner_weight.
+- move: Huv_eq; case: (uv.1 == uv.2)=> //= _.
+  exact: ge0_pr.
+Qed.
+
+Lemma lift_projected_coupling_event_ge
+    {T U : choiceType} (f : T -> U)
+    (P Q : {distr T / R}) (d : {distr (U * U) / R}) :
+  dmargin fst d =1 dmargin f P ->
+  dmargin snd d =1 dmargin f Q ->
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  \P_[lift_projected_coupling f P Q d]
+    (fun xy => f xy.1 == f xy.2) >=
+  \P_[d] (fun uv => uv.1 == uv.2).
+Proof.
+move=> HdL HdR HP HQ.
+pose F : U * U -> R := fun uv => lift_projected_inner_event_prob f P Q uv.
+pose I : U * U -> R :=
+  fun uv => if uv \in dinsupp d then (uv.1 == uv.2)%:R else 0.
+rewrite /lift_projected_coupling __deprecated__pr_dlet.
+rewrite [X in X <= _]pr_exp.
+rewrite (eq_exp (mu := d) (f1 := fun uv => (uv.1 == uv.2)%:R)
+  (f2 := I)); last first.
+  move=> uv Huv.
+  by rewrite /I Huv.
+apply: le_exp.
+- apply: bounded_has_exp.
+  exists 1=> uv.
+  rewrite /I.
+  case: ifP=> _.
+  + by rewrite ger0_norm ?ler0n ?lern1 ?leq_b1.
+  + by rewrite normr0 ler01.
+- apply: bounded_has_exp.
+  exists 1=> uv.
+  rewrite /F /lift_projected_inner_event_prob.
+  rewrite ger0_norm; first exact: le1_pr.
+  exact: ge0_pr.
+- move=> uv.
+  rewrite /I /F /lift_projected_inner_event_prob.
+  case Huv: (uv \in dinsupp d).
+  + rewrite /lift_projected_inner /projected_pair_event.
+    exact: (lift_projected_coupling_inner_event_ge
+      f P Q d HdL HdR HP HQ uv Huv).
+  + exact: ge0_pr.
+Qed.
+
+(* Disintegrates a maximal coupling of projected marginals into a coupling of
+   the original distributions.  The intended construction samples a maximal
+   coupling of [dmargin f P] and [dmargin f Q], then samples each full output
+   from the corresponding conditional fiber. *)
+Lemma projected_total_variation_coupling
+    {T U : choiceType} (f : T -> U) (P Q : {distr T / R}) ε :
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  total_variation (dmargin f P) (dmargin f Q) <= ε ->
+  exists d : {distr (T * T) / R},
+    dmargin fst d =1 P /\
+    dmargin snd d =1 Q /\
+    \P_[d] (fun xy => f xy.1 == f xy.2) >= 1 - ε.
+Proof.
+move=> HP HQ Htv.
+have HdfP : dweight (dmargin f P) = 1 by rewrite dmargin_dweight.
+have HdfQ : dweight (dmargin f Q) = 1 by rewrite dmargin_dweight.
+have [d [HdL [HdR Hprob]]] :=
+  maximal_coupling_total_variation
+    (dmargin f P) (dmargin f Q) ε HdfP HdfQ Htv.
+exists (lift_projected_coupling f P Q d).
+split.
+- exact: lift_projected_coupling_margin_l.
+split.
+- exact: lift_projected_coupling_margin_r.
+- have Hlift :=
+    lift_projected_coupling_event_ge f P Q d HdL HdR HP HQ.
+  exact: (le_trans Hprob Hlift).
 Qed.
 
 Definition lift_loss_post

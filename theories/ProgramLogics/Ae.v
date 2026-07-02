@@ -391,6 +391,25 @@ Lemma additiveErrorSeqRule
   ⦃ post ⦄.
 Admitted.
 
+Lemma additiveErrorOptSeqRule
+  {inL_t inR_t midL_t midR_t outL_t outR_t : ord_choiceType}
+  (progL : inL_t -> raw_code midL_t)
+  (progR : inR_t -> raw_code midR_t)
+  (contL : midL_t -> raw_code outL_t)
+  (contR : midR_t -> raw_code outR_t)
+  (pre : pred ((inL_t * heap) * (inR_t * heap)))
+  (mid : pred ((midL_t * heap) * (midR_t * heap)))
+  (post : pred (option (outL_t * heap) * option (outR_t * heap)))
+  (ε ε' : R) :
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
+  ⊨AE_opt ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
+  ⊨AE_opt ⦃ pre ⦄
+    (fun xL => yL ← progL xL ;; contL yL)
+    ≈( ε + ε' )
+    (fun xR => yR ← progR xR ;; contR yR)
+  ⦃ post ⦄.
+Admitted.
+
 Lemma additiveErrorCompileCallsRule
   (q : nat) (X Y I O : choice_type)
   (L L' : Locations) (M : Interface)
