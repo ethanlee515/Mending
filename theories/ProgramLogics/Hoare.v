@@ -10,7 +10,8 @@ From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorp
 From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve.Crypt.nominal Require Import Pr.
-From SSProve Require Import pkg_core_definition pkg_advantage pkg_notation.
+From SSProve Require Import pkg_core_definition pkg_advantage pkg_distr
+  pkg_notation.
 
 Declare Scope HoareNotations.
 Local Open Scope HoareNotations.
@@ -116,4 +117,62 @@ rewrite /hoareJudgment=> Hcont x mem Hpre out Hout.
 rewrite Pr_code_sample in Hout.
 have [sample Hsample Hinner] := @dinsupp_dlet R _ _ _ _ _ Hout.
 exact: (Hcont x sample mem Hpre Hsample out Hinner).
+Qed.
+
+Lemma hoareAssertDRule
+  {in_t : ord_choiceType} {out_t : choice_type}
+  (b : bool)
+  (pre : pred (in_t * heap))
+  (post : pred (out_t * heap))
+  (cont : b = true -> in_t -> raw_code out_t) :
+  (forall x mem (Hb : b = true),
+    pre (x, mem) ->
+    forall out, out \in dinsupp (Pr_code (cont Hb x) mem) -> post out) ->
+  ⊨Hoare ⦃ pre ⦄
+    (fun x => @assertD out_t b (fun Hb => cont Hb x))
+  ⦃ post ⦄.
+Proof.
+rewrite /hoareJudgment=> Hcont x mem Hpre out Hout.
+destruct b eqn:Hb.
+- rewrite /assertD /= in Hout.
+  exact: (Hcont x mem erefl Hpre out Hout).
+- rewrite /assertD Pr_code_fail in Hout.
+  by move/dinsuppP: Hout; rewrite dnullE.
+Qed.
+
+Lemma dinsupp_assertD
+  {out_t : choice_type} (b : bool)
+  (cont : b = true -> raw_code out_t) mem out :
+  out \in dinsupp (Pr_code (@assertD out_t b cont) mem) ->
+  exists Hb : b = true,
+    out \in dinsupp (Pr_code (cont Hb) mem).
+Proof.
+destruct b.
+- rewrite /assertD /=.
+  move=> Hout.
+  by exists erefl.
+- rewrite /assertD Pr_code_fail.
+  move=> Hout.
+  by move/dinsuppP: Hout; rewrite dnullE.
+Qed.
+
+Lemma Pr_code_bind_assertD
+  {mid_t out_t : choice_type} (b : bool)
+  (cont : b = true -> raw_code mid_t)
+  (k : mid_t -> raw_code out_t) mem :
+  Pr_code
+    (x ← @assertD mid_t b cont ;;
+     k x)
+    mem =1
+  Pr_code
+    (@assertD out_t b (fun Hb =>
+      x ← cont Hb ;;
+      k x))
+    mem.
+Proof.
+move=> out.
+destruct b.
+- by rewrite /assertD Pr_code_bind.
+rewrite /assertD Pr_code_bind Pr_code_fail dlet_null_ext Pr_code_fail.
+by [].
 Qed.

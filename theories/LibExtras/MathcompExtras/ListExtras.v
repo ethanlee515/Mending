@@ -34,3 +34,12 @@ Proof.
 apply: List_In_mem.
 exact: (nth_error_In _ _ (nth_valid_nth_error lst n index_valid)).
 Qed.
+
+Lemma nth_valid_irrel {A} (lst : list A) n
+    (index_valid1 index_valid2 : n < length lst) :
+  nth_valid lst n index_valid1 = nth_valid lst n index_valid2.
+Proof.
+have H1 := nth_valid_nth_error lst n index_valid1.
+have H2 := nth_valid_nth_error lst n index_valid2.
+by rewrite H1 in H2; inversion H2.
+Qed.
