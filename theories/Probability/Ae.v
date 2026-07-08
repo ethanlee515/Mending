@@ -81,6 +81,61 @@ rewrite (psum_option_split (complete D)).
 - exact: summable_mu.
 Qed.
 
+Lemma complete_distr_ext {T : choiceType} (D E : {distr T / R}) :
+  D =1 E ->
+  complete D =1 complete E.
+Proof.
+move=> HDE [x|].
+- by rewrite !completeE /= HDE.
+rewrite !completeE /=.
+have Hdweight : dweight D = dweight E.
+  rewrite !pr_predT.
+  apply: eq_psum=> x.
+  exact: HDE.
+by rewrite Hdweight.
+Qed.
+
+Lemma complete_dnull {T : choiceType} :
+  complete (dnull : {distr T / R}) =1 dunit None.
+Proof.
+case=> [x|].
+- by rewrite completeE /= dnullE dunit1E.
+- rewrite completeE /= dunit1E eqxx.
+  rewrite (_ : dweight (dnull : {distr T / R}) = 0); first by rewrite subr0.
+  rewrite pr_predT.
+  rewrite (eq_psum (F2 := fun _ : T => 0)); first exact: psum0.
+  by move=> x; rewrite dnullE.
+Qed.
+
+Lemma dmargin_dnull {T U : choiceType} (f : T -> U) :
+  dmargin f (dnull : {distr T / R}) =1 dnull.
+Proof.
+move=> y.
+rewrite dmarginE dletE dnullE.
+rewrite (eq_psum (F2 := fun _ : T => 0)); first exact: psum0.
+by move=> x; rewrite dnullE mul0r.
+Qed.
+
+Lemma complete_dmargin_dnull {T U : choiceType} (f : T -> U) :
+  complete (dmargin f (dnull : {distr T / R})) =1 dunit None.
+Proof.
+move=> z.
+rewrite (complete_distr_ext
+  (dmargin f (dnull : {distr T / R})) dnull (dmargin_dnull f) z).
+exact: complete_dnull.
+Qed.
+
+Lemma dflip_dweight (p : R) :
+  dweight (dflip p : {distr bool / R}) = 1.
+Proof.
+rewrite pr_predT psum_fin.
+rewrite /index_enum !unlock /=.
+rewrite !dflip1E /mflip /=.
+rewrite ger0_norm ?cp01_clamp //.
+rewrite ger0_norm ?subr_ge0 ?cp01_clamp //.
+by rewrite addr0 addrC subrK.
+Qed.
+
 Lemma dmargin_omap_complete
     {T U : choiceType} (f : T -> U) (D : {distr T / R}) :
   dmargin (omap f) (complete D) =1 complete (dmargin f D).
@@ -102,6 +157,423 @@ move=> x.
 rewrite !inE.
 case: x=> [x|] /=; last by [].
 by rewrite mul0r eqxx.
+Qed.
+
+Definition complete_bind_kernel
+    {T U : choiceType} (K : T -> {distr U / R})
+    (x : option T) : {distr (option U) / R} :=
+  match x with
+  | Some y => complete (K y)
+  | None => dunit None
+  end.
+
+Lemma dweight_dlet {T U : choiceType}
+    (D : {distr T / R}) (K : T -> {distr U / R}) :
+  dweight (\dlet_(x <- D) K x) =
+  psum (fun x => D x * dweight (K x)).
+Proof.
+pose b := true.
+pose B : {distr bool / R} := dunit b.
+have Hleft :
+    (\dlet_(_ <- \dlet_(x <- D) K x) B) b =
+    dweight (\dlet_(x <- D) K x).
+  rewrite dletC /B dunit1E eqxx.
+  by rewrite mulr1.
+rewrite -Hleft.
+rewrite (__deprecated__dlet_dlet K (fun _ : U => B) D b).
+rewrite dletE.
+apply/eq_psum=> x.
+congr (_ * _).
+rewrite /B dletC dunit1E eqxx mulr1.
+by rewrite pr_predT.
+Qed.
+
+Lemma complete_bind_some
+    {T U : choiceType} (D : {distr T / R})
+    (K : T -> {distr U / R}) z :
+  (\dlet_(x <- complete D) complete_bind_kernel K x) (Some z) =
+  complete (\dlet_(x <- D) K x) (Some z).
+Proof.
+rewrite completeE /=.
+rewrite !dletE.
+rewrite (psum_option_some_zero
+  (fun x : option T =>
+    complete D x * complete_bind_kernel K x (Some z))).
+  apply: eq_psum=> x.
+  by rewrite /complete_bind_kernel completeE /=.
+by rewrite /complete_bind_kernel dunit1E /= mulr0.
+Qed.
+
+Lemma complete_bind_none
+    {T U : choiceType} (D : {distr T / R})
+    (K : T -> {distr U / R}) :
+  (\dlet_(x <- complete D) complete_bind_kernel K x) None =
+  complete (\dlet_(x <- D) K x) None.
+Proof.
+rewrite completeE /= dletE.
+rewrite (psum_option_split (fun x : option T =>
+  complete D x * complete_bind_kernel K x None)).
+- rewrite /complete_bind_kernel dunit1E eqxx mulr1 completeE /=.
+  rewrite (eq_psum
+    (F2 := fun x : T => D x - D x * dweight (K x))).
+    rewrite (@psumB R _ D (fun x => D x * dweight (K x))).
+    + rewrite -pr_predT -dweight_dlet.
+      lra.
+    + move=> x.
+      apply/andP; split.
+      * rewrite mulr_ge0 ?ge0_mu //.
+        rewrite pr_predT.
+        exact: ge0_psum.
+      rewrite -[leRHS]mulr1.
+      apply: ler_wpM2l; first exact: ge0_mu.
+      rewrite pr_predT.
+      exact: le1_mu.
+    + exact: summable_mu.
+  move=> x.
+  by rewrite mulrBr mulr1.
+- case=> [x|].
+  + rewrite /complete_bind_kernel completeE /=.
+    apply: mulr_ge0; first exact: ge0_mu.
+    rewrite subr_ge0 pr_predT.
+    exact: le1_mu.
+  + rewrite /complete_bind_kernel dunit1E eqxx mulr1 completeE /=.
+    rewrite subr_ge0 pr_predT.
+    exact: le1_mu.
+- apply: summable_mlet.
+Qed.
+
+Lemma complete_bind
+    {T U : choiceType} (D : {distr T / R})
+    (K : T -> {distr U / R}) :
+  \dlet_(x <- complete D) complete_bind_kernel K x
+  =1 complete (\dlet_(x <- D) K x).
+Proof.
+case=> [z|].
+- exact: complete_bind_some.
+- exact: complete_bind_none.
+Qed.
+
+Lemma total_variation_complete_ge
+    {T : choiceType} (P Q : {distr T / R}) :
+  total_variation P Q <= total_variation (complete P) (complete Q).
+Proof.
+rewrite /total_variation.
+apply: ler_wpM2l; first by lra.
+rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
+set S := fun x : option T => `|complete P x - complete Q x|.
+have HSnonneg : forall x, 0 <= S x by move=> x; exact: normr_ge0.
+have HSsumm : summable S.
+  apply/summable_abs.
+  apply: summableD; first exact: summable_mu.
+  by apply: summableN; exact: summable_mu.
+have -> : psum (fun x : T => `|P x - Q x|) =
+    psum (fun x : T => S (Some x)).
+  apply/eq_psum=> x.
+  by rewrite /S !completeE.
+rewrite (psum_option_split S HSnonneg HSsumm).
+by rewrite lerDl.
+Qed.
+
+Lemma total_variation_eq_le0
+    {T : choiceType} (P Q : {distr T / R}) :
+  P =1 Q -> total_variation P Q <= 0.
+Proof.
+move=> HPQ.
+rewrite /total_variation.
+rewrite (_ : sum (fun y => `|P y - Q y|) = 0).
+  by rewrite mulr0 lexx.
+rewrite -(@sum0 R T).
+apply/eq_sum=> y.
+by rewrite HPQ subrr normr0.
+Qed.
+
+Lemma total_variation_refl_le0
+    {T : choiceType} (P : {distr T / R}) :
+  total_variation P P <= 0.
+Proof.
+apply: total_variation_eq_le0.
+by [].
+Qed.
+
+Lemma total_variation_ext
+    {T : choiceType} (P P' Q Q' : {distr T / R}) :
+  P =1 P' -> Q =1 Q' ->
+  total_variation P Q = total_variation P' Q'.
+Proof.
+move=> HP HQ.
+rewrite /total_variation.
+congr (_ * _).
+apply/eq_sum=> y.
+by rewrite HP HQ.
+Qed.
+
+Lemma total_variation_point_bound2
+    {T : choiceType} (P Q : {distr T / R}) (x : T) :
+  `|P x - Q x| <= 2 * total_variation P Q.
+Proof.
+rewrite /total_variation.
+have Hsummable : summable (fun y => P y - Q y).
+  apply: summableD; first exact: summable_mu.
+  by apply: summableN; exact: summable_mu.
+have Hpoint :=
+  gerfinseq_psum (S := fun y => P y - Q y) (r := [:: x])
+    _ Hsummable.
+rewrite big_seq1 in Hpoint.
+rewrite -(psum_abs (fun y => P y - Q y)) in Hpoint.
+have Hpsum_sum :
+  psum (fun y => `|P y - Q y|) =
+  sum (fun y => `|P y - Q y|).
+  by apply: psum_sum=> y; exact: normr_ge0.
+rewrite Hpsum_sum in Hpoint.
+apply: (@le_trans _ _ (sum (fun y => `|P y - Q y|))).
+  exact: Hpoint.
+lra.
+Qed.
+
+Lemma total_variation_complete_point_bound2
+    {T : choiceType} (P Q : {distr T / R}) (x : T) :
+  `|P x - Q x| <=
+    2 * total_variation (complete P) (complete Q).
+Proof.
+have H := total_variation_point_bound2 (complete P) (complete Q) (Some x).
+by rewrite !completeE /= in H.
+Qed.
+
+Lemma dmargin_dunit_fst_pair {T U : choiceType} (x : T) (y : U) :
+  dmargin fst (dunit (x, y) : {distr (T * U) / R}) =1 dunit x.
+Proof.
+move=> z.
+rewrite dmarginE dlet_unit.
+by [].
+Qed.
+
+Lemma dmargin_dunit_snd_pair {T U : choiceType} (x : T) (y : U) :
+  dmargin snd (dunit (x, y) : {distr (T * U) / R}) =1 dunit y.
+Proof.
+move=> z.
+rewrite dmarginE dlet_unit.
+by [].
+Qed.
+
+Definition shared_complete_sample_coupling
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V) :
+    {distr (option U * option V) / R} :=
+  \dlet_(x <- complete D)
+    match x with
+    | Some y => dunit (Some (f y), Some (g y))
+    | None => dunit (None, None)
+    end.
+
+Lemma shared_complete_sample_coupling_margin_l
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V) :
+  dmargin fst (shared_complete_sample_coupling D f g) =1
+    complete (dmargin f D).
+Proof.
+move=> z.
+rewrite /shared_complete_sample_coupling.
+rewrite __deprecated__dmargin_dlet.
+transitivity ((\dlet_(x <- complete D) dunit (omap f x)) z).
+- apply: eq_in_dlet=> // x _ z'.
+  case: x=> [x|].
+  + exact: dmargin_dunit_fst_pair.
+  + exact: dmargin_dunit_fst_pair.
+- by rewrite -dmarginE dmargin_omap_complete.
+Qed.
+
+Lemma shared_complete_sample_coupling_margin_r
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V) :
+  dmargin snd (shared_complete_sample_coupling D f g) =1
+    complete (dmargin g D).
+Proof.
+move=> z.
+rewrite /shared_complete_sample_coupling.
+rewrite __deprecated__dmargin_dlet.
+transitivity ((\dlet_(x <- complete D) dunit (omap g x)) z).
+- apply: eq_in_dlet=> // x _ z'.
+  case: x=> [x|].
+  + exact: dmargin_dunit_snd_pair.
+  + exact: dmargin_dunit_snd_pair.
+- by rewrite -dmarginE dmargin_omap_complete.
+Qed.
+
+Lemma shared_complete_sample_coupling_margins
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V) :
+  dmargin fst (shared_complete_sample_coupling D f g) =1
+    complete (dmargin f D) /\
+  dmargin snd (shared_complete_sample_coupling D f g) =1
+    complete (dmargin g D).
+Proof.
+split.
+- exact: shared_complete_sample_coupling_margin_l.
+- exact: shared_complete_sample_coupling_margin_r.
+Qed.
+
+Lemma shared_complete_sample_coupling_dweight
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V) :
+  dweight (shared_complete_sample_coupling D f g) = 1.
+Proof.
+rewrite /shared_complete_sample_coupling dweight_dlet.
+transitivity (@psum R _ (fun x : option T => complete D x * 1)).
+- apply/eq_psum=> x.
+  congr (_ * _).
+  case: x=> [x|]; exact: dunit_dweight.
+- transitivity (@psum R _ (complete D)).
+    apply/eq_psum=> x.
+    by rewrite mulr1.
+  by rewrite -pr_predT complete_dweight.
+Qed.
+
+Definition product_coupling
+    {T U : choiceType} (P : {distr T / R}) (Q : {distr U / R}) :
+    {distr (T * U) / R} :=
+  \dlet_(x <- P) \dlet_(y <- Q) dunit (x, y).
+
+Lemma product_coupling_margin_l
+    {T U : choiceType} (P : {distr T / R}) (Q : {distr U / R}) :
+  dweight Q = 1 ->
+  dmargin fst (product_coupling P Q) =1 P.
+Proof.
+move=> HQ x0.
+rewrite /product_coupling __deprecated__dmargin_dlet.
+transitivity ((\dlet_(x <- P) dunit x) x0).
+- apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  transitivity ((\dlet_(y <- Q) dunit x) z).
+  + apply: eq_in_dlet=> // y _ z'.
+    exact: dmargin_dunit_fst_pair.
+  + rewrite dletE.
+    rewrite psumZr; last exact: ge0_mu.
+    by rewrite -pr_predT HQ mul1r.
+- by rewrite dlet_dunit_id.
+Qed.
+
+Lemma product_coupling_margin_r
+    {T U : choiceType} (P : {distr T / R}) (Q : {distr U / R}) :
+  dweight P = 1 ->
+  dmargin snd (product_coupling P Q) =1 Q.
+Proof.
+move=> HP y0.
+rewrite /product_coupling __deprecated__dmargin_dlet.
+transitivity ((\dlet_(x <- P) Q) y0).
+- apply: eq_in_dlet=> // x _ z.
+  rewrite __deprecated__dmargin_dlet.
+  transitivity ((\dlet_(y <- Q) dunit y) z).
+  + apply: eq_in_dlet=> // y _ z'.
+    exact: dmargin_dunit_snd_pair.
+  + by rewrite dlet_dunit_id.
+- rewrite dletE.
+  rewrite psumZr; last exact: ge0_mu.
+  by rewrite -pr_predT HP mul1r.
+Qed.
+
+Lemma product_coupling_margins
+    {T U : choiceType} (P : {distr T / R}) (Q : {distr U / R}) :
+  dweight P = 1 ->
+  dweight Q = 1 ->
+  dmargin fst (product_coupling P Q) =1 P /\
+  dmargin snd (product_coupling P Q) =1 Q.
+Proof.
+move=> HP HQ.
+split.
+- exact: product_coupling_margin_l.
+- exact: product_coupling_margin_r.
+Qed.
+
+Definition completed_fallback_coupling
+    {T U : choiceType} (P : {distr T / R}) (Q : {distr U / R}) :
+    {distr (option T * option U) / R} :=
+  product_coupling (complete P) (complete Q).
+
+Lemma completed_fallback_coupling_margins
+    {T U : choiceType} (P : {distr T / R}) (Q : {distr U / R}) :
+  dmargin fst (completed_fallback_coupling P Q) =1 complete P /\
+  dmargin snd (completed_fallback_coupling P Q) =1 complete Q.
+Proof.
+apply: product_coupling_margins;
+  exact: complete_dweight.
+Qed.
+
+Definition complete_bind_fallback_coupling
+    {midL_t midR_t outL_t outR_t : choiceType}
+    (KL : midL_t -> {distr outL_t / R})
+    (KR : midR_t -> {distr outR_t / R})
+    (xy : option midL_t * option midR_t) :
+    {distr (option outL_t * option outR_t) / R} :=
+  product_coupling
+    (complete_bind_kernel KL xy.1)
+    (complete_bind_kernel KR xy.2).
+
+Lemma complete_bind_kernel_dweight
+    {T U : choiceType} (K : T -> {distr U / R}) x :
+  dweight (complete_bind_kernel K x) = 1.
+Proof.
+case: x=> [x|].
+- exact: complete_dweight.
+- exact: dunit_dweight.
+Qed.
+
+Lemma complete_bind_fallback_coupling_margins
+    {midL_t midR_t outL_t outR_t : choiceType}
+    (KL : midL_t -> {distr outL_t / R})
+    (KR : midR_t -> {distr outR_t / R})
+    (xy : option midL_t * option midR_t) :
+  dmargin fst (complete_bind_fallback_coupling KL KR xy) =1
+    complete_bind_kernel KL xy.1 /\
+  dmargin snd (complete_bind_fallback_coupling KL KR xy) =1
+    complete_bind_kernel KR xy.2.
+Proof.
+apply: product_coupling_margins;
+  exact: complete_bind_kernel_dweight.
+Qed.
+
+Lemma pr_dlet_lower_bound_good
+    {T U : choiceType} (D : {distr T / R}) (K : T -> {distr U / R})
+    (good : pred T) (post : pred U) ε ε' :
+  0 <= ε ->
+  0 <= ε' ->
+  \P_[D] good >= 1 - ε ->
+  (forall x, good x -> \P_[K x] post >= 1 - ε') ->
+  \P_[\dlet_(x <- D) K x] post >= 1 - (ε + ε').
+Proof.
+move=> Heps Heps' Hgood HK.
+case: (leP ε' 1)=> Heps'le1.
+- have Hc : 0 <= 1 - ε' by lra.
+  rewrite __deprecated__pr_dlet.
+  have Hpoint :
+      (fun x => (good x)%:R * (1 - ε')) <=1
+      (fun x => \P_[K x] post).
+    move=> x.
+    case Hx: (good x).
+    + by rewrite /= mul1r; exact: HK.
+    + by rewrite /= mul0r; exact: ge0_pr.
+  have Hle :
+      \E_[D] (fun x => (good x)%:R * (1 - ε')) <=
+      \E_[D] (fun x => \P_[K x] post).
+    apply: le_exp.
+    + apply: bounded_has_exp.
+      exists `|1 - ε'|=> x.
+      case: (good x); rewrite /= ?mul1r ?mul0r ?normr0 //.
+    + apply: bounded_has_exp.
+      exists 1=> x.
+      rewrite ger0_norm; first exact: le1_pr.
+      exact: ge0_pr.
+    + exact: Hpoint.
+  apply: (le_trans _ Hle).
+  rewrite expectation_scale_right -pr_exp.
+  have Hmul : (1 - ε) * (1 - ε') <= \P_[D] good * (1 - ε').
+    apply: ler_wpM2r; first exact: Hc.
+    exact: Hgood.
+  have Htarget : 1 - (ε + ε') <= (1 - ε) * (1 - ε') by nra.
+  exact: (le_trans Htarget Hmul).
+- have Htarget : 1 - (ε + ε') <= 0 by lra.
+  have Hnonneg : 0 <= \P_[\dlet_(x <- D) K x] post.
+    exact: ge0_pr.
+  exact: (le_trans Htarget Hnonneg).
 Qed.
 
 Definition coupling_with_loss
@@ -693,6 +1165,43 @@ rewrite mul0r.
 apply/esym/dinsuppPn.
 apply/negP=> Hx.
 by move: (Hsupp x Hx); rewrite Hpx.
+Qed.
+
+Lemma shared_complete_sample_coupling_pr_eq1
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V)
+    (post : pred (option U * option V)) :
+  (forall x, x \in dinsupp D -> post (Some (f x), Some (g x))) ->
+  post (None, None) ->
+  \P_[shared_complete_sample_coupling D f g] post = 1.
+Proof.
+move=> Hsome Hnone.
+apply: pr_eq1_of_support.
+- exact: shared_complete_sample_coupling_dweight.
+- move=> xy Hxy.
+  rewrite /shared_complete_sample_coupling in Hxy.
+  have [ox Hox Hinner] := @dinsupp_dlet R _ _ _ _ _ Hxy.
+  case: ox Hox Hinner=> [x|] Hox Hinner.
+  + have -> : xy = (Some (f x), Some (g x)).
+      exact: in_dunit Hinner.
+    apply: Hsome.
+    move: Hox.
+    by rewrite in_dinsupp completeE /= -in_dinsupp.
+  + have -> : xy = (None, None).
+      exact: in_dunit Hinner.
+    exact: Hnone.
+Qed.
+
+Lemma shared_complete_sample_coupling_pr_ge1
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V)
+    (post : pred (option U * option V)) :
+  (forall x, x \in dinsupp D -> post (Some (f x), Some (g x))) ->
+  post (None, None) ->
+  \P_[shared_complete_sample_coupling D f g] post >= 1.
+Proof.
+move=> Hsome Hnone.
+by rewrite shared_complete_sample_coupling_pr_eq1.
 Qed.
 
 Lemma diagonal_overlap_eq_pr {T : choiceType}

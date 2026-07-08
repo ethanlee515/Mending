@@ -75,7 +75,6 @@ Module IndCpad(Import S: ApproxFheScheme).
         c <$ (ciphertext; encrypt pk m) ;;
         table ← get table_addr ;;
         let updated_table := (table ++ [ :: (m0,m1, c)]) in
-        #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         ret c
       } ; 
@@ -91,7 +90,6 @@ Module IndCpad(Import S: ApproxFheScheme).
         let m1' := interpret_unary gate m1 in
         c' <$ (ciphertext; eval1 evk gate c) ;;
         let updated_table := (table ++ [ :: (m0', m1', c')]) in
-        #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         ret c'
       } ;
@@ -109,7 +107,6 @@ Module IndCpad(Import S: ApproxFheScheme).
         let evk := getSome o oevk in
         c' <$ (ciphertext; eval2 evk gate ci cj) ;;
         let updated_table := (table ++ [ :: (m0', m1', c')]) in
-        #assert ((length updated_table) <= max_queries) ;;
         #put table_addr := updated_table ;;
         ret c'
       } ;

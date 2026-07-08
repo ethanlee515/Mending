@@ -39,6 +39,7 @@ Module Type ApproxFheScheme.
   Parameter interpret_binary : binary_gate → message → message → message.
   (* Now, the "usual" 4-tuple (keygen, enc, eval, dec). *)
   Parameter keygen : distr R (pk_t × evk_t × sk_t).
+  Axiom keygen_lossless : dweight keygen = 1.
   Parameter encrypt : pk_t → message → distr R ciphertext.
   Parameter eval1 : evk_t → unary_gate → ciphertext → distr R ciphertext.
   Parameter eval2 : evk_t → binary_gate → ciphertext → ciphertext →

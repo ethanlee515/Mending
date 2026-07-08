@@ -183,6 +183,8 @@ Definition binary_gate := Scheme.binary_gate.
 Definition interpret_unary := Scheme.interpret_unary.
 Definition interpret_binary := Scheme.interpret_binary.
 Definition keygen := Scheme.keygen.
+Lemma keygen_lossless : dweight keygen = 1.
+Proof. exact: Scheme.keygen_lossless. Qed.
 Definition encrypt := Scheme.encrypt.
 Definition eval1 := Scheme.eval1.
 Definition eval2 := Scheme.eval2.
