@@ -153,6 +153,49 @@ The same coordinate-system problem affects the current
 the zero vector, so the bound becomes vacuous. The vector KL comparison should
 instead happen in one chart, comparing centers `0` and `isometry a b`.
 
+Intended fix: refactor the geometry around origin-centered charts and one-chart
+comparisons. A plausible replacement interface is:
+
+```coq
+(* zero denotes the all-zero dim.-tuple int; concrete name TBD. *)
+isometry_center0 :
+  forall c, isometry c c = zero
+
+metric_chartE :
+  forall a b, metric a b = ivec_dist zero (isometry a b)
+
+inverse_isometry_shift :
+  forall a b x,
+    inverse_isometry b x =
+    inverse_isometry a (ivec_add x (isometry a b))
+```
+
+Here `metric_chartE` is meant literally: the distance from `a` to `b` is the
+norm of `b`'s coordinate in the chart centered at `a`. For the torus/plaintext
+space with `isometry a b` chosen as the coordinate-wise shortest integer
+representative of `b - a` modulo `q`, this is exactly the usual torus max
+distance and should be a reviewer-friendly axiom.
+
+Then the message-level KL bridge should data-process the vector KL comparison
+through `encode ∘ inverse_isometry a`, comparing vector Gaussians centered at
+`zero` and `isometry a b`. This avoids any false equality between floods around
+different messages.
+
+Preferred refactor: avoid computing `KL(f # P, f # Q)` as a standalone
+distribution fact. Instead, keep the flood as a two-step program:
+
+```coq
+v <$ vector_gaussian ;;
+ret (inverse_isometry a v)
+```
+
+After rewriting both sides into one chart, the first step compares vector
+Gaussians and pays the known coordinate-wise KL cost; the second step applies
+the same deterministic continuation `inverse_isometry a` and should cost zero
+by the sequencing/Pythagorean rule. This is the real data-processing argument,
+but phrased operationally so the proof does not need a finite-codomain
+`KL(f # P, f # Q)` lemma.
+
 The active security route now uses finite message encodings and direct
 vector-center bounds rather than an opaque message-space Gaussian KL axiom.
 The local Gaussian KL bound is proved for integer vectors, lifted through
@@ -280,6 +323,10 @@ inverse_isometry_shift :
     inverse_isometry a (ivec_add x (isometry a b))
 ```
 
+For the intended torus model, `metric_chartE` is just the statement that
+`isometry a b` is the shortest representative of `b - a` and `metric` is the
+corresponding max norm.
+
 With this shape, the right comparison is:
 
 ```coq
@@ -303,8 +350,9 @@ The direct route should also compare vector centers in one chart, not compare
 ## Next Work
 
 1. Refactor the message-KL bridge away from
-   `finite_common_inverse_isometry_encoding*` and toward the origin-centered
-   chart laws above.
+   `finite_common_inverse_isometry_encoding*` and direct
+   `KL(f # P, f # Q)` facts, toward the origin-centered chart laws and
+   sample-then-map sequencing described above.
 2. Refactor `challenge_decrypt_prefix_row_vector_bound`,
    `chart_center_dist_le_metric_cert`, and their theorem wrappers so the vector
    bound is stated in one chart.
