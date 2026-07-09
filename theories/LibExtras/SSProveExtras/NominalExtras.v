@@ -1,4 +1,5 @@
 From Stdlib Require Import Utf8.
+From extructures Require Import ffun fperm.
 Set Warnings "-notation-overridden,-ambiguous-paths".
 From mathcomp Require Import all_boot.
 Set Warnings "notation-overridden,ambiguous-paths".
@@ -12,6 +13,25 @@ Local Open Scope sep_scope.
 Local Open Scope seq_scope.
 
 Set Bullet Behavior "Strict Subproofs".
+
+Lemma move_rename_between {X Y : nomType} (x z : X) (y : Y) :
+  move z y = ((fresh z y * (fresh x y)^-1)%fperm) ∙ move x y.
+Proof.
+  rewrite /move.
+  rewrite -rename_comp.
+  congr (rename _ y).
+  apply/eq_fperm=> a.
+  rewrite !fpermM /=.
+  by rewrite fpermM /= fpermK.
+Qed.
+
+Lemma fseparate_rename π (K L : Locations) :
+  fseparate K L ->
+  fseparate (π ∙ K : Locations) (π ∙ L : Locations).
+Proof.
+  rewrite !fseparate_disj.
+  exact: disj_rename.
+Qed.
 
 Lemma moved_package_valid
     (I E : Interface) (P A : nom_package) :

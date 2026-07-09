@@ -319,6 +319,30 @@ have Hzx : z = x := Hf _ _ (eqP Hfz).
 by move: Hzx=> ->; rewrite inE.
 Qed.
 
+Lemma dmargin_comp {T U V : choiceType}
+    (f : U -> V) (g : T -> U) (P : {distr T / R}) :
+  dmargin f (dmargin g P) =1 dmargin (fun x => f (g x)) P.
+Proof.
+move=> z.
+by rewrite !pr_pred1 !pr_dmargin.
+Qed.
+
+Lemma summable_injective_comp {T U : choiceType}
+    (f : T -> U) (S : U -> R) :
+  injective f ->
+  summable S ->
+  summable (fun x : T => S (f x)).
+Proof.
+move=> Hf Hsumm.
+apply/summable_seqP.
+exists (psum S); first exact: ge0_psum.
+move=> J uniq_J.
+have uniq_fJ : uniq [seq f x | x <- J].
+  by rewrite map_inj_in_uniq // => x y _ _ /Hf.
+rewrite -(@big_map R 0 +%R U T f J predT (fun y => `|S y|)).
+exact: (gerfinseq_psum uniq_fJ Hsumm).
+Qed.
+
 Lemma finite_kl_dmargin_injective {T U : choiceType}
     (f : T -> U) (P Q : {distr T / R}) :
   injective f ->
@@ -383,6 +407,28 @@ split.
   apply: summable_fiber_psum.
   - move=> x; exact: normr_ge0.
   exact: HFabssm.
+Qed.
+
+Lemma finite_kl_of_dmargin_injective {T U : choiceType}
+    (f : T -> U) (P Q : {distr T / R}) :
+  injective f ->
+  finite_kl (dmargin f P) (dmargin f Q) ->
+  finite_kl P Q.
+Proof.
+move=> Hf Hfin.
+pose F := fun x : T => P x * ln (P x / Q x).
+pose G := fun y : U =>
+  dmargin f P y * ln (dmargin f P y / dmargin f Q y).
+split.
+- move=> x HQx0.
+  have HQfx0 : dmargin f Q (f x) = 0.
+    by rewrite dmargin_injectiveE.
+  have HPfx0 :=
+    finite_kl_absolute_continuous _ _ Hfin (f x) HQfx0.
+  by move: HPfx0; rewrite dmargin_injectiveE.
+- apply: (eq_summable (S1 := fun x : T => G (f x))).
+    by move=> x; rewrite /G /F !dmargin_injectiveE.
+  exact: (summable_injective_comp f G Hf (finite_kl_summable _ _ Hfin)).
 Qed.
 
 Lemma kl_dmargin_injective {T U : choiceType}
@@ -1032,6 +1078,322 @@ have HfinalL :
 have HfinalR :
     (K - A + B) + (A - B) = K by ring.
 by rewrite HfinalL HfinalR in Hfinal.
+Qed.
+
+Lemma summable_finite_ord_sum_core
+    {T : choiceType} {m : nat} (F : 'I_m -> T -> R) :
+  (forall i : 'I_m, summable (F i)) ->
+  summable (fun x => \sum_(i < m) F i x).
+Proof.
+move=> Hsumm.
+elim: m F Hsumm=> [|m IH] F Hsumm.
+  apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+  by move=> x; rewrite big_ord0.
+apply: (eq_summable
+  (S1 := fun x : T =>
+    F ord0 x + \sum_(i < m) F (lift ord0 i) x)).
+  by move=> x; rewrite big_ord_recl.
+apply: summableD.
+  exact: Hsumm.
+apply: IH=> i.
+exact: Hsumm.
+Qed.
+
+Lemma summable_seq_sum_core
+    {T : choiceType} {I : eqType} (s : seq I) (F : I -> T -> R) :
+  (forall i, i \in s -> summable (F i)) ->
+  summable (fun x => \sum_(i <- s) F i x).
+Proof.
+elim: s=> [|i s IH] Hsumm.
+  apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+  by move=> x; rewrite big_nil.
+apply: (eq_summable
+  (S1 := fun x : T => F i x + \sum_(j <- s) F j x)).
+  by move=> x; rewrite big_cons.
+apply: summableD.
+  apply: Hsumm.
+  by rewrite inE eqxx.
+apply: IH=> j Hj.
+apply: Hsumm.
+by rewrite inE Hj orbT.
+Qed.
+
+Lemma sum_seq_sum_core
+    {T : choiceType} {I : eqType} (s : seq I) (F : I -> T -> R) :
+  (forall i, i \in s -> summable (F i)) ->
+  sum (fun x => \sum_(i <- s) F i x) =
+  \sum_(i <- s) sum (F i).
+Proof.
+elim: s=> [|i s IH] Hsumm.
+  rewrite big_nil.
+  rewrite (eq_sum (F2 := fun _ : T => 0)); first exact: sum0.
+  by move=> x; rewrite big_nil.
+rewrite big_cons.
+rewrite (eq_sum (F2 := fun x : T => F i x + \sum_(j <- s) F j x));
+  last first.
+  by move=> x; rewrite big_cons.
+rewrite sumD.
+  congr (_ + _).
+  apply: IH=> j Hj.
+  apply: Hsumm.
+  by rewrite inE Hj orbT.
+  apply: Hsumm.
+  by rewrite inE eqxx.
+apply: summable_seq_sum_core=> j Hj.
+apply: Hsumm.
+by rewrite inE Hj orbT.
+Qed.
+
+Lemma sum_finite_ord_sum_core
+    {T : choiceType} {m : nat} (F : 'I_m -> T -> R) :
+  (forall i : 'I_m, summable (F i)) ->
+  sum (fun x => \sum_(i < m) F i x) =
+  \sum_(i < m) sum (F i).
+Proof.
+move=> Hsumm.
+elim: m F Hsumm=> [|m IH] F Hsumm.
+  rewrite big_ord0.
+  rewrite (eq_sum (F2 := fun _ : T => 0)); first exact: sum0.
+  by move=> x; rewrite big_ord0.
+rewrite big_ord_recl.
+rewrite (eq_sum (F2 := fun x : T =>
+  F ord0 x + \sum_(i < m) F (lift ord0 i) x)); last first.
+  by move=> x; rewrite big_ord_recl.
+rewrite sumD.
+  congr (_ + _).
+  apply: IH=> i.
+  exact: Hsumm.
+  exact: Hsumm.
+apply: summable_finite_ord_sum_core=> i.
+exact: Hsumm.
+Qed.
+
+Lemma finite_kl_dmargin_ord {T : choiceType} {m : nat}
+    (f : T -> 'I_m) (P Q : {distr T / R}) :
+  finite_kl P Q ->
+  finite_kl (dmargin f P) (dmargin f Q).
+Proof.
+move=> Hfin.
+split.
+- exact: dmargin_absolute_continuous (finite_kl_absolute_continuous P Q Hfin).
+- exact: summable_fin.
+Qed.
+
+Lemma kl_dmargin_ord_le {T : choiceType} {m : nat}
+    (f : T -> 'I_m) (P Q : {distr T / R}) :
+  finite_kl P Q ->
+  δ_KL (dmargin f P) (dmargin f Q) <= δ_KL P Q.
+Proof.
+move=> Hfin.
+have Hac := finite_kl_absolute_continuous P Q Hfin.
+pose I := fun x : T => P x * ln (P x / Q x).
+pose F := fun i : 'I_m => fun x : T => (f x == i)%:R * I x.
+have HsummF i : summable (F i).
+  apply: (eq_summable (S1 := fun x : T => (f x == i)%:R * I x)).
+    by [].
+  exact: (summable_condl (fun x => f x == i)
+    (finite_kl_summable P Q Hfin)).
+pose G := fun i : 'I_m =>
+  dmargin f P i * ln (dmargin f P i / dmargin f Q i).
+have Hlog i : G i <= sum (F i).
+  pose p := fun x : T => (f x == i)%:R * P x.
+  pose q := fun x : T => (f x == i)%:R * Q x.
+  have Hp x : 0 <= p x by rewrite /p mulr_ge0 ?ler0n ?ge0_mu.
+  have Hq x : 0 <= q x by rewrite /q mulr_ge0 ?ler0n ?ge0_mu.
+  have Hsp : summable p by rewrite /p; exact: summable_pr.
+  have Hsq : summable q by rewrite /q; exact: summable_pr.
+  have Hsi : summable (fun x => p x * ln (p x / q x)).
+    apply: (eq_summable (S1 := F i)).
+      move=> x.
+      rewrite /F /I /p /q.
+      by case: (f x == i); rewrite ?mul1r ?mul0r.
+    exact: HsummF.
+  have Hac_i x : q x = 0 -> p x = 0.
+    rewrite /p /q.
+    case: (f x == i); last by rewrite !mul0r.
+    by rewrite !mul1r; exact: Hac x.
+  have H := log_sum_inequality_finite p q Hp Hq Hsp Hsq Hsi Hac_i.
+  move: H.
+  rewrite /G /p /q !dmargin_psumE.
+  rewrite (eq_sum (F2 := F i)); last first.
+    move=> x.
+    rewrite /F /I.
+    by case: (f x == i); rewrite ?mul1r ?mul0r.
+  by [].
+rewrite /δ_KL /esp.
+rewrite (eq_sum (F2 := G)); last by move=> i; rewrite /G mulrC.
+rewrite (eq_sum (F2 := I)); last by move=> x; rewrite /I mulrC.
+rewrite (sum_finseq (r := index_enum 'I_m)); last 2 first.
+  exact: index_enum_uniq.
+  by move=> i _; rewrite mem_index_enum.
+apply: le_trans.
+  apply: ler_sum=> i _.
+  exact: Hlog.
+rewrite -sum_seq_sum_core; last first.
+  by move=> i _; exact: HsummF.
+rewrite (eq_sum (F2 := I)); first exact: lexx.
+move=> x.
+rewrite /F /I.
+rewrite (bigD1_seq (f x)) ?mem_index_enum ?index_enum_uniq //=.
+rewrite eqxx mul1r.
+rewrite big1 ?addr0 // => i Hi.
+by rewrite eq_sym (negbTE Hi) mul0r.
+Qed.
+
+Lemma kl_dmargin_ord_bound {T : choiceType} {m : nat}
+    (f : T -> 'I_m) (P Q : {distr T / R}) eps :
+  finite_kl P Q ->
+  δ_KL P Q <= eps ->
+  finite_kl (dmargin f P) (dmargin f Q) /\
+  δ_KL (dmargin f P) (dmargin f Q) <= eps.
+Proof.
+move=> Hfin Hkl.
+split; first exact: finite_kl_dmargin_ord.
+exact: (le_trans (kl_dmargin_ord_le f P Q Hfin) Hkl).
+Qed.
+
+Lemma finite_kl_dmargin_ord_common_ext {T : choiceType} {m : nat}
+    (f fP fQ : T -> 'I_m) (P Q : {distr T / R}) :
+  finite_kl P Q ->
+  dmargin f P =1 dmargin fP P ->
+  dmargin f Q =1 dmargin fQ Q ->
+  finite_kl (dmargin fP P) (dmargin fQ Q).
+Proof.
+move=> Hfin HP HQ.
+exact: (finite_kl_ext
+  (dmargin f P) (dmargin fP P)
+  (dmargin f Q) (dmargin fQ Q)
+  HP HQ (finite_kl_dmargin_ord f P Q Hfin)).
+Qed.
+
+Lemma kl_dmargin_ord_common_le {T : choiceType} {m : nat}
+    (f fP fQ : T -> 'I_m) (P Q : {distr T / R}) :
+  finite_kl P Q ->
+  dmargin f P =1 dmargin fP P ->
+  dmargin f Q =1 dmargin fQ Q ->
+  δ_KL (dmargin fP P) (dmargin fQ Q) <= δ_KL P Q.
+Proof.
+move=> Hfin HP HQ.
+rewrite -(kl_ext
+  (dmargin f P) (dmargin fP P)
+  (dmargin f Q) (dmargin fQ Q) HP HQ).
+exact: kl_dmargin_ord_le.
+Qed.
+
+Lemma kl_dmargin_ord_common_bound {T : choiceType} {m : nat}
+    (f fP fQ : T -> 'I_m) (P Q : {distr T / R}) eps :
+  finite_kl P Q ->
+  δ_KL P Q <= eps ->
+  dmargin f P =1 dmargin fP P ->
+  dmargin f Q =1 dmargin fQ Q ->
+  finite_kl (dmargin fP P) (dmargin fQ Q) /\
+  δ_KL (dmargin fP P) (dmargin fQ Q) <= eps.
+Proof.
+move=> Hfin Hkl HP HQ.
+split.
+- exact: (finite_kl_dmargin_ord_common_ext f fP fQ P Q Hfin HP HQ).
+- exact: (le_trans
+    (kl_dmargin_ord_common_le f fP fQ P Q Hfin HP HQ) Hkl).
+Qed.
+
+Lemma kl_dmargin_finite_encoding_common_bound
+    {T U : choiceType} {m : nat}
+    (enc : U -> 'I_m)
+    (f fP fQ : T -> 'I_m) (gP gQ : T -> U)
+    (P Q : {distr T / R}) eps :
+  injective enc ->
+  finite_kl P Q ->
+  δ_KL P Q <= eps ->
+  dmargin f P =1 dmargin fP P ->
+  dmargin f Q =1 dmargin fQ Q ->
+  dmargin fP P =1 dmargin enc (dmargin gP P) ->
+  dmargin fQ Q =1 dmargin enc (dmargin gQ Q) ->
+  finite_kl (dmargin gP P) (dmargin gQ Q) /\
+  δ_KL (dmargin gP P) (dmargin gQ Q) <= eps.
+Proof.
+move=> Henc Hfin Hkl HP HQ HencP HencQ.
+pose DP := dmargin gP P.
+pose DQ := dmargin gQ Q.
+have [Hfin_common Hkl_common] :=
+  kl_dmargin_ord_common_bound f fP fQ P Q eps Hfin Hkl HP HQ.
+have Hfin_enc : finite_kl (dmargin enc DP) (dmargin enc DQ).
+  exact: (finite_kl_ext
+    (dmargin fP P) (dmargin enc DP)
+    (dmargin fQ Q) (dmargin enc DQ)
+    HencP HencQ Hfin_common).
+have Hfin_msg : finite_kl DP DQ.
+  exact: finite_kl_of_dmargin_injective Henc Hfin_enc.
+split; first exact: Hfin_msg.
+have Hkl_enc : δ_KL (dmargin enc DP) (dmargin enc DQ) <= eps.
+  rewrite -(kl_ext
+    (dmargin fP P) (dmargin enc DP)
+    (dmargin fQ Q) (dmargin enc DQ) HencP HencQ).
+  exact: Hkl_common.
+rewrite -(kl_dmargin_injective enc DP DQ Henc Hfin_msg).
+exact: Hkl_enc.
+Qed.
+
+Lemma kl_dmargin_finite_encoding_common_bound_comp
+    {T U : choiceType} {m : nat}
+    (enc : U -> 'I_m)
+    (common : T -> 'I_m) (gP gQ : T -> U)
+    (P Q : {distr T / R}) eps :
+  injective enc ->
+  finite_kl P Q ->
+  δ_KL P Q <= eps ->
+  dmargin common P =1 dmargin (fun x => enc (gP x)) P ->
+  dmargin common Q =1 dmargin (fun x => enc (gQ x)) Q ->
+  finite_kl (dmargin gP P) (dmargin gQ Q) /\
+  δ_KL (dmargin gP P) (dmargin gQ Q) <= eps.
+Proof.
+move=> Henc Hfin Hkl HP HQ.
+apply: (kl_dmargin_finite_encoding_common_bound
+  enc common (fun x => enc (gP x)) (fun x => enc (gQ x))
+  gP gQ P Q eps Henc Hfin Hkl HP HQ).
+- move=> y.
+  by rewrite dmargin_comp.
+- move=> y.
+  by rewrite dmargin_comp.
+Qed.
+
+Lemma kl_dmargin_finite_encoding_common_bound_comp_eq
+    {T U : choiceType} {m : nat}
+    (enc : U -> 'I_m)
+    (common : T -> 'I_m) (gP gQ : T -> U)
+    (P Q : {distr T / R}) eps :
+  injective enc ->
+  finite_kl P Q ->
+  δ_KL P Q <= eps ->
+  (forall x, common x = enc (gP x)) ->
+  (forall x, common x = enc (gQ x)) ->
+  finite_kl (dmargin gP P) (dmargin gQ Q) /\
+  δ_KL (dmargin gP P) (dmargin gQ Q) <= eps.
+Proof.
+move=> Henc Hfin Hkl HP HQ.
+exact: (kl_dmargin_finite_encoding_common_bound_comp
+  enc common gP gQ P Q eps Henc Hfin Hkl
+  (dmargin_fun_ext common (fun x => enc (gP x)) P HP)
+  (dmargin_fun_ext common (fun x => enc (gQ x)) Q HQ)).
+Qed.
+
+Lemma kl_dmargin_finite_encoding_common_bound_comp_eq_in
+    {T U : choiceType} {m : nat}
+    (enc : U -> 'I_m)
+    (common : T -> 'I_m) (gP gQ : T -> U)
+    (P Q : {distr T / R}) eps :
+  injective enc ->
+  finite_kl P Q ->
+  δ_KL P Q <= eps ->
+  (forall x, x \in dinsupp P -> common x = enc (gP x)) ->
+  (forall x, x \in dinsupp Q -> common x = enc (gQ x)) ->
+  finite_kl (dmargin gP P) (dmargin gQ Q) /\
+  δ_KL (dmargin gP P) (dmargin gQ Q) <= eps.
+Proof.
+move=> Henc Hfin Hkl HP HQ.
+exact: (kl_dmargin_finite_encoding_common_bound_comp
+  enc common gP gQ P Q eps Henc Hfin Hkl
+  (dmargin_fun_ext_in common (fun x => enc (gP x)) P HP)
+  (dmargin_fun_ext_in common (fun x => enc (gQ x)) Q HQ)).
 Qed.
 
 Lemma log_sum_inequality_seq_pos {T : eqType} (s : seq T) (p q : T -> R) :

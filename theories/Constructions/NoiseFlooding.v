@@ -14,7 +14,7 @@ From Mending.Probability.DiscreteGaussians Require Import
   DiscreteGaussian DiscreteGaussianKL.
 From extructures Require Import ord fset fmap.
 Import PackageNotation.
-Import GRing.Theory.
+Import GRing.Theory Order.Theory.
 Local Open Scope package_scope.
 Local Open Scope sep_scope.
 Local Open Scope ring_scope.
@@ -144,6 +144,34 @@ rewrite (eq_psum
 rewrite (eq_psum (F2 := discrete_gaussian c s)); last
   by move=> x; rewrite mulr1.
 by rewrite -pr_predT discrete_gaussian_mass1.
+Qed.
+
+Lemma n_dg_shifted_dinsupp {n : nat} (center y : n.-tuple int) s :
+  0 < s ->
+  y \in dinsupp (n_dg_shifted center s).
+Proof.
+elim: n center y=> [|n IH] center y Hs.
+- rewrite [center](tuple0 center) [y](tuple0 y) /=.
+  by rewrite in_dinsupp dunit1E eqxx oner_neq0.
+case/tupleP: center=> c center.
+case/tupleP: y=> x xs.
+rewrite /= theadE.
+have Hbehead : behead_tuple [tuple of c :: center] = center.
+  by apply: val_inj.
+rewrite Hbehead.
+apply: (@dlet_dinsupp R int (n.+1.-tuple int)
+  (fun x0 : int =>
+    \dlet_(xs0 <- n_dg_shifted center s) dunit (cons_tuple x0 xs0))
+  (discrete_gaussian c s) x (cons_tuple x xs)).
+- apply/dinsuppP.
+  move=> Hx0.
+  have Hxgt := discrete_gaussian_gt0 c s x Hs.
+  by rewrite Hx0 ltxx in Hxgt.
+apply: (@dlet_dinsupp R (n.-tuple int) (n.+1.-tuple int)
+  (fun xs0 : n.-tuple int => dunit (cons_tuple x xs0))
+  (n_dg_shifted center s) xs (cons_tuple x xs)).
+- exact: IH.
+by rewrite dunit1E eqxx oner_neq0.
 Qed.
 
 Lemma n_dg_mass1 n s :

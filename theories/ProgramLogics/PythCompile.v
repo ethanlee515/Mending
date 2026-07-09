@@ -1,7 +1,7 @@
 (* Pythagorean call-compilation rules. *)
 
 From Stdlib Require Import Unicode.Utf8.
-From extructures Require Import ord fset fmap.
+From extructures Require Import ord fset fmap fperm.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
 From mathcomp Require Import all_boot all_order all_algebra.
 From mathcomp Require Import reals distr ssrZ realseq realsum exp lra.
@@ -32,6 +32,74 @@ Local Open Scope ring_scope.
 Definition heap_eq_on (K : Locations) (mem0 mem1 : heap) : Prop :=
   forall l, fhas K l -> get_heap mem0 l = get_heap mem1 l.
 
+Lemma heap_eq_on_refl K mem :
+  heap_eq_on K mem mem.
+Proof. by move=> l _. Qed.
+
+Lemma heap_eq_on_sym K mem0 mem1 :
+  heap_eq_on K mem0 mem1 ->
+  heap_eq_on K mem1 mem0.
+Proof.
+move=> H l Hl.
+by rewrite H.
+Qed.
+
+Lemma heap_eq_on_trans K mem0 mem1 mem2 :
+  heap_eq_on K mem0 mem1 ->
+  heap_eq_on K mem1 mem2 ->
+  heap_eq_on K mem0 mem2.
+Proof.
+move=> H01 H12 l Hl.
+by rewrite H01 // H12.
+Qed.
+
+Lemma heap_eq_on_rename
+    (π : {fperm Nominal.Nominal_atom__canonical__Ord_Ord})
+    K mem0 mem1 :
+  heap_eq_on K mem0 mem1 ->
+  heap_eq_on
+    (Nominal.rename π K)
+    (Nominal.rename π mem0)
+    (Nominal.rename π mem1).
+Proof.
+move=> Heq l Hl.
+have Hpre : fhas K (Nominal.rename (π^-1)%fperm l : Location).
+  have H := @fhas_rename (π^-1)%fperm (Nominal.rename π K) l Hl.
+  by rewrite Nominal.renameK in H.
+have -> : l =
+    (Nominal.rename π
+      (Nominal.rename (π^-1)%fperm l : Location) : Location).
+  by rewrite Nominal.renameKV.
+by rewrite !get_heap_rename Heq.
+Qed.
+
+Definition heap_eq_on_renamed
+    (π : {fperm Nominal.Nominal_atom__canonical__Ord_Ord})
+    (K : Locations)
+    (memL memR : heap) : Prop :=
+  heap_eq_on (Nominal.rename π K) (Nominal.rename π memL) memR.
+
+Lemma heap_eq_on_renamed_refl
+    (π : {fperm Nominal.Nominal_atom__canonical__Ord_Ord})
+    K mem :
+  heap_eq_on_renamed π K mem (Nominal.rename π mem).
+Proof.
+exact: heap_eq_on_refl.
+Qed.
+
+Lemma heap_eq_on_renamed_get
+    (π : {fperm Nominal.Nominal_atom__canonical__Ord_Ord})
+    K memL memR
+    (l : Location) :
+  heap_eq_on_renamed π K memL memR ->
+  fhas K l ->
+  get_heap memL l = get_heap memR (Nominal.rename π l : Location).
+Proof.
+move=> Hren Hl.
+have Hloc := Hren (Nominal.rename π l : Location) (fhas_rename Hl).
+by rewrite get_heap_rename in Hloc.
+Qed.
+
 Definition heap_pred_depends_only_on
   (K : Locations) (p : pred heap) : Prop :=
   forall mem0 mem1, heap_eq_on K mem0 mem1 -> p mem0 = p mem1.
@@ -48,6 +116,170 @@ apply/negP=> /eqP Hkl.
 have Hnotin := notin_has_separate K L k Hk HKL.
 have Hin := fhas_in L l Hl.
 by rewrite Hkl Hin in Hnotin.
+Qed.
+
+Lemma heap_eq_on_set_heap_same
+  (K : Locations) (mem0 mem1 : heap) (l : Location) (v : l) :
+  heap_eq_on K mem0 mem1 ->
+  heap_eq_on K (set_heap mem0 l v) (set_heap mem1 l v).
+Proof.
+move=> Heq k Hk.
+rewrite /get_heap /set_heap !setmE.
+case Hkl: (k.1 == l.1)=> //.
+exact: Heq.
+Qed.
+
+Lemma heap_eq_on_renamed_set_heap_same
+  (π : {fperm Nominal.Nominal_atom__canonical__Ord_Ord})
+  (K : Locations) (memL memR : heap) (l : Location) (v : l) :
+  heap_eq_on_renamed π K memL memR ->
+  heap_eq_on_renamed π K
+    (set_heap memL l v)
+    (set_heap memR (Nominal.rename π l : Location) v).
+Proof.
+move=> Hren.
+rewrite /heap_eq_on_renamed -set_heap_rename.
+exact: (heap_eq_on_set_heap_same (Nominal.rename π K)
+  (Nominal.rename π memL) memR (Nominal.rename π l) v Hren).
+Qed.
+
+Lemma heap_eq_on_set_heap_left_separate
+  (K L : Locations) (mem0 mem1 : heap) (l : Location) (v : l) :
+  fseparate K L ->
+  fhas L l ->
+  heap_eq_on K mem0 mem1 ->
+  heap_eq_on K (set_heap mem0 l v) mem1.
+Proof.
+move=> HKL Hl Heq k Hk.
+rewrite get_set_heap_neq.
+- exact: Heq.
+- apply/negP=> /eqP Hkl.
+  have Hnotin := notin_has_separate K L k Hk HKL.
+  have Hin := fhas_in L l Hl.
+  by rewrite Hkl Hin in Hnotin.
+Qed.
+
+Lemma heap_eq_on_set_heap_right_separate
+  (K L : Locations) (mem0 mem1 : heap) (l : Location) (v : l) :
+  fseparate K L ->
+  fhas L l ->
+  heap_eq_on K mem0 mem1 ->
+  heap_eq_on K mem0 (set_heap mem1 l v).
+Proof.
+move=> HKL Hl Heq k Hk.
+rewrite get_set_heap_neq.
+- exact: Heq.
+- apply/negP=> /eqP Hkl.
+  have Hnotin := notin_has_separate K L k Hk HKL.
+  have Hin := fhas_in L l Hl.
+  by rewrite Hkl Hin in Hnotin.
+Qed.
+
+Lemma heap_eq_on_renamed_set_heap_left_separate
+  (π : {fperm Nominal.Nominal_atom__canonical__Ord_Ord})
+  (K L : Locations) (memL memR : heap) (l : Location) (v : l) :
+  fseparate
+    (Nominal.rename π K : Locations)
+    (Nominal.rename π L : Locations) ->
+  fhas L l ->
+  heap_eq_on_renamed π K memL memR ->
+  heap_eq_on_renamed π K (set_heap memL l v) memR.
+Proof.
+move=> Hsep Hl Hren.
+rewrite /heap_eq_on_renamed -set_heap_rename.
+exact: (heap_eq_on_set_heap_left_separate
+  (Nominal.rename π K) (Nominal.rename π L)
+  (Nominal.rename π memL) memR
+  (Nominal.rename π l : Location) v
+  Hsep (fhas_rename Hl) Hren).
+Qed.
+
+Lemma heap_eq_on_renamed_set_heap_right_separate
+  (π : {fperm Nominal.Nominal_atom__canonical__Ord_Ord})
+  (K L : Locations) (memL memR : heap) (l : Location) (v : l) :
+  fseparate (Nominal.rename π K : Locations) L ->
+  fhas L l ->
+  heap_eq_on_renamed π K memL memR ->
+  heap_eq_on_renamed π K memL (set_heap memR l v).
+Proof.
+move=> Hsep Hl Hren.
+rewrite /heap_eq_on_renamed.
+exact: (heap_eq_on_set_heap_right_separate
+  (Nominal.rename π K : Locations) L (Nominal.rename π memL) memR
+  l v Hsep Hl Hren).
+Qed.
+
+Lemma closed_code_preserves_heap_eq_on
+  {A : choice_type} (K L : Locations) (prog : raw_code A) mem out :
+  ValidCode L [interface] prog ->
+  fseparate K L ->
+  out \in dinsupp (Pr_code prog mem) ->
+  heap_eq_on K mem out.2.
+Proof.
+move=> Hvalid HKL.
+have Hvc := valid_code_from_class L [interface] A prog Hvalid.
+elim: Hvc mem out=> [a|o x k Ho Hk IH|l k Hl Hk IH
+    |l v k Hl Hk IH|op k Hk IH] mem out Hout /=.
+- rewrite Pr_code_ret in Hout.
+  have -> : out = (a, mem).
+    exact: in_dunit Hout.
+  exact: heap_eq_on_refl.
+- exfalso.
+  rewrite /fhas /= in Ho.
+  by fmap_invert Ho.
+- rewrite Pr_code_get in Hout.
+  exact: (IH (get_heap mem l) mem out Hout).
+- rewrite Pr_code_put in Hout.
+  have Htail := IH (set_heap mem l v) out Hout.
+  exact: (heap_eq_on_trans K mem (set_heap mem l v) out.2
+    (heap_eq_on_set_heap_separate K L mem l v HKL Hl) Htail).
+- rewrite Pr_code_sample in Hout.
+  have [a _ Hinner] := @dinsupp_dlet R _ _ _ _ _ Hout.
+  exact: (IH a mem out Hinner).
+Qed.
+
+Lemma linked_code_preserves_heap_eq_on
+  {A : choice_type} (K L L' : Locations) (M : Interface)
+  (P : raw_package) (prog : raw_code A) mem out :
+  ValidCode L M prog ->
+  ValidPackage L' [interface] M P ->
+  fseparate K L ->
+  fseparate K L' ->
+  out \in dinsupp (Pr_code (code_link prog P) mem) ->
+  heap_eq_on K mem out.2.
+Proof.
+move=> Hvalid HP HKL HKL'.
+have Hvc := valid_code_from_class L M A prog Hvalid.
+elim: Hvc mem out=> [a|o x k Ho Hk IH|l k Hl Hk IH
+    |l v k Hl Hk IH|op k Hk IH] mem out Hout /=.
+- rewrite Pr_code_ret in Hout.
+  have -> : out = (a, mem).
+    exact: in_dunit Hout.
+  exact: heap_eq_on_refl.
+- rewrite Pr_code_bind in Hout.
+  have [mid Hmid Hinner] := @dinsupp_dlet R _ _ _ _ _ Hout.
+  have Hresolve_valid :
+      ValidCode L' [interface] (resolve P o x).
+    exact: (@valid_resolve L' [interface] M P o x HP Ho).
+  have Hmid_eq :
+      heap_eq_on K mem mid.2.
+    exact: (closed_code_preserves_heap_eq_on
+      K L' (resolve P o x) mem mid Hresolve_valid HKL' Hmid).
+  have Htail_eq :
+      heap_eq_on K mid.2 out.2.
+    exact: (IH mid.1 mid.2 out Hinner).
+  exact: (heap_eq_on_trans K mem mid.2 out.2 Hmid_eq Htail_eq).
+- rewrite Pr_code_get in Hout.
+  exact: (IH (get_heap mem l) mem out Hout).
+- rewrite Pr_code_put in Hout.
+  have Htail_eq :
+      heap_eq_on K (set_heap mem l v) out.2.
+    exact: (IH (set_heap mem l v) out Hout).
+  exact: (heap_eq_on_trans K mem (set_heap mem l v) out.2
+    (heap_eq_on_set_heap_separate K L mem l v HKL Hl) Htail_eq).
+- rewrite Pr_code_sample in Hout.
+  have [a _ Hinner] := @dinsupp_dlet R _ _ _ _ _ Hout.
+  exact: (IH a mem out Hinner).
 Qed.
 
 
@@ -261,6 +493,103 @@ Definition compile_calls_from_trace_step_cont
       resume_from_packed_trace packed_trace
   end.
 
+Lemma compileCallsFromTraceS_step_cont
+    (q : nat) (X Y A : choice_type)
+    (p : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix : trace_t) :
+  continue_from_trace root trace_prefix = Some prog ->
+  compile_calls_from_trace q.+1 (X := X) (Y := Y) p fn root trace_prefix =
+  bind (run_until_next_call prog fn)
+    (compile_calls_from_trace_step_cont q (X := X) (Y := Y) p fn
+      root trace_prefix).
+Proof.
+move=> Htrace.
+rewrite (@compile_calls_from_traceS_decompose q X Y A p fn root prog
+  trace_prefix Htrace).
+rewrite /compile_calls_from_trace_step_cont bind_assoc.
+f_equal.
+apply functional_extensionality=> s.
+case: s=> [[x|a] packed_local_trace] /=.
+- case: (call_from_package (X := X) (Y := Y) p fn x)=> [body|] //=.
+  by rewrite bind_assoc.
+- by [].
+Qed.
+
+Definition prepend_suspended_trace {A : choice_type}
+    (trace_prefix : trace_t) (s : suspended_program (A := A)) :
+    suspended_program :=
+  let '(status, packed_local_trace) := s in
+  (status, pack_trace (trace_prefix ++ unpack_trace packed_local_trace)).
+
+Lemma runUntilNextCallAux_prepend_trace
+    (A : choice_type) (prog : raw_code A) fn
+    (trace_prefix local_trace : trace_t) :
+  run_until_next_call_aux prog fn (trace_prefix ++ local_trace) =
+  bind (run_until_next_call_aux prog fn local_trace)
+    (fun s => ret (prepend_suspended_trace trace_prefix s)).
+Proof.
+move: trace_prefix local_trace.
+elim: prog=> [a|o x k IH|l k IH|l v k IH|op k IH]
+    trace_prefix local_trace /=.
+- by rewrite /prepend_suspended_trace /= unpack_pack_trace.
+- case: o x k IH=> f [S T] x k IH /=.
+  case Hfid: (f == fn).
+  + by rewrite /prepend_suspended_trace /= unpack_pack_trace.
+  + cbn.
+    f_equal.
+    apply functional_extensionality=> y.
+    rewrite rcons_cat.
+    exact: IH.
+- cbn.
+  f_equal.
+  apply functional_extensionality=> y.
+  rewrite rcons_cat.
+  exact: IH.
+- cbn.
+  f_equal.
+  rewrite rcons_cat.
+  exact: IH.
+- cbn.
+  f_equal.
+  apply functional_extensionality=> y.
+  rewrite rcons_cat.
+  exact: IH.
+Qed.
+
+Lemma compileCallsFromTraceStepCont_prepend_trace
+    (q : nat) (X Y A : choice_type)
+    (p : raw_package) (fn : ident) (root : raw_code A)
+    (trace_prefix : trace_t) (s : suspended_program (A := A)) :
+  compile_calls_from_trace_step_cont q (X := X) (Y := Y) p fn root nil
+    (prepend_suspended_trace trace_prefix s) =
+  compile_calls_from_trace_step_cont q (X := X) (Y := Y) p fn root
+    trace_prefix s.
+Proof.
+case: s=> [[packed_x|a] packed_local_trace];
+  rewrite /compile_calls_from_trace_step_cont /prepend_suspended_trace /=
+    !unpack_pack_trace //.
+Qed.
+
+Lemma compileCallsFromTraceStepCont_runUntilNextCallAux_prepend
+    (q : nat) (X Y A : choice_type)
+    (p : raw_package) (fn : ident) (root prog : raw_code A)
+    (trace_prefix : trace_t) :
+  bind (run_until_next_call_aux prog fn trace_prefix)
+    (compile_calls_from_trace_step_cont q (X := X) (Y := Y) p fn root nil) =
+  bind (run_until_next_call prog fn)
+    (compile_calls_from_trace_step_cont q (X := X) (Y := Y) p fn root
+      trace_prefix).
+Proof.
+rewrite /run_until_next_call.
+rewrite -(cats0 trace_prefix).
+rewrite runUntilNextCallAux_prepend_trace.
+rewrite bind_assoc.
+f_equal.
+apply functional_extensionality=> s.
+rewrite /= cats0.
+by rewrite compileCallsFromTraceStepCont_prepend_trace.
+Qed.
+
 Lemma code_link_resolve_closed_with
     (X Y : choice_type) (L : Locations) (M : Interface)
     (p P_link : raw_package) (fn : ident) (x : X) :
@@ -272,6 +601,33 @@ Proof.
 move=> Hp Hfn.
 apply: code_link_closed.
 exact: (@valid_resolve L [interface] M p (mkopsig fn X Y) x Hp Hfn).
+Qed.
+
+Lemma code_link_rename
+    {A : choice_type} {π}
+    (c : raw_code A) (p : raw_package) :
+  Nominal.rename π (code_link c p) =
+  code_link (Nominal.rename π c) (Nominal.rename π p).
+Proof.
+induction c in p |- *; cbn.
+- reflexivity.
+- change (Nominal.rename π
+    (bind (resolve p o x) (fun b : tgt o => code_link (k b) p)) =
+    bind (resolve (Nominal.rename π p) o x)
+      (fun b : tgt o =>
+        code_link (Nominal.rename π (k b)) (Nominal.rename π p))).
+  rewrite mcode_bind resolve_rename.
+  f_equal.
+  apply functional_extensionality=> y.
+  exact: H.
+- f_equal.
+  apply functional_extensionality=> y.
+  exact: H.
+- f_equal.
+  exact: IHc.
+- f_equal.
+  apply functional_extensionality=> y.
+  exact: H.
 Qed.
 
 Lemma code_link_invalid_trace_code
@@ -291,6 +647,15 @@ rewrite Pr_code_bind /invalid_trace_code !Pr_code_sample.
 by rewrite !dlet_null_ext.
 Qed.
 
+Lemma Pr_code_bind_invalid_trace_code_ext
+    (A B : choice_type) (contL contR : A -> raw_code B) mem :
+  Pr_code (x ← invalid_trace_code (A := A) ;; contL x) mem =
+  Pr_code (x ← invalid_trace_code (A := A) ;; contR x) mem.
+Proof.
+rewrite !Pr_code_bind_invalid_trace_code.
+by [].
+Qed.
+
 Lemma Pr_code_link_bind_invalid_trace_code
     (A B : choice_type) (cont : A -> raw_code B)
     (P_link : raw_package) mem :
@@ -301,6 +666,18 @@ Proof.
 rewrite code_link_bind.
 rewrite Pr_code_bind_invalid_trace_code.
 exact: Pr_code_bind_invalid_trace_code.
+Qed.
+
+Lemma Pr_code_link_bind_invalid_trace_code_ext
+    (A B : choice_type) (contL contR : A -> raw_code B)
+    (P_link : raw_package) mem :
+  Pr_code (code_link (x ← invalid_trace_code (A := A) ;; contL x) P_link)
+    mem =
+  Pr_code (code_link (x ← invalid_trace_code (A := A) ;; contR x) P_link)
+    mem.
+Proof.
+rewrite !Pr_code_link_bind_invalid_trace_code.
+by [].
 Qed.
 
 Lemma pythCallAtRule
@@ -475,6 +852,141 @@ case: s=> [[x|a] packed_local_trace] /=.
 - by [].
 Qed.
 
+Lemma Pr_code_codeLink_compileCallsFromTrace_cursor
+    (q : nat) (X Y A : choice_type)
+    (p P_link : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix local_trace : trace_t)
+    mem :
+  continue_from_trace root trace_prefix = Some prog ->
+  Pr_code (code_link
+    (compile_calls_from_trace q (X := X) (Y := Y) p fn root
+      (trace_prefix ++ local_trace)) P_link) mem =
+  Pr_code (code_link
+    (compile_calls_from_trace q (X := X) (Y := Y) p fn prog
+      local_trace) P_link) mem.
+Proof.
+move: X Y A p P_link fn root prog trace_prefix local_trace mem.
+elim: q=> [|q IH] X Y A p P_link fn root prog
+    trace_prefix local_trace mem Htrace.
+- rewrite /compile_calls_from_trace /factor_calls_aux /= !unpack_pack_trace.
+  by rewrite (@continue_from_trace_cat A root prog trace_prefix local_trace
+    Htrace).
+- case Hlocal: (continue_from_trace prog local_trace)=> [prog'|].
+  + have Hroot_local :
+      continue_from_trace root (trace_prefix ++ local_trace) = Some prog'.
+      by rewrite (@continue_from_trace_cat A root prog trace_prefix
+        local_trace Htrace) Hlocal.
+    rewrite (codeLinkCompileCallsFromTraceS_decompose q X Y A p P_link fn
+      root prog' (trace_prefix ++ local_trace) Hroot_local).
+    rewrite (codeLinkCompileCallsFromTraceS_decompose q X Y A p P_link fn
+      prog prog' local_trace Hlocal).
+    rewrite !Pr_code_bind.
+    apply: distr_ext=> out.
+    apply: eq_in_dlet; last by [].
+    move=> y _ z.
+    case: y=> [[[packed_x|b] packed_local_trace] mem'] /=.
+    * case Hx: (call_from_package (X := X) (Y := Y) p fn packed_x)=>
+        [body|].
+      -- rewrite !code_link_bind !Pr_code_bind.
+         apply: eq_in_dlet; last by [].
+         move=> ymem _ z'.
+         case: ymem=> y mem''.
+         rewrite -catA rcons_cat.
+         rewrite (IH X Y A p P_link fn root prog trace_prefix
+           (rcons (local_trace ++ unpack_trace packed_local_trace)
+             (call_entry (pickle y))) mem'' Htrace).
+         by [].
+      -- rewrite (Pr_code_link_bind_invalid_trace_code_ext
+           packed_trace_t A
+           (fun packed_trace =>
+             match continue_from_trace root (unpack_trace packed_trace) with
+             | Some prog'0 => prog'0
+             | None => invalid_trace_code
+             end)
+           (fun packed_trace =>
+             match continue_from_trace prog (unpack_trace packed_trace) with
+             | Some prog'0 => prog'0
+             | None => invalid_trace_code
+             end)
+           P_link mem').
+         by [].
+    * rewrite !unpack_pack_trace.
+      by rewrite -catA (@continue_from_trace_cat A root prog trace_prefix
+        (local_trace ++ unpack_trace packed_local_trace) Htrace).
+  + have Hroot_local :
+      continue_from_trace root (trace_prefix ++ local_trace) = None.
+      by rewrite (@continue_from_trace_cat A root prog trace_prefix
+        local_trace Htrace) Hlocal.
+    rewrite /compile_calls_from_trace /factor_calls_aux /=.
+    rewrite Hroot_local Hlocal.
+    rewrite (Pr_code_link_bind_invalid_trace_code_ext
+      packed_trace_t A
+      (fun packed_trace =>
+        match continue_from_trace root (unpack_trace packed_trace) with
+        | Some prog'0 => prog'0
+        | None => invalid_trace_code
+        end)
+      (fun packed_trace =>
+        match continue_from_trace prog (unpack_trace packed_trace) with
+        | Some prog'0 => prog'0
+        | None => invalid_trace_code
+        end)
+      P_link mem).
+    by [].
+Qed.
+
+Lemma Pr_code_codeLink_compileCallsFromTrace_aux_prepend
+    (q : nat) (X Y A : choice_type)
+    (p P_link : raw_package) (fn : ident)
+    (root prog : raw_code A) (trace_prefix : trace_t) mem :
+  continue_from_trace root trace_prefix = Some prog ->
+  Pr_code (code_link
+    (packed_trace ←
+       (s ← run_until_next_call_aux prog fn trace_prefix ;;
+        match s with
+        | (inl x, packed_local_trace) =>
+            match call_from_package (X := X) (Y := Y) p fn x with
+            | Some body =>
+                y ← body ;;
+                factor_calls_aux q (X := X) (Y := Y) p fn root
+                  (rcons (unpack_trace packed_local_trace)
+                    (call_entry (pickle y)))
+            | None => invalid_trace_code
+            end
+        | (inr _, packed_local_trace) =>
+            ret (pack_trace (unpack_trace packed_local_trace))
+        end) ;;
+     match continue_from_trace root (unpack_trace packed_trace) with
+     | Some prog' => prog'
+     | None => invalid_trace_code
+     end) P_link) mem =
+  Pr_code (code_link
+    (compile_calls_from_trace q.+1 (X := X) (Y := Y) p fn root
+      trace_prefix) P_link) mem.
+Proof.
+move=> Htrace.
+transitivity (Pr_code (code_link
+  (bind (run_until_next_call_aux prog fn trace_prefix)
+    (compile_calls_from_trace_step_cont q (X := X) (Y := Y) p fn root nil))
+  P_link) mem).
+- rewrite /compile_calls_from_trace_step_cont /compile_calls_from_trace.
+  rewrite bind_assoc.
+  f_equal.
+  f_equal.
+  f_equal.
+  apply functional_extensionality=> s.
+  case: s=> [[packed_x|a] packed_local_trace] /=.
+  + case: (call_from_package (X := X) (Y := Y) p fn packed_x)=>
+      [body|] /=.
+    * by rewrite bind_assoc.
+    * by [].
+  + by [].
+- rewrite compileCallsFromTraceStepCont_runUntilNextCallAux_prepend.
+  rewrite code_link_bind.
+  by rewrite -(codeLinkCompileCallsFromTraceS_decompose q X Y A p P_link
+    fn root prog trace_prefix Htrace).
+Qed.
+
 Lemma codeLinkClosedPrefixBind
     (A B : choice_type) (L : Locations) (P_link : raw_package)
     (prefix : raw_code A) (cont : A -> raw_code B) :
@@ -531,20 +1043,86 @@ apply functional_extensionality=> x.
 by rewrite codeLinkCompileCalls0.
 Qed.
 
-Lemma codeLinkCompileCallsClosedPrefix
+Lemma Pr_code_codeLinkCompileCallsClosedPrefix
     (q : nat) (X Y A B : choice_type)
     (L : Locations) (p P_link : raw_package) (fn : ident)
-    (prefix : raw_code A) (cont : A -> raw_code B) :
+    (prefix : raw_code A) (cont : A -> raw_code B) mem :
   ValidCode L [interface] prefix ->
-  code_link
+  Pr_code (code_link
     (compile_calls q (X := X) (Y := Y) p fn
       (bind prefix cont))
-    P_link =
-  bind prefix (fun x =>
+    P_link) mem =
+  Pr_code (bind prefix (fun x =>
     code_link
       (compile_calls q (X := X) (Y := Y) p fn (cont x))
-      P_link).
-Admitted.
+      P_link)) mem.
+Proof.
+move: q X Y B p P_link fn cont mem.
+case=> [|q] X Y B p P_link fn cont mem Hvalid.
+- rewrite (codeLinkCompileCallsClosedPrefix0 X Y A B L p P_link fn
+    prefix cont Hvalid).
+  by [].
+- move: cont mem.
+  elim: Hvalid=> [a|o x k Ho Hk IH|l k Hl Hk IH
+      |l v k Hl Hk IH|op k Hk IH] cont mem /=.
+  + by [].
+  + exfalso.
+    exact: (fhas_empty _ Ho).
+  + rewrite !Pr_code_get.
+    set y := get_heap mem l.
+    transitivity (Pr_code (code_link
+      (compile_calls_from_trace q.+1 (X := X) (Y := Y) p fn
+        (v ← get l ;; x ← k v ;; cont x)
+        [:: get_entry (pickle y)]) P_link) mem).
+    * apply: Pr_code_codeLink_compileCallsFromTrace_aux_prepend.
+      by rewrite /= /decode_get_entry pickleK continue_from_trace_nil.
+    * rewrite -(cats0 [:: get_entry (pickle y)]).
+      rewrite (Pr_code_codeLink_compileCallsFromTrace_cursor q.+1 X Y B
+        p P_link fn
+        (v ← get l ;; x ← k v ;; cont x)
+        (x ← k y ;; cont x)
+        [:: get_entry (pickle y)] [::] mem).
+      -- exact: (IH y cont mem).
+      -- by rewrite /= /decode_get_entry pickleK continue_from_trace_nil.
+  + rewrite !Pr_code_put.
+    transitivity (Pr_code (code_link
+      (compile_calls_from_trace q.+1 (X := X) (Y := Y) p fn
+        (#put l := v ;; x ← k ;; cont x)
+        [:: put_entry]) P_link) (set_heap mem l v)).
+    * apply: Pr_code_codeLink_compileCallsFromTrace_aux_prepend.
+      by rewrite /= continue_from_trace_nil.
+    * rewrite -(cats0 [:: put_entry]).
+      rewrite (Pr_code_codeLink_compileCallsFromTrace_cursor q.+1 X Y B
+        p P_link fn
+        (#put l := v ;; x ← k ;; cont x)
+        (x ← k ;; cont x)
+        [:: put_entry] [::] (set_heap mem l v)).
+      -- exact: (IH cont (set_heap mem l v)).
+      -- by rewrite /= continue_from_trace_nil.
+  + rewrite !Pr_code_sample.
+    apply: distr_ext=> z.
+    apply: eq_in_dlet=> // y _ z'.
+    transitivity (Pr_code (code_link
+      (compile_calls_from_trace q.+1 (X := X) (Y := Y) p fn
+        (a ← sample op ;; x ← k a ;; cont x)
+        [:: sample_entry (pickle y)]) P_link) mem z').
+    * rewrite (Pr_code_codeLink_compileCallsFromTrace_aux_prepend q X Y B
+        p P_link fn
+        (a ← sample op ;; x ← k a ;; cont x)
+        (x ← k y ;; cont x)
+        [:: sample_entry (pickle y)] mem).
+      -- by [].
+      -- by rewrite /= /decode_sample_entry pickleK continue_from_trace_nil.
+    * rewrite -(cats0 [:: sample_entry (pickle y)]).
+      rewrite (Pr_code_codeLink_compileCallsFromTrace_cursor q.+1 X Y B
+        p P_link fn
+        (a ← sample op ;; x ← k a ;; cont x)
+        (x ← k y ;; cont x)
+        [:: sample_entry (pickle y)] [::] mem).
+      -- rewrite (IH y cont mem).
+         by [].
+      -- by rewrite /= /decode_sample_entry pickleK continue_from_trace_nil.
+Qed.
 
 (** Base-case continuation after the shared search: either no [fn] call remains,
     the packed call input is invalid, or we spend the single call budget and

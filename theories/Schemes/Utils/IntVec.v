@@ -3,6 +3,7 @@ From mathcomp Require Import all_boot all_order all_algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 
+Import GRing.Theory.
 Local Open Scope ring_scope.
 
 Definition max_norm {n} (v : n.-tuple int) : nat :=
@@ -38,6 +39,15 @@ Definition ivec_sub {n} (v w : n.-tuple int) : n.-tuple int :=
 
 Definition ivec_dist {n} (v w : n.-tuple int) : nat :=
   max_norm (ivec_sub v w).
+
+Lemma ivec_dist_refl {n : nat} (v : n.-tuple int) :
+  ivec_dist v v = 0%N.
+Proof.
+apply/eqP.
+rewrite eqn_leq leq0n andbT /ivec_dist /max_norm.
+apply/bigmax_leqP=> i _.
+by rewrite /ivec_sub tnth_mktuple subrr absz0.
+Qed.
 
 Lemma ivec_dist_tnth_le {n : nat} (v w : n.-tuple int) (i : 'I_n) :
   (absz (tnth v i - tnth w i) <= ivec_dist v w)%N.

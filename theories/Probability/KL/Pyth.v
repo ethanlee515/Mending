@@ -151,6 +151,29 @@ move=> [Heps [HP [HQ Hcond]]].
 exact: (coordinate_bounded_kl_finite_kl P Q eps Heps HP HQ Hcond).
 Qed.
 
+Lemma pythDist_kl_bound
+    {n : nat} {A : choiceType}
+    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
+  pythDist P Q eps ->
+  δ_KL P Q <= \sum_(i < n) tnth eps i.
+Proof.
+move=> [Heps [HP [HQ Hcond_all]]].
+have HfinPQ : finite_kl P Q.
+  exact: (coordinate_bounded_kl_finite_kl P Q eps Heps HP HQ Hcond_all).
+have Hfin : forall (i : 'I_n) (a : i.-tuple A),
+    finite_kl
+      (conditional_coordinate P a)
+      (conditional_coordinate Q a).
+  by move=> i a; have [Hfin _] := Hcond_all i a.
+have Hcond : forall (i : 'I_n) (a : i.-tuple A),
+    δ_KL (conditional_coordinate P a)
+         (conditional_coordinate Q a) <=
+      tnth eps i.
+  by move=> i a; have [_ Hle] := Hcond_all i a.
+exact: (iterated_kl_chain_bound_via_pointwise
+  P Q eps Heps HP HQ HfinPQ Hfin Hcond).
+Qed.
+
 Lemma pythDist_refl
   {n : nat} {A : choiceType}
   (P : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :

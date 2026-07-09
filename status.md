@@ -4,34 +4,90 @@ Compact handoff for the current formalization state.
 
 ## Build Gate
 
-- Ethan reported that a clean whole-project rebuild succeeds after the latest
-  cleanup.
-- Last local targeted checks passed:
+Latest targeted Coq checks after restoring the local-isometry fields and
+threading finite encoding as explicit security evidence:
 
-  ```sh
-  rocq c -Q theories Mending theories/Schemes/ApproxFHE.v
-  rocq c -Q theories Mending theories/Schemes/Indcpa.v
-  rocq c -Q theories Mending theories/Schemes/Indcpad.v
-  rocq c -Q theories Mending theories/Constructions/NoiseFlooding.v
-  rocq c -Q theories Mending theories/Security/IndcpadSimulator.v
-  rocq c -Q theories Mending theories/Probability/Ae.v
-  rocq c -Q theories Mending theories/Probability/OutputHeap.v
-  rocq c -Q theories Mending theories/Probability/PythSeq.v
-  rocq c -Q theories Mending theories/ProgramLogics/Ae.v
-  rocq c -Q theories Mending theories/ProgramLogics/Pyth.v
-  rocq c -Q theories Mending theories/ProgramLogics/PythCompile.v
-  rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
-  rocq c -Q theories Mending -vos theories/Security/NoiseFloodingSecurity.v
-  git diff --check
-  ```
+```sh
+timeout 600s rocq c -Q theories Mending theories/Schemes/ApproxFHE.v
+timeout 600s rocq c -Q theories Mending theories/Schemes/Indcpa.v
+timeout 600s rocq c -Q theories Mending theories/Schemes/Indcpad.v
+timeout 600s rocq c -Q theories Mending theories/Constructions/NoiseFlooding.v
+timeout 600s rocq c -Q theories Mending theories/Security/IndcpadSimulator.v
+timeout 600s rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
+```
 
-- Existing deprecation warnings remain in probability/compiler files.
-- `Pythagorean-RHL/lmss.tex` builds with `make`, with existing LaTeX warnings.
-- `NoiseFloodingSecurity.v` now full proof-checks locally without the previous
-  reduction-side decrypt support ssreflect warning.
-- The previous `compileRule` frontier is cleared: the decrypt-call replacement
-  now has a resolved one-coordinate `⊨Pyth1` judgment, so
-  `ind_cpad_compiled_guess_decrypt_replacement_from_compile` checks.
+Latest hygiene checks after the current handoff update:
+
+```sh
+git diff --check
+rg -n "Admitted\.|Axiom |admit" \
+  theories/ProgramLogics/PythCompile.v \
+  theories/Security/NoiseFloodingSecurity.v \
+  theories/Probability/Ae.v
+rg -n "inv_isoK|isoK|isometry_radius|iso_correct" \
+  theories/Schemes/ApproxFHE.v
+rg -n "local_chart_metric_to_ivec_dist|local_chart_center_metric_to_ivec_dist|noise_flooding_vector_pythDist_from_metric_chart" \
+  theories/Security/NoiseFloodingSecurity.v
+rg -n "Parameter chart_center_dist_le_metric|Axiom chart_center_dist_le_metric" \
+  theories
+```
+
+The focused admit/axiom scan, removed local-chart-helper scan, and
+metric-interface chart-center scan are expected to produce no output. The
+local-isometry scan should show the restored active assumptions in
+`ApproxFHE.v`.
+
+Keep this focused gate green after local proof edits:
+
+```sh
+rocq c -Q theories Mending theories/LibExtras/MathcompExtras/DistrExtras.v
+rocq c -Q theories Mending theories/Schemes/Utils/IntVec.v
+rocq c -Q theories Mending theories/Probability/KL/Core.v
+rocq c -Q theories Mending theories/Schemes/ApproxFHE.v
+rocq c -Q theories Mending theories/Probability/KL/Pyth.v
+rocq c -Q theories Mending theories/Constructions/NoiseFlooding.v
+rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
+git diff --check
+rg -n "Admitted\.|Axiom |admit" \
+  theories/ProgramLogics/PythCompile.v \
+  theories/Security/NoiseFloodingSecurity.v \
+  theories/Probability/Ae.v
+```
+
+Broader gate to keep green before major handoff/merge:
+
+```sh
+rocq c -Q theories Mending theories/LibExtras/MathcompExtras/DistrExtras.v
+rocq c -Q theories Mending theories/Schemes/Utils/IntVec.v
+rocq c -Q theories Mending theories/Probability/KL/Core.v
+rocq c -Q theories Mending theories/Probability/KL/Pinsker.v
+rocq c -Q theories Mending theories/Schemes/ApproxFHE.v
+rocq c -Q theories Mending theories/Schemes/Indcpa.v
+rocq c -Q theories Mending theories/Schemes/Indcpad.v
+rocq c -Q theories Mending theories/Probability/DiscreteGaussians/DiscreteGaussianKL.v
+rocq c -Q theories Mending theories/LibExtras/SSProveExtras/DiscreteGaussian.v
+rocq c -Q theories Mending theories/Probability/ConditionalCoordinate.v
+rocq c -Q theories Mending theories/Probability/KL/ChainPointwise.v
+rocq c -Q theories Mending theories/Probability/DletTuple.v
+rocq c -Q theories Mending theories/Probability/KL/Pyth.v
+rocq c -Q theories Mending theories/Probability/PythSeq.v
+rocq c -Q theories Mending theories/ProgramLogics/Pyth.v
+rocq c -Q theories Mending theories/ProgramLogics/PythCompile.v
+rocq c -Q theories Mending theories/Constructions/NoiseFlooding.v
+rocq c -Q theories Mending theories/Security/IndcpadSimulator.v
+rocq c -Q theories Mending theories/LibExtras/SSProveExtras/NominalExtras.v
+rocq c -Q theories Mending theories/Probability/Ae.v
+rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
+git diff --check
+rg -n "Admitted\.|Axiom |admit" \
+  theories/ProgramLogics/PythCompile.v \
+  theories/Security/NoiseFloodingSecurity.v \
+  theories/Probability/Ae.v
+```
+
+Known warnings remain from existing notation/deprecation warnings in
+`Pinsker.v`, `DletTuple.v`, `NoiseFlooding.v`, `IndcpadSimulator.v`,
+`PythSeq.v`, `PythCompile.v`, and `Ae.v`.
 
 ## Main Chain
 
@@ -54,514 +110,206 @@ ind_cpad_compiled_sim_decrypt_game_code
 ind_cpad_compiled_sim_decrypt_self_link_game_code
   -- 0 -->
 ind_cpad_sim_decrypt_game_code
-  -- 0 -->
+  -- 0, direct/factored reduction bridge -->
+ind_cpa_reduction_direct_factored_game_code
+  -- 0, unfresh/factored linked bridge -->
+ind_cpa_reduction_unfresh_linked_game_code
+  -- 0, alpha/freshening bridge -->
 ind_cpa_reduction_linked_game_code
   -- 0 -->
 ind_cpa_reduction_game_code
 ```
 
-The Coq assembly theorem is:
-
-```coq
-ind_cpa_reduction_additive_error_from_compile
-```
-
+The chart-route assembly theorem is
+`ind_cpa_reduction_additive_error_from_compile`, now with explicit
+`finite_encoding_cert` and `chart_center_dist_le_metric_cert` premises. The
+direct assembly theorem is
+`ind_cpa_reduction_additive_error_from_compile_ready_vector_bound`, with
+`finite_encoding_cert` and `decrypt_prefix_ready_vector_bound_cert` premises.
 The final endpoint is intentionally result-level via `same_game_result_opt`.
-It compares only the returned winning bit, matching the security theorem and
-avoiding unnecessary heap equality between the sim-decrypt IND-CPAD game and
-the IND-CPA reduction presentation.
+The chain is closed modulo the scheme, correctness, IND-CPA, the metric
+interface assumptions, `finite_encoding_cert`, and whichever explicit route
+certificate is chosen.
 
-## Proved Pieces
+## Current Frontier
 
-- `ApproxCorrectnessPerfect` is the active exact correctness assumption for
-  keygen/encrypt/eval.
-- `ApproxFheScheme` now exposes `keygen_lossless : dweight keygen = 1`.
-- IND-CPAD query accounting is by decrypt count, not table size.
-- Encrypt/eval table-extension calls no longer assert
-  `length updated_table <= max_queries`; the bound is enforced only by the
-  decrypt counter.
-- `IndCpadSimDecryptOracle` keeps real encrypt/eval behavior and replaces only
-  `oracle_decrypt`.
-- `challenge_heap_valid` is the main invariant for challenge bit, keys, table
-  rows, and `good_keys`.
-- Decrypt code is factored through:
+Important blocker: the current `finite_encoding_cert` is proof-shaped in a way
+that is likely false for the intended origin-centered chart model. In
+particular, the fields
+`finite_common_inverse_isometry_encoding_left/right` ask for one common
+encoding map whose pushforward agrees with both
+`encode ∘ inverse_isometry centerL` and
+`encode ∘ inverse_isometry centerR` when both tuple Gaussians are centered at
+their own chart origins. If the intended chart law includes
+`isometry a a = 0` and `isometry b b = 0`, this would force the flooded
+message distributions around `a` and `b` to be equal rather than merely close.
+That is not the noise-flooding statement, so this certificate should be
+replaced before further concrete-instance work.
 
-  ```coq
-  ind_cpad_decrypt_prefix_code
-  ind_cpad_real_decrypt_cont
-  ind_cpad_sim_decrypt_cont
-  ```
+The same coordinate-system problem affects the current
+`chart_center_dist_le_metric_cert` and
+`challenge_decrypt_prefix_row_vector_bound` route. They compare
+`isometry a a` with `isometry b b`; under origin-centered charts both sides are
+the zero vector, so the bound becomes vacuous. The vector KL comparison should
+instead happen in one chart, comparing centers `0` and `isometry a b`.
 
-- The one-call decrypt replacement is proved:
+The active security route now uses finite message encodings and direct
+vector-center bounds rather than an opaque message-space Gaussian KL axiom.
+The local Gaussian KL bound is proved for integer vectors, lifted through
+finite-output KL data processing, and then packaged as message-level
+`pythDist`/program-logic wrappers.
 
-  ```coq
-  ind_cpad_decrypt_code_pyth1
-  ind_cpad_decrypt_resolve_pyth1
-  ind_cpad_decrypt_code_pyth_short
-  ind_cpad_decrypt_resolve_pyth_short
-  ind_cpad_decrypt_resolve_additive_error_short
-  ```
-
-- The invariant-compatible compile bridge is packaged through the factored open
-  challenger:
-
-  ```coq
-  ind_cpad_challenge_init_code
-  ind_cpad_factored_open_game_code
-  ind_cpad_open_game_code_factored
-  ind_cpad_challenge_init_code_empty_valid
-  ind_cpad_factored_compiled_guess_decrypt_replacement
-  ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring
-  ind_cpad_game_to_compiled_sim_decrypt_additive_error
-  ```
-
-- Result-level AE/TV helpers are in place:
-
-  ```coq
-  same_result_opt
-  same_game_result_opt
-  same_game_output_result_opt
-  same_output_heap_game_output_opt
-  same_game_output_same_output_heap_opt
-  additiveErrorOptSameResultTvdEqRule
-  additiveErrorOptSameGameResultTvBound
-  additiveErrorOptSameGameResultTvdEqRule
-  additiveErrorOptSameGameResultReflRule
-  additiveErrorOptSameGameResultTriangleRule
-  additiveErrorOptSameGameOutputToResult
-  ```
-
-- Exact endpoint presentation helpers now include:
-
-  ```coq
-  ind_cpad_compiled_sim_decrypt_self_link_to_sim_decrypt_ae
-  ind_cpa_reduction_game_code_linked_ae
-  ind_cpa_reduction_linked_game_code_ae
-  ```
-
-- Generic moved-package helpers live in
-  `theories/LibExtras/SSProveExtras/NominalExtras.v`:
-
-  ```coq
-  moved_package_valid
-  moved_resolve_bind_valid
-  moved_resolve_ret_valid
-  ```
-
-## Probability Glue
-
-`projected_total_variation_coupling` is fully proved in
-`theories/Probability/Ae.v`.  It lifts a coupling of projected result marginals
-back to full completed outputs by conditioning on projected fibers.
-
-Important supporting facts:
+The direct ready-vector Hoare obligation is now named:
 
 ```coq
-complete_bind_kernel
-dweight_dlet
-complete_bind_some
-complete_bind_none
-complete_bind
-complete_distr_ext
-complete_dmargin_dnull
-dmargin_dunit_fst_pair
-dmargin_dunit_snd_pair
-product_coupling
-product_coupling_margins
-completed_fallback_coupling
-completed_fallback_coupling_margins
-complete_bind_fallback_coupling
-complete_bind_kernel_dweight
-complete_bind_fallback_coupling_margins
-shared_complete_sample_coupling
-shared_complete_sample_coupling_margins
-shared_complete_sample_coupling_dweight
-shared_complete_sample_coupling_pr_eq1
-shared_complete_sample_coupling_pr_ge1
-dflip_dweight
-conditional_fiber_factorization
-conditional_fiber_recompose
-lift_projected_coupling
-lift_projected_coupling_margin_l
-lift_projected_coupling_margin_r
-lift_projected_coupling_event_ge
-projected_total_variation_coupling
+decrypt_prefix_ready_vector_bound_cert max_queries
 ```
 
-The aggregate event proof avoids raw `psum` normalization by rewriting both
-sides as expectations over the projected coupling and applying `le_exp`
-pointwise.
+That alias abbreviates the certificate that `ind_cpad_decrypt_prefix_code`
+returns rows satisfying:
 
-## Gaussian/Chart State
+```coq
+challenge_decrypt_prefix_row_ready_vector_bound
+```
 
-- Shifted tuple Gaussian definitions and product Pythagorean bounds are in
-  place.
-- Successful decrypt is connected to raw oracle code by:
+The chart-center route instantiates the certificate with:
 
-  ```coq
-  noise_flooding_successful_decrypt_code_pyth
-  noise_flooding_successful_decrypt_code_pyth1
-  ```
+```coq
+ind_cpad_decrypt_prefix_code_readies_row_vector_bound
+```
 
-- Exact-center chart case is axiom-free:
+This closed proof derives vector-ready rows from row-ready rows using
+`chart_center_dist_le_metric_cert`. For concrete instances that can prove the
+vector-center bound directly, the premised route carries
+`decrypt_prefix_ready_vector_bound_cert` through code, resolve, compile,
+reduction, and the final theorem:
 
-  ```coq
-  noise_flooding_message_gaussian_kl_refl
-  noise_flooding_message_gaussian_pythDist_refl
-  ```
+```coq
+ind_cpad_decrypt_code_pyth1_from_metric_encoding_ready_vector_bound
+ind_cpad_decrypt_resolve_pyth1_from_metric_encoding_ready_vector_bound
+ind_cpad_compiled_guess_decrypt_replacement_from_compile_ready_vector_bound
+ind_cpad_game_to_compiled_sim_decrypt_additive_error_ready_vector_bound
+ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
+ind_cpa_reduction_additive_error_ready_vector_bound
+ind_cpa_reduction_bound_ready_vector_bound
+is_secure_ready_vector_bound
+```
 
-- Metric-to-vector local chart reasoning is proved:
+The public theorem `is_secure` is now the chart-route theorem and takes
+`finite_encoding_cert` and `chart_center_dist_le_metric_cert` explicitly. The
+theorem `is_secure_ready_vector_bound` is the direct route and takes
+`finite_encoding_cert` and `decrypt_prefix_ready_vector_bound_cert`
+explicitly. `NoiseFloodingSecure` no longer ascribes the closed `IsIndCpad`
+module type, because chart/encoding evidence is no longer hidden in the metric
+interface.
 
-  ```coq
-  local_chart_metric_to_ivec_dist
-  local_chart_center_metric_to_ivec_dist
-  noise_flooding_vector_pythDist_from_metric_chart
-  ```
+## Useful Proof Surfaces
 
-## Sequencing Glue
+Finite-encoding/KL bridge:
 
-- `additiveErrorOptSeqRule` in `theories/ProgramLogics/Ae.v` is now proved.
-  The proof uses completed-bind margin glue and a generic good-prefix event
-  bound:
+```coq
+kl_dmargin_ord_bound
+kl_dmargin_ord_common_bound
+kl_dmargin_finite_encoding_common_bound
+kl_dmargin_finite_encoding_common_bound_comp
+kl_dmargin_finite_encoding_common_bound_comp_eq
+kl_dmargin_finite_encoding_common_bound_comp_eq_in
+```
 
-  ```coq
-  complete_bind_kernel
-  complete_bind
-  total_variation_complete_ge
-  total_variation_eq_le0
-  total_variation_refl_le0
-  total_variation_ext
-  total_variation_point_bound2
-  total_variation_complete_point_bound2
-  dmargin_some
-  additiveErrorTvdEqTotalRule
-  additiveErrorTvdEqPostTotalRule
-  additiveErrorReflTotalRule
-  completed_fallback_coupling
-  completed_fallback_coupling_margins
-  complete_bind_fallback_coupling
-  complete_bind_fallback_coupling_margins
-  shared_complete_sample_coupling
-  shared_complete_sample_coupling_margins
-  shared_complete_sample_coupling_dweight
-  shared_complete_sample_coupling_pr_eq1
-  shared_complete_sample_coupling_pr_ge1
-  additiveErrorOptSeqKernel
-  additiveErrorOptSeqKernel_margins
-  additiveErrorOptSeqKernel_event
-  coupling_bind_kernel
-  additiveErrorOptSeqRule_coupling
-  pr_dlet_lower_bound_good
-  additiveErrorOptSeqRule
-  additiveErrorSeqRule
-  additiveErrorTvBound
-  ```
+Noise-flooding/message bridge:
 
-  This proves that completing a subdistribution commutes with semantic bind
-  when `None` continues to `None`, and provides an independent completed
-  fallback coupling for bad prefix pairs where the middle relation is not
-  available.  The dependent kernel that uses continuation AE couplings on good
-  prefix pairs and fallback couplings otherwise is also in place, with its
-  margins proved.  The generic `coupling_bind_kernel` lemma now binds a prefix
-  coupling with any pointwise kernel coupling, and
-  `additiveErrorOptSeqRule_coupling` uses it to prove the margin/coupling half
-  for sequenced completed programs.  The event side is discharged by
-  `pr_dlet_lower_bound_good`, which formalizes the union-bound-style estimate
-  for a good prefix event followed by a good continuation.  The non-optional
-  sequencing rule is now a wrapper around the optional rule.  The generic
-  `additiveErrorTvBound` extraction is also proved by projecting completed
-  couplings to optional result values and using `total_variation_complete_ge`
-  to drop completion.
-- The older raw-TV rules in `theories/ProgramLogics/Ae.v` should be treated
-  carefully: non-optional `⊨AE` uses `lift_loss_post`, so raw subdistribution
-  TV alone is not enough when either side can fail.  The new
-  `additiveErrorTvdEqTotalRule` is the sound total-mass variant for exact
-  output equality, and `additiveErrorTvdEqPostTotalRule` is the corresponding
-  postcondition-preserving variant.  `additiveErrorReflTotalRule` is the
-  corresponding sound reflexivity rule; the older raw reflexivity rule remains
-  delicate for partial programs.  The generic zero-TV equality/reflexivity,
-  TV extensionality, and pointwise TV-bound lemmas now live in
-  `theories/Probability/Ae.v`, so the security file no longer carries local
-  copies.  Challenge initialization now uses the total post rule instead of
-  the older admitted raw-TV post rule.  The needed
-  totality facts are exposed by `keygen_lossless`, `dflip_dweight`, and:
+```coq
+noise_flooding_vector_kl_bound
+noise_flooding_message_gaussian_kl_from_finite_encoding_vector_bound
+noise_flooding_message_gaussian_kl_from_finite_encoding
+noise_flooding_message_gaussian_pythDist_from_finite_encoding_vector_bound
+noise_flooding_successful_decrypt_code_pyth_from_metric_encoding_vector_bound
+noise_flooding_successful_decrypt_code_pyth1_from_metric_encoding_vector_bound
+```
 
-  ```coq
-  ind_cpad_challenge_init_code_dweight
-  ```
+Metric-interface helpers:
+
+```coq
+shifted_tuple_gaussian_n_dg_shiftedE
+shifted_tuple_gaussian_dinsupp
+common_inverse_isometry_encoding_left_n_dg_shifted
+common_inverse_isometry_encoding_right_n_dg_shifted
+```
+
+The local-isometry obligations `inv_isoK`, `isoK`, `isometry_radius`, and
+`iso_correct` are restored in `ApproxFheMetric` as active assumptions. The
+current finite-encoding/vector-ready security route does not consume them
+directly yet, but they remain in the interface as the intended local-isometry
+contract. The older local-chart helper lemmas in `NoiseFloodingSecurity.v`
+remain removed/unused.
+`chart_center_dist_le_metric` was also removed from `ApproxFheMetric`; the
+security file now names that route-specific evidence as:
+
+```coq
+chart_center_dist_le_metric_cert
+```
+
+Finite message encoding is now carried by the security file as:
+
+```coq
+finite_encoding_cert
+```
+
+This record should be treated as provisional: keep the finite encoding and
+injectivity pieces if needed for finite-output KL data processing, but do not
+try to prove the current `finite_common_inverse_isometry_encoding*` fields for
+the intended `(Z mod q)^n` chart model.
 
 ## Remaining Gaps
 
-- `codeLinkCompileCallsClosedPrefix` in
-  `theories/ProgramLogics/PythCompile.v`.
+Before doing more proof work, replace the bad common-encoding certificate with
+chart laws that match the intended geometry. A plausible replacement interface
+is:
 
-  The zero-budget closed-prefix case is proved:
+```coq
+(* zero denotes the all-zero dim.-tuple int; concrete name TBD. *)
+isometry_center0 :
+  forall c, isometry c c = zero
 
-  ```coq
-  codeLinkClosedPrefixBind
-  codeLinkCompileCallsClosedPrefix0
-  ```
+metric_chartE :
+  forall a b, metric a b = ivec_dist zero (isometry a b)
 
-  Positive budgets still need a semantic trace-prefix fusion lemma for
-  `factor_calls_aux`/`run_until_next_call_aux`.  A raw syntactic rebase lemma is
-  too strong because invalid packed trace branches are both null semantically
-  but can have different continuations.  The null-branch facts already proved:
+inverse_isometry_shift :
+  forall a b x,
+    inverse_isometry b x =
+    inverse_isometry a (ivec_add x (isometry a b))
+```
 
-  ```coq
-  Pr_code_bind_invalid_trace_code
-  Pr_code_link_bind_invalid_trace_code
-  ```
+With this shape, the right comparison is:
 
-- Endpoint bridges in `theories/Security/NoiseFloodingSecurity.v`:
+```coq
+encode ∘ inverse_isometry a
+```
 
-  ```coq
-  ind_cpad_compiled_sim_decrypt_mixed_to_self_link_ae
-  ind_cpad_sim_decrypt_to_ind_cpa_reduction_linked_ae
-  ```
+applied to vector Gaussians centered at `zero` and `isometry a b`,
+respectively. That matches noise flooding: the distributions are close by the
+integer-vector Gaussian KL bound; they are not required to be equal.
 
-  The mixed-to-self bridge is the bounded-query endpoint.  After the first
-  `max_queries` selected decrypt calls are compiled, residual uncompiled
-  decrypt calls should assert-fail on both sides because real and simulator
-  packages share the decrypt counter.  Local over-bound failure facts are
-  proved:
+After that refactor, final security should use either the chart-law route above
+or a concrete proof of the reshaped direct obligation:
 
-  ```coq
-  ind_cpad_real_decrypt_code_over_bound_null
-  ind_cpad_sim_decrypt_code_over_bound_null
-  ind_cpad_real_decrypt_resolve_over_bound_null
-  ind_cpad_sim_decrypt_resolve_over_bound_null
-  ```
+```coq
+decrypt_prefix_ready_vector_bound_cert max_queries
+```
 
-  The linked IND-CPA reduction bridge should remain result-level: the
-  sim-decrypt IND-CPAD presentation and the reduction simulator use different
-  bookkeeping locations, but should return the same bit.  The intended
-  cross-game heap invariant is now named:
-
-  ```coq
-  reduction_initialized_heap
-  sim_decrypt_reduction_heap_rel
-  sim_decrypt_reduction_heap_rel_initialized
-  ```
-
-  It relates the two initialized heaps by the sampled bit/keys, ready flag,
-  adversary-visible table, and decrypt counter, while allowing the two packages
-  to own different internal bookkeeping locations.  Projection lemmas for each
-  component are proved, as are the first generic preservation facts:
-
-  ```coq
-  sim_decrypt_reduction_heap_rel_set_table
-  sim_decrypt_reduction_heap_rel_set_decrypt_count
-  sim_decrypt_reduction_heap_rel_set_decrypt_count_valid
-  ```
-
-  Table preservation is also specialized to the three adversary-visible row
-  append operations:
-
-  ```coq
-  sim_decrypt_reduction_heap_rel_set_table_encrypt
-  sim_decrypt_reduction_heap_rel_set_table_eval1
-  sim_decrypt_reduction_heap_rel_set_table_eval2
-  ```
-
-  The rewrite layer from reduction-side table reads to left-table expressions is
-  now present:
-
-  ```coq
-  sim_decrypt_reduction_heap_rel_eval1_row
-  sim_decrypt_reduction_heap_rel_eval2_row_i
-  sim_decrypt_reduction_heap_rel_eval2_row_j
-  sim_decrypt_reduction_heap_rel_set_table_encrypt_right
-  sim_decrypt_reduction_heap_rel_set_table_eval1_right
-  sim_decrypt_reduction_heap_rel_set_table_eval2_right
-  ```
-
-  The next endpoint-invariant facts should move from heap-update preservation
-  to oracle-body simulations: encrypt/eval calls should produce the same
-  returned ciphertext and preserve `sim_decrypt_reduction_heap_rel`; decrypt
-  calls should produce the same option result distribution and preserve the
-  relation after the shared counter increment.
-
-  The reduction simulator's adversary-visible oracle bodies are now exposed as
-  raw code with resolve lemmas:
-
-  ```coq
-  ind_cpa_reduction_challenge_init_code
-  ind_cpa_reduction_challenge_init_code_empty_shape
-  ind_cpad_reduction_challenge_init_heaps_rel
-  ind_cpa_reduction_sim_encrypt_code
-  ind_cpa_reduction_sim_encrypt_resolveE
-  ind_cpa_reduction_sim_eval1_code
-  ind_cpa_reduction_sim_eval1_resolveE
-  ind_cpa_reduction_sim_eval2_code
-  ind_cpa_reduction_sim_eval2_resolveE
-  ```
-
-  The initialization helper names the right-side heap shape expected by
-  `sim_decrypt_reduction_heap_rel`: after the shared challenge bit and keygen
-  samples, the IND-CPAD challenge heap and the reduction heap are related.
-  The intended relation-preserving oracle postcondition is now named:
-
-  ```coq
-  same_result_sim_decrypt_reduction_opt
-  same_result_sim_decrypt_reduction_result_opt
-  ```
-
-  It strengthens the existing result-only postcondition by additionally
-  requiring related heaps on successful outputs while still allowing paired
-  failure.
-  This should make the upcoming adversary/oracle lifting proof start from a
-  named invariant rather than redoing raw bind-support reasoning.  The exposed
-  oracle bodies should make the remaining simulations look like direct
-  `Pr_code`/Hoare arguments over named programs, matching the existing
-  `ind_cpad_real_*_code` exposure on the left.
-
-  The encrypt oracle has the expected linked result comparison:
-
-  ```coq
-  ind_cpa_reduction_sim_encrypt_linked_code
-  ind_cpad_sim_decrypt_reduction_encrypt_linked_result_eq
-  ind_cpa_reduction_sim_encrypt_linked_code_left_support_rel
-  ind_cpad_sim_decrypt_reduction_encrypt_resolve_linked_left_support_rel
-  ind_cpad_sim_decrypt_reduction_encrypt_linked_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_encrypt_resolve_linked_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_encrypt_resolve_linked_ae
-  ind_cpad_sim_decrypt_reduction_encrypt_resolve_linked_rel_ae
-  ```
-
-  The right side is factored through an explicit linked-body raw code because
-  the reduction simulator obtains encrypt ciphertexts through the outer
-  IND-CPA oracle rather than sampling them internally.  The left-support helper
-  strengthens this from result-marginal equality to the witness shape needed by
-  a future relation-preserving coupling: every successful linked reduction
-  encrypt output has a left sim-decrypt encrypt output with the same ciphertext
-  and related heaps.  The AE wrapper packages the oracle call under
-  `same_input_sim_decrypt_reduction_pre` and the generic result-only
-  postcondition `same_result_opt`.  The stronger relation-preserving AE wrapper
-  is also now proved by an explicit shared-sample coupling: when the public key
-  is initialized, both sides use the same encrypt sample and update their
-  respective table locations in lockstep; when the key is absent, both sides
-  fail and the completed null coupling handles the paired `None` branch.  The
-  null branch now uses the generic `complete_dmargin_dnull` helper.
-
-  The analogous direct `eval1` relation-preserving proof exposed a dependent
-  assertion-normalization issue: unfolding the raw code exposes the
-  `#assert ... as r_in_range` continuation proof as a boolean equality, while
-  `nth_valid`/the table-row lemmas want the proposition form.  The reusable
-  assertion-coupling helper now packages the common same-guard case:
-
-  ```coq
-  assertD_same_guard_coupling
-  ```
-
-  True branches delegate to a supplied continuation coupling, while false
-  branches are coupled as paired `(None, None)` failures under a nonnegative
-  error budget.  Using this helper, the `eval1` and `eval2` oracles now also
-  have relation-preserving AE wrappers.  The proofs align the range guards with
-  the table relation, use proof irrelevance for generated `nth_valid` witnesses,
-  couple the shared eval samples, and preserve
-  `sim_decrypt_reduction_heap_rel` with
-  `sim_decrypt_reduction_heap_rel_set_table_eval1_right` and
-  `sim_decrypt_reduction_heap_rel_set_table_eval2_right`.
-
-  A generic shared-sample relation coupling helper is also available:
-
-  ```coq
-  shared_sample_relation_coupling
-  ```
-
-  It packages the common proof pattern where both programs are margins of the
-  same completed sample distribution and the postcondition holds for every
-  sample in support plus the paired failure branch.  This is intended to shorten
-  the remaining decrypt relation-preserving wrapper, especially the equal-label
-  shared-noise branch.
-
-  Support-level simulations for the reduction-side eval oracles now exist:
-
-  ```coq
-  ind_cpa_reduction_sim_eval1_code_support_rel
-  ind_cpa_reduction_sim_eval1_code_left_support_rel
-  ind_cpa_reduction_sim_eval2_code_support_rel
-  ind_cpa_reduction_sim_eval2_code_left_support_rel
-  ind_cpad_sim_decrypt_reduction_eval1_result_eq
-  ind_cpad_sim_decrypt_reduction_eval2_result_eq
-  ind_cpad_sim_decrypt_reduction_eval1_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_eval2_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_eval1_resolve_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_eval2_resolve_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_eval1_resolve_left_support_rel
-  ind_cpad_sim_decrypt_reduction_eval2_resolve_left_support_rel
-  ind_cpad_sim_decrypt_reduction_eval1_resolve_ae
-  ind_cpad_sim_decrypt_reduction_eval1_resolve_rel_ae
-  ind_cpad_sim_decrypt_reduction_eval2_resolve_ae
-  ind_cpad_sim_decrypt_reduction_eval2_resolve_rel_ae
-  ```
-
-  They say every successful reduction-side eval output can be matched by a
-  left-side output with the same returned ciphertext and related heaps.  Both
-  eval oracles now also have the left-support strengthening needed for a
-  relation-preserving coupling, and those facts are also exposed at the
-  resolve/oracle-call boundary.  The result-equality lemmas package the same
-  eval comparisons as
-  exact equality of returned-ciphertext marginals, and the TV wrappers turn
-  those equalities into zero-distance facts over completed result marginals.
-  The resolve-level wrappers expose the same facts at the oracle-call
-  boundary, and the AE wrappers package them as result-only zero-error oracle
-  judgments.
-
-  The reduction simulator's decrypt body is also exposed, and the first
-  none-result support case is proved:
-
-  ```coq
-  ind_cpa_reduction_sim_decrypt_code
-  ind_cpa_reduction_sim_decrypt_resolveE
-  sim_decrypt_reduction_heap_rel_decrypt_row
-  ind_cpa_reduction_sim_decrypt_code_support_rel_none
-  ind_cpa_reduction_sim_decrypt_code_support_rel
-  ind_cpa_reduction_sim_decrypt_code_left_support_rel
-  ind_cpad_sim_decrypt_reduction_decrypt_result_eq
-  ind_cpad_sim_decrypt_reduction_decrypt_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_decrypt_resolve_result_tv_le0
-  ind_cpad_sim_decrypt_reduction_decrypt_resolve_left_support_rel
-  ind_cpad_sim_decrypt_reduction_decrypt_resolve_ae
-  ```
-
-  The general support-shape lemma covers both the unequal-label `None` branch
-  and the equal-label sampled `Some` branch at the level of matching returned
-  option values and related heaps.  The left-support strengthening now also
-  shows that the matched output is in the support of the left sim-decrypt code,
-  using the same sampled noise in the equal-label branch.  Decrypt is also
-  packaged as exact equality of returned-result marginals under
-  `sim_decrypt_reduction_heap_rel`, with a zero-TV wrapper for the completed
-  result marginals, a resolve-level wrapper for oracle-call use, and a
-  result-only zero-error AE wrapper.  The remaining endpoint work is to lift
-  these per-oracle encrypt/eval/decrypt AE facts through the adversary
-  execution and discharge the mixed compiled/self-link bridge.
-
-- Explicit axiom:
-
-  ```coq
-  noise_flooding_message_gaussian_kl
-  ```
-
-  Likely replacement: deterministic KL data processing for `dmargin`, plus the
-  domain-specific chart translation assumptions.
-
-## Paper State
-
-`Pythagorean-RHL/lmss.tex` mirrors the formal chain, including the linked
-endpoint `H_4'`.  It distinguishes the mixed-link and self-link compiled
-sim-decrypt games, explains why the final bridge is result-level, and sketches
-the projected-marginal disintegration argument behind
-`projected_total_variation_coupling`.  The `H_3 -> H_4'` paragraph now spells
-out the intended endpoint invariant: the two heaps are not equal, but they
-carry the same sampled bit/keys, adversary-visible table, decrypt counter, and
-answers to adversary calls.
+The direct route should also compare vector centers in one chart, not compare
+`isometry a a` with `isometry b b`.
 
 ## Next Work
 
-1. Prove or justify `codeLinkCompileCallsClosedPrefix` without an admit.
-2. Prove `ind_cpad_compiled_sim_decrypt_mixed_to_self_link_ae`.
-3. Prove `ind_cpad_sim_decrypt_to_ind_cpa_reduction_linked_ae` at
-   `same_game_result_opt`.
-4. Replace `noise_flooding_message_gaussian_kl` with smaller reusable
-   geometric/probabilistic ingredients.
+1. Refactor the message-KL bridge away from
+   `finite_common_inverse_isometry_encoding*` and toward the origin-centered
+   chart laws above.
+2. Refactor `challenge_decrypt_prefix_row_vector_bound`,
+   `chart_center_dist_le_metric_cert`, and their theorem wrappers so the vector
+   bound is stated in one chart.
+3. Keep only the finite encoding/injectivity assumptions that are actually
+   needed for finite-output KL data processing.
+4. Decide whether the concrete proof should use the chart-law route or the
+   direct `decrypt_prefix_ready_vector_bound_cert` route.
+5. Keep the focused gate green after each proof step.

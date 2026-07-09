@@ -545,6 +545,30 @@ apply/eq_psum=> x.
 by rewrite HPQ.
 Qed.
 
+Lemma dmargin_fun_ext {T U : choiceType} (f g : T -> U)
+    (P : {distr T / R}) :
+  f =1 g ->
+  dmargin f P =1 dmargin g P.
+Proof.
+move=> Hfg y.
+rewrite !dmargin_psumE.
+apply/eq_psum=> x.
+by rewrite Hfg.
+Qed.
+
+Lemma dmargin_fun_ext_in {T U : choiceType} (f g : T -> U)
+    (P : {distr T / R}) :
+  (forall x, x \in dinsupp P -> f x = g x) ->
+  dmargin f P =1 dmargin g P.
+Proof.
+move=> Hfg y.
+rewrite !dmargin_psumE.
+apply/eq_psum=> x.
+case Hx: (x \in dinsupp P).
+  by rewrite (Hfg x Hx).
+by move/dinsuppPn: Hx=> ->; rewrite !mulr0.
+Qed.
+
 Lemma dunit_dweight {T : choiceType} (x : T) :
   dweight (dunit x : {distr T / R}) = 1.
 Proof.

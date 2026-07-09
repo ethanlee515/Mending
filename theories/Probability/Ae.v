@@ -1167,6 +1167,32 @@ apply/negP=> Hx.
 by move: (Hsupp x Hx); rewrite Hpx.
 Qed.
 
+Lemma support_of_pr_ge1 {A : choiceType}
+    (D : {distr A / R}) (p : pred A) :
+  dweight D = 1 ->
+  \P_[D] p >= 1 ->
+  forall x, x \in dinsupp D -> p x.
+Proof.
+move=> HD Hpr x Hx.
+case Hpx: (p x); first by [].
+exfalso.
+have HDx_pos : 0 < D x.
+  move: Hx.
+  rewrite in_dinsupp=> Hx.
+  by rewrite lt_def ge0_mu andbT Hx.
+have Hcomp_pos : 0 < \P_[D] (predC p).
+  apply: (lt_le_trans HDx_pos).
+  rewrite [D x]pr_pred1.
+  apply: subset_pr=> y Hy.
+  move/eqP: Hy=> Hy.
+  subst y.
+  by rewrite !inE Hpx.
+have Hcomp_nonpos : \P_[D] (predC p) <= 0.
+  rewrite pr_predC HD.
+  lra.
+lra.
+Qed.
+
 Lemma shared_complete_sample_coupling_pr_eq1
     {T U V : choiceType} (D : {distr T / R})
     (f : T -> U) (g : T -> V)
@@ -1202,6 +1228,43 @@ Lemma shared_complete_sample_coupling_pr_ge1
 Proof.
 move=> Hsome Hnone.
 by rewrite shared_complete_sample_coupling_pr_eq1.
+Qed.
+
+Lemma shared_complete_sample_coupling_pr_eq1_total
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V)
+    (post : pred (option U * option V)) :
+  dweight D = 1 ->
+  (forall x, x \in dinsupp D -> post (Some (f x), Some (g x))) ->
+  \P_[shared_complete_sample_coupling D f g] post = 1.
+Proof.
+move=> HD Hsome.
+apply: pr_eq1_of_support.
+- exact: shared_complete_sample_coupling_dweight.
+- move=> xy Hxy.
+  rewrite /shared_complete_sample_coupling in Hxy.
+  have [ox Hox Hinner] := @dinsupp_dlet R _ _ _ _ _ Hxy.
+  case: ox Hox Hinner=> [x|] Hox Hinner.
+  + have -> : xy = (Some (f x), Some (g x)).
+      exact: in_dunit Hinner.
+    apply: Hsome.
+    move: Hox.
+    by rewrite in_dinsupp completeE /= -in_dinsupp.
+  + exfalso.
+    move: Hox.
+    by rewrite in_dinsupp completeE /= HD subrr eqxx.
+Qed.
+
+Lemma shared_complete_sample_coupling_pr_ge1_total
+    {T U V : choiceType} (D : {distr T / R})
+    (f : T -> U) (g : T -> V)
+    (post : pred (option U * option V)) :
+  dweight D = 1 ->
+  (forall x, x \in dinsupp D -> post (Some (f x), Some (g x))) ->
+  \P_[shared_complete_sample_coupling D f g] post >= 1.
+Proof.
+move=> HD Hsome.
+by rewrite shared_complete_sample_coupling_pr_eq1_total.
 Qed.
 
 Lemma diagonal_overlap_eq_pr {T : choiceType}

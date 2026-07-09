@@ -6,6 +6,9 @@ From extructures Require Import ord fset fmap.
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import NominalPrelude.
 From Mending.Schemes.Utils Require Import IntVec.
+From Mending.Probability.KL Require Import Core.
+From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
+From Mending.LibExtras.MathcompExtras Require Import DistrExtras DTuple.
 Import PackageNotation.
 Import Order.Theory.
 Local Open Scope package_scope.
@@ -96,12 +99,14 @@ Module Type ApproxFheScheme.
 
 End ApproxFheScheme.
 
-(* To talk about correctness, we need a metric. *)
+(* To talk about correctness and noise flooding, we need a message metric plus
+   chart maps into integer vectors.  Route-specific chart-center and finite
+   encoding evidence is carried by the security lemmas that use it. *)
 Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
   Parameter metric : message → message → nat.
+  Parameter dim : nat.
   (* We only care about metrics that are locally isometric to Z^n.
    * e.g., polynomials of some fixed degree whose coefficients belong to a finite field. *)
-  Parameter dim : nat.
   (* TODO Why not just assume center maps to 0^n? *)
   Parameter isometry_radius : message -> nat.
   Parameter isometry : message -> message -> dim.-tuple int.
@@ -119,6 +124,14 @@ Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
     metric center a <= isometry_radius center ->
     metric center b <= isometry_radius center ->
     metric a b = ivec_dist (isometry center a) (isometry center b).
+  Definition centered_tuple_gaussian (stdev : R) :
+      distr R (dim.-tuple int) :=
+    nfold_distr dim (centered_discrete_gaussian stdev).
+  Definition shifted_tuple_gaussian
+      (center : dim.-tuple int) (stdev : R) :
+    distr R (dim.-tuple int) :=
+    dmargin (fun noise => ivec_add noise center)
+      (centered_tuple_gaussian stdev).
 End ApproxFheMetric.
 
 (* Correctness of each individual algorithm in the FHE 4-tuple *)
