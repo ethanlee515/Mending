@@ -57,8 +57,10 @@ Latest `Print Assumptions Secure.is_secure` grouping:
 
 Notably absent from the current public endpoint assumptions:
 `finite_encoding_cert`, `chart_center_dist_le_metric_cert`,
-`finite_common_inverse_isometry_encoding`, `inv_isoK`, `isoK`, and
-`iso_correct`.
+`finite_common_inverse_isometry_encoding`, `finite_message_encoding_cert`,
+`isometry_radius`, `inv_isoK`, `isoK`, and `iso_correct`. These names have now
+also been removed from the Coq hot-path files rather than merely being unused
+assumptions.
 
 The new frontier is therefore SSProve's program/package semantics themselves.
 `raw_code`, `Pr_code`, and `raw_package` expose the admitted interchange axiom,
@@ -328,6 +330,15 @@ Definition clean_coupling d P Q :=
   `Probability/OutputHeap.v:complete_output_heap` wrapper directly, i.e.
   "pack output/heap, then apply `complete`." A grep for the exact identifier
   `completed_output_heap` under `theories/` now returns no matches.
+- Removed the old finite-codomain noise-flooding route and the scalar/short
+  decrypt-replacement variants that depended on it. The security proof now
+  keeps the tuple-budget, ready-vector-bound compiler route as the theorem
+  path, and grepping `theories/` finds no remaining
+  `finite_encoding_cert`, `finite_message_encoding_cert`,
+  `finite_common_inverse_isometry_encoding`, or
+  `chart_center_dist_le_metric_cert`.
+- Removed unused optional chart axioms from `ApproxFHE.v`:
+  `isometry_radius`, `inv_isoK`, `isoK`, and `iso_correct`.
 
 ## Metric Interface Ground Truth
 
@@ -357,24 +368,17 @@ metric a b = ivec_dist 0 (I_a(b))
 I_a(a) = 0
 ```
 
-`inv_isoK`, `isoK`, `isometry_radius`, and `iso_correct` remain restored in
-`ApproxFHE.v` for the user's original metric interface record. They are not
-the current proof route.
+`inv_isoK`, `isoK`, `isometry_radius`, and `iso_correct` have been removed from
+`ApproxFHE.v`. They were reasonable optional chart-interface facts, but not
+part of the main theorem or paper-facing proof route.
 
-The old `finite_encoding_cert`/`chart_center_dist_le_metric_cert` route still
-exists as legacy scaffolding for older lemmas, but it is explicitly marked
-obsolete in `NoiseFloodingSecurity.v` and is not used by the public endpoint.
-In particular, `finite_common_inverse_isometry_encoding` should not guide new
-work; it conflicts with the intended origin-centered chart story. The current
-endpoint uses the one-chart vector comparison plus `metric_chartE` instead.
-The practical finite-codomain workaround is therefore resolved for the public
-security theorem: `ApproxFHE.v` has no finite isometry-codomain assumption, and
-`Print Assumptions Secure.is_secure` no longer lists `finite_encoding_cert`,
-`chart_center_dist_le_metric_cert`, or `finite_message_encoding_cert`. Some
-finite-encoding lemmas remain in `NoiseFloodingSecurity.v` as legacy or
-short/scalar variants; the theorem-facing path uses the ready-vector-bound
-compiler route, proving the KL/Pythagorean cost on integer-vector Gaussians and
-then applying the deterministic message continuation operationally.
+The old finite-codomain workaround has been deleted from the Coq hot path:
+`finite_encoding_cert`, `finite_message_encoding_cert`,
+`chart_center_dist_le_metric_cert`, and
+`finite_common_inverse_isometry_encoding` no longer occur under `theories/`.
+The theorem-facing path uses the ready-vector-bound compiler route, proving the
+KL/Pythagorean cost on integer-vector Gaussians and then applying the
+deterministic message continuation operationally.
 
 ## Current Frontier
 

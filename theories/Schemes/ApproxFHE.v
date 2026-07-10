@@ -108,7 +108,6 @@ Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
   (* We only care about metrics that are locally isometric to Z^n.
    * e.g., polynomials of some fixed degree whose coefficients belong to a finite field. *)
   (* Charts are origin-centered: each chosen center maps to the zero vector. *)
-  Parameter isometry_radius : message -> nat.
   Parameter isometry : message -> message -> dim.-tuple int.
   Parameter inverse_isometry : message -> dim.-tuple int -> message.
   Axiom isometry_center0 :
@@ -120,18 +119,6 @@ Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
     forall (centerL centerR : message) (v : dim.-tuple int),
     inverse_isometry centerR v =
     inverse_isometry centerL (ivec_add v (isometry centerL centerR)).
-  Axiom inv_isoK :
-    forall (center : message) (m : message),
-    inverse_isometry center (isometry center m) = m.
-  Axiom isoK :
-    forall (center : message) (v : dim.-tuple int),
-    ivec_dist (isometry center center) v <= isometry_radius center ->
-    isometry center (inverse_isometry center v) = v.
-  Axiom iso_correct :
-    forall (center : message) (a b : message),
-    metric center a <= isometry_radius center ->
-    metric center b <= isometry_radius center ->
-    metric a b = ivec_dist (isometry center a) (isometry center b).
   Definition centered_tuple_gaussian (stdev : R) :
       distr R (dim.-tuple int) :=
     nfold_distr dim (centered_discrete_gaussian stdev).
