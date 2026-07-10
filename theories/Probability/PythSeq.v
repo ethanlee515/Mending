@@ -30,11 +30,6 @@ Definition completedPythKernelPair {ℓ : nat} : Type :=
   ({distr ((ℓ.+1).-tuple (option (nat * heap))) / R} *
    {distr ((ℓ.+1).-tuple (option (nat * heap))) / R})%type.
 
-Definition completed_output_heap {out_t : choice_type}
-    (out : {distr (out_t * heap) / R}) :
-    {distr (option (nat * heap)) / R} :=
-  complete (dmargin (@pack_output_heap out_t) out).
-
 Lemma dlet_complete_some
   {T U : choiceType}
   (D : {distr T / R})
@@ -94,9 +89,9 @@ Definition completedPythKernelSpec
   let '(P, Q) := W in
   pythDist P Q s /\
   dmargin (fun omega => tnth omega ord_max) P
-    =1 completed_output_heap KL /\
+    =1 complete_output_heap KL /\
   dmargin (fun omega => tnth omega ord_max) Q
-    =1 completed_output_heap KR /\
+    =1 complete_output_heap KR /\
   (forall x, x \in dinsupp KL -> post x) /\
   (forall x, x \in dinsupp KR -> post x).
 
@@ -120,7 +115,7 @@ Lemma completedPythKernelSpec_marginL
   (W : completedPythKernelPair (ℓ := ℓ)) :
   completedPythKernelSpec KL KR post s W ->
   dmargin (fun omega => tnth omega ord_max) W.1
-    =1 completed_output_heap KL.
+    =1 complete_output_heap KL.
 Proof. by case: W=> P Q /= [_ [Hmargin _]]. Qed.
 
 Lemma completedPythKernelSpec_marginR
@@ -132,7 +127,7 @@ Lemma completedPythKernelSpec_marginR
   (W : completedPythKernelPair (ℓ := ℓ)) :
   completedPythKernelSpec KL KR post s W ->
   dmargin (fun omega => tnth omega ord_max) W.2
-    =1 completed_output_heap KR.
+    =1 complete_output_heap KR.
 Proof. by case: W=> P Q /= [_ [_ [Hmargin _]]]. Qed.
 
 Lemma completedPythKernelSpec_postL
@@ -184,7 +179,7 @@ Definition completedSemanticBindKernel
       match decode_output_heap packed with
       | Some y =>
           match @idP (mid y) with
-          | ReflectT _ => completed_output_heap (K y)
+          | ReflectT _ => complete_output_heap (K y)
           | ReflectF _ => dunit None
           end
       | None => dunit None
@@ -192,19 +187,19 @@ Definition completedSemanticBindKernel
   | None => dunit None
   end.
 
-Lemma completed_output_heap_bind_some
+Lemma complete_output_heap_bind_some
   {mid_t out_t : choice_type}
   (ML : {distr (mid_t * heap) / R})
   (KL : mid_t * heap -> {distr (out_t * heap) / R})
   (mid : pred (mid_t * heap)) :
   (forall y, y \in dinsupp ML -> mid y) ->
   forall packed,
-  (\dlet_(x <- completed_output_heap ML)
+  (\dlet_(x <- complete_output_heap ML)
     completedSemanticBindKernel KL mid x) (Some packed)
-  = completed_output_heap (\dlet_(y <- ML) KL y) (Some packed).
+  = complete_output_heap (\dlet_(y <- ML) KL y) (Some packed).
 Proof.
 move=> Hmid packed.
-rewrite /completed_output_heap.
+rewrite /complete_output_heap.
 rewrite (dlet_complete_some (dmargin (@pack_output_heap mid_t) ML)
   (completedSemanticBindKernel KL mid) packed); last first.
   by rewrite /completedSemanticBindKernel dunit1E.
@@ -222,19 +217,19 @@ have Hy : y \in dinsupp ML.
 congr (_ * _).
 rewrite /completedSemanticBindKernel decode_output_heap_pack.
 destruct (@idP (mid y)) as [Hymid|Hymid].
-  by rewrite /completed_output_heap completeE.
+  by rewrite /complete_output_heap completeE.
 by case: Hymid; exact: (Hmid y Hy).
 Qed.
 
-Lemma completed_output_heap_bind_none_mass
+Lemma complete_output_heap_bind_none_mass
   {mid_t out_t : choice_type}
   (ML : {distr (mid_t * heap) / R})
   (KL : mid_t * heap -> {distr (out_t * heap) / R}) :
-  (\dlet_(y <- ML) completed_output_heap (KL y)) None +
+  (\dlet_(y <- ML) complete_output_heap (KL y)) None +
     (1 - dweight ML) =
-  completed_output_heap (\dlet_(y <- ML) KL y) None.
+  complete_output_heap (\dlet_(y <- ML) KL y) None.
 Proof.
-rewrite /completed_output_heap !completeE /=.
+rewrite /complete_output_heap !completeE /=.
 rewrite dmargin_dweight.
 rewrite dletE.
 rewrite (eq_psum
@@ -265,23 +260,23 @@ rewrite (eq_psum
   by move=> y; rewrite completeE /= dmargin_dweight.
 Qed.
 
-Lemma completed_output_heap_bind_none
+Lemma complete_output_heap_bind_none
   {mid_t out_t : choice_type}
   (ML : {distr (mid_t * heap) / R})
   (KL : mid_t * heap -> {distr (out_t * heap) / R})
   (mid : pred (mid_t * heap)) :
   (forall y, y \in dinsupp ML -> mid y) ->
-  (\dlet_(x <- completed_output_heap ML)
+  (\dlet_(x <- complete_output_heap ML)
     completedSemanticBindKernel KL mid x) None
-  = completed_output_heap (\dlet_(y <- ML) KL y) None.
+  = complete_output_heap (\dlet_(y <- ML) KL y) None.
 Proof.
 move=> Hmid.
-rewrite /completed_output_heap.
+rewrite /complete_output_heap.
 rewrite dlet_complete_none.
 rewrite dmargin_dweight dunit1E eqxx mulr1.
 rewrite (dlet_dmargin_pack_output_heap ML
   (fun x => completedSemanticBindKernel KL mid (Some x)) None).
-rewrite -(completed_output_heap_bind_none_mass ML KL).
+rewrite -(complete_output_heap_bind_none_mass ML KL).
 congr (_ + _).
 rewrite !dletE.
 apply/eq_psum=> y.
@@ -293,24 +288,24 @@ have Hy : y \in dinsupp ML.
 congr (_ * _).
 rewrite /completedSemanticBindKernel decode_output_heap_pack.
 destruct (@idP (mid y)) as [Hymid|Hymid].
-  by rewrite /completed_output_heap.
+  by rewrite /complete_output_heap.
 by case: Hymid; exact: (Hmid y Hy).
 Qed.
 
 
-Lemma completed_output_heap_bind
+Lemma complete_output_heap_bind
   {mid_t out_t : choice_type}
   (ML : {distr (mid_t * heap) / R})
   (KL : mid_t * heap -> {distr (out_t * heap) / R})
   (mid : pred (mid_t * heap)) :
   (forall y, y \in dinsupp ML -> mid y) ->
-  \dlet_(x <- completed_output_heap ML)
+  \dlet_(x <- complete_output_heap ML)
     completedSemanticBindKernel KL mid x
-  =1 completed_output_heap (\dlet_(y <- ML) KL y).
+  =1 complete_output_heap (\dlet_(y <- ML) KL y).
 Proof.
 move=> Hmid [packed|].
-- exact: completed_output_heap_bind_some.
-- exact: completed_output_heap_bind_none.
+- exact: complete_output_heap_bind_some.
+- exact: complete_output_heap_bind_none.
 Qed.
 
 Lemma completedPythKernel_choice
@@ -902,9 +897,9 @@ Lemma completedTraceBind_suffix_bound_bad_prefix
   completedPythTraceBindPair mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall j : 'I_(ℓ2.+1), 0 <= tnth s2 j) ->
@@ -927,13 +922,13 @@ case Hfinal: (tnth (catTuplePrefix i Hi a) ord_max)=> [packed|].
       exact: (dmargin_dinsupp_image P0
         (fun omega => tnth omega ord_max) _ Hprefix_supp).
     have Hfinal_supp_ML :
-        Some packed \in dinsupp (completed_output_heap ML).
+        Some packed \in dinsupp (complete_output_heap ML).
       rewrite in_dinsupp -HmarginL0.
       by move: Hfinal_supp_P0; rewrite in_dinsupp.
     have Hpacked_supp :
         packed \in dinsupp (dmargin (@pack_output_heap mid_t) ML).
       move: Hfinal_supp_ML.
-      by rewrite in_dinsupp /completed_output_heap completeE /= in_dinsupp.
+      by rewrite in_dinsupp /complete_output_heap completeE /= in_dinsupp.
     have [z Hz Hpack] :=
       dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
         packed Hpacked_supp.
@@ -1004,9 +999,9 @@ Lemma completedTraceBind_suffix_bound
   completedPythTraceBindPair mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall j : 'I_(ℓ2.+1), 0 <= tnth s2 j) ->
@@ -1081,9 +1076,9 @@ Lemma completedTraceBind_cond_bound
   completedPythTraceBindPair mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall j : 'I_(ℓ2.+1), 0 <= tnth s2 j) ->
@@ -1118,9 +1113,9 @@ Lemma completedTraceBind_cond_finite_kl
   completedPythTraceBindPair mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
@@ -1210,13 +1205,13 @@ case Hfinal: (tnth (catTuplePrefix i Hi a) ord_max)=> [packed|].
         exact: (dmargin_dinsupp_image P0
           (fun omega => tnth omega ord_max) _ Hprefix_supp).
       have Hfinal_supp_ML :
-          Some packed \in dinsupp (completed_output_heap ML).
+          Some packed \in dinsupp (complete_output_heap ML).
         rewrite in_dinsupp -HmarginL0.
         by move: Hfinal_supp_P0; rewrite in_dinsupp.
       have Hpacked_supp :
           packed \in dinsupp (dmargin (@pack_output_heap mid_t) ML).
         move: Hfinal_supp_ML.
-        by rewrite in_dinsupp /completed_output_heap completeE /= in_dinsupp.
+        by rewrite in_dinsupp /complete_output_heap completeE /= in_dinsupp.
       have [z Hz Hpack] :=
         dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
           packed Hpacked_supp.
@@ -1251,13 +1246,13 @@ case Hfinal: (tnth (catTuplePrefix i Hi a) ord_max)=> [packed|].
       exact: (dmargin_dinsupp_image P0
         (fun omega => tnth omega ord_max) _ Hprefix_supp).
     have Hfinal_supp_ML :
-        Some packed \in dinsupp (completed_output_heap ML).
+        Some packed \in dinsupp (complete_output_heap ML).
       rewrite in_dinsupp -HmarginL0.
       by move: Hfinal_supp_P0; rewrite in_dinsupp.
     have Hpacked_supp :
         packed \in dinsupp (dmargin (@pack_output_heap mid_t) ML).
       move: Hfinal_supp_ML.
-      by rewrite in_dinsupp /completed_output_heap completeE /= in_dinsupp.
+      by rewrite in_dinsupp /complete_output_heap completeE /= in_dinsupp.
     have [z Hz Hpack] :=
       dmargin_dinsupp_preimage ML (@pack_output_heap mid_t)
         packed Hpacked_supp.
@@ -1315,9 +1310,9 @@ Lemma completedTraceBind_pythDist
   completedPythTraceBindPair mid P0 Q0 K P Q ->
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
@@ -1359,7 +1354,7 @@ Lemma completedTraceKernel_final_marginL
       completedPythKernelPair (ℓ := ℓ2)) :
   (forall y,
     dmargin (fun omega => tnth omega ord_max) (K y).1
-      =1 completed_output_heap (KL (proj1_sig y))) ->
+      =1 complete_output_heap (KL (proj1_sig y))) ->
   forall omega,
     dmargin (fun omega2 => tnth omega2 ord_max)
       (@completedPythTraceKernelL ℓ1 ℓ2 mid_t mid K omega)
@@ -1385,7 +1380,7 @@ Lemma completedTraceKernel_final_marginR
       completedPythKernelPair (ℓ := ℓ2)) :
   (forall y,
     dmargin (fun omega => tnth omega ord_max) (K y).2
-      =1 completed_output_heap (KR (proj1_sig y))) ->
+      =1 complete_output_heap (KR (proj1_sig y))) ->
   forall omega,
     dmargin (fun omega2 => tnth omega2 ord_max)
       (@completedPythTraceKernelR ℓ1 ℓ2 mid_t mid K omega)
@@ -1412,15 +1407,15 @@ Lemma completedTraceKernel_bind_final_marginL
   (K : { y : mid_t * heap | mid y } ->
       completedPythKernelPair (ℓ := ℓ2)) :
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y,
     dmargin (fun omega => tnth omega ord_max) (K y).1
-      =1 completed_output_heap (KL (proj1_sig y))) ->
+      =1 complete_output_heap (KL (proj1_sig y))) ->
   \dlet_(omega <- P0)
     dmargin (fun omega2 => tnth omega2 ord_max)
       (completedPythTraceKernelL mid K omega)
-  =1 completed_output_heap (\dlet_(y <- ML) KL y).
+  =1 complete_output_heap (\dlet_(y <- ML) KL y).
 Proof.
 move=> Hmargin Hmid HK z.
 pose final (omega : (ℓ1.+1).-tuple (option (nat * heap))) :=
@@ -1432,11 +1427,11 @@ rewrite -(eq_in_dlet (mu := P0)
   rewrite -(dlet_dmargin_final P0
     (completedSemanticBindKernel KL mid) z).
   rewrite -(eq_in_dlet
-    (mu := completed_output_heap ML)
+    (mu := complete_output_heap ML)
     (nu := dmargin final P0)
     (f := completedSemanticBindKernel KL mid)
     (g := completedSemanticBindKernel KL mid)).
-    exact: (completed_output_heap_bind ML KL mid Hmid z).
+    exact: (complete_output_heap_bind ML KL mid Hmid z).
   - by [].
   - by move=> x; rewrite -Hmargin.
 - move=> omega Homega z'.
@@ -1457,15 +1452,15 @@ Lemma completedTraceKernel_bind_final_marginR
   (K : { y : mid_t * heap | mid y } ->
       completedPythKernelPair (ℓ := ℓ2)) :
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y,
     dmargin (fun omega => tnth omega ord_max) (K y).2
-      =1 completed_output_heap (KR (proj1_sig y))) ->
+      =1 complete_output_heap (KR (proj1_sig y))) ->
   \dlet_(omega <- Q0)
     dmargin (fun omega2 => tnth omega2 ord_max)
       (completedPythTraceKernelR mid K omega)
-  =1 completed_output_heap (\dlet_(y <- MR) KR y).
+  =1 complete_output_heap (\dlet_(y <- MR) KR y).
 Proof.
 move=> Hmargin Hmid HK z.
 pose final (omega : (ℓ1.+1).-tuple (option (nat * heap))) :=
@@ -1477,11 +1472,11 @@ rewrite -(eq_in_dlet (mu := Q0)
   rewrite -(dlet_dmargin_final Q0
     (completedSemanticBindKernel KR mid) z).
   rewrite -(eq_in_dlet
-    (mu := completed_output_heap MR)
+    (mu := complete_output_heap MR)
     (nu := dmargin final Q0)
     (f := completedSemanticBindKernel KR mid)
     (g := completedSemanticBindKernel KR mid)).
-    exact: (completed_output_heap_bind MR KR mid Hmid z).
+    exact: (complete_output_heap_bind MR KR mid Hmid z).
   - by [].
   - by move=> x; rewrite -Hmargin.
 - move=> omega Homega z'.
@@ -1505,21 +1500,21 @@ Lemma completedTraceBind_final_margins
       (option (nat * heap))) / R}) :
   completedPythTraceBindPair mid P0 Q0 K P Q ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall y,
     dmargin (fun omega => tnth omega ord_max) (K y).1
-      =1 completed_output_heap (KL (proj1_sig y))) ->
+      =1 complete_output_heap (KL (proj1_sig y))) ->
   (forall y,
     dmargin (fun omega => tnth omega ord_max) (K y).2
-      =1 completed_output_heap (KR (proj1_sig y))) ->
+      =1 complete_output_heap (KR (proj1_sig y))) ->
   dmargin (fun omega => tnth omega ord_max) P
-    =1 completed_output_heap (\dlet_(y <- ML) KL y) /\
+    =1 complete_output_heap (\dlet_(y <- ML) KL y) /\
   dmargin (fun omega => tnth omega ord_max) Q
-    =1 completed_output_heap (\dlet_(y <- MR) KR y).
+    =1 complete_output_heap (\dlet_(y <- MR) KR y).
 Proof.
 move=> [HP HQ] HmarginL0 HmarginR0 HmidL HmidR HKL HKR.
 split.
@@ -1586,9 +1581,9 @@ Lemma completedPythDist_bind_pyth_kernel_witness
       completedPythKernelPair (ℓ := ℓ2)) :
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
@@ -1599,9 +1594,9 @@ Lemma completedPythDist_bind_pyth_kernel_witness
       (option (nat * heap))) / R}),
     pythDist P Q (cat_tuple s1 s2) /\
     dmargin (fun omega => tnth omega ord_max) P
-      =1 completed_output_heap (\dlet_(y <- ML) KL y) /\
+      =1 complete_output_heap (\dlet_(y <- ML) KL y) /\
     dmargin (fun omega => tnth omega ord_max) Q
-      =1 completed_output_heap (\dlet_(y <- MR) KR y) /\
+      =1 complete_output_heap (\dlet_(y <- MR) KR y) /\
     (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
     (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
 Proof.
@@ -1620,9 +1615,9 @@ have Hdist :
   exact: (completedPythKernelSpec_dist _ _ _ _ _ (HK y)).
 have [HmarginL HmarginR] :
     dmargin (fun omega => tnth omega ord_max) P
-      =1 completed_output_heap (\dlet_(y <- ML) KL y) /\
+      =1 complete_output_heap (\dlet_(y <- ML) KL y) /\
     dmargin (fun omega => tnth omega ord_max) Q
-      =1 completed_output_heap (\dlet_(y <- MR) KR y).
+      =1 complete_output_heap (\dlet_(y <- MR) KR y).
   apply: (completedTraceBind_final_margins
     ML MR KL KR mid P0 Q0 K P Q Hbind
     HmarginL0 HmarginR0 HmidL HmidR).
@@ -1659,9 +1654,9 @@ Lemma completedPythDist_bind_pyth_kernel
   (P0 Q0 : {distr ((ℓ1.+1).-tuple (option (nat * heap))) / R}) :
   pythDist P0 Q0 s1 ->
   dmargin (fun omega => tnth omega ord_max) P0
-    =1 completed_output_heap ML ->
+    =1 complete_output_heap ML ->
   dmargin (fun omega => tnth omega ord_max) Q0
-    =1 completed_output_heap MR ->
+    =1 complete_output_heap MR ->
   (forall y, y \in dinsupp ML -> mid y) ->
   (forall y, y \in dinsupp MR -> mid y) ->
   (forall i : 'I_(ℓ2.+1), 0 <= tnth s2 i) ->
@@ -1670,18 +1665,18 @@ Lemma completedPythDist_bind_pyth_kernel
         (option (nat * heap))) / R}),
       pythDist P Q s2 /\
       dmargin (fun omega => tnth omega ord_max) P
-        =1 completed_output_heap (KL y) /\
+        =1 complete_output_heap (KL y) /\
       dmargin (fun omega => tnth omega ord_max) Q
-        =1 completed_output_heap (KR y) /\
+        =1 complete_output_heap (KR y) /\
       (forall x, x \in dinsupp (KL y) -> post x) /\
       (forall x, x \in dinsupp (KR y) -> post x)) ->
   exists (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple
       (option (nat * heap))) / R}),
     pythDist P Q (cat_tuple s1 s2) /\
     dmargin (fun omega => tnth omega ord_max) P
-      =1 completed_output_heap (\dlet_(y <- ML) KL y) /\
+      =1 complete_output_heap (\dlet_(y <- ML) KL y) /\
     dmargin (fun omega => tnth omega ord_max) Q
-      =1 completed_output_heap (\dlet_(y <- MR) KR y) /\
+      =1 complete_output_heap (\dlet_(y <- MR) KR y) /\
     (forall x, x \in dinsupp (\dlet_(y <- ML) KL y) -> post x) /\
     (forall x, x \in dinsupp (\dlet_(y <- MR) KR y) -> post x).
 Proof.

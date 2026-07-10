@@ -323,6 +323,11 @@ Definition clean_coupling d P Q :=
 - `rg -n "\bcoupling\b|\blmg\b|\brmg\b"` over the migrated AE/security files
   now finds no real proof dependency on SSProve `coupling`; only a comment
   remains in `PythCompile.v`.
+- Removed the duplicate `completed_output_heap` wrapper from
+  `Probability/PythSeq.v`. Pythagorean trace sequencing now uses the canonical
+  `Probability/OutputHeap.v:complete_output_heap` wrapper directly, i.e.
+  "pack output/heap, then apply `complete`." A grep for the exact identifier
+  `completed_output_heap` under `theories/` now returns no matches.
 
 ## Metric Interface Ground Truth
 
@@ -362,6 +367,14 @@ obsolete in `NoiseFloodingSecurity.v` and is not used by the public endpoint.
 In particular, `finite_common_inverse_isometry_encoding` should not guide new
 work; it conflicts with the intended origin-centered chart story. The current
 endpoint uses the one-chart vector comparison plus `metric_chartE` instead.
+The practical finite-codomain workaround is therefore resolved for the public
+security theorem: `ApproxFHE.v` has no finite isometry-codomain assumption, and
+`Print Assumptions Secure.is_secure` no longer lists `finite_encoding_cert`,
+`chart_center_dist_le_metric_cert`, or `finite_message_encoding_cert`. Some
+finite-encoding lemmas remain in `NoiseFloodingSecurity.v` as legacy or
+short/scalar variants; the theorem-facing path uses the ready-vector-bound
+compiler route, proving the KL/Pythagorean cost on integer-vector Gaussians and
+then applying the deterministic message continuation operationally.
 
 ## Current Frontier
 
@@ -420,6 +433,39 @@ rg -n "__deprecated__dlet_dmargin|__deprecated__dmargin_dlet" \
 Those remaining deprecated rewrites are not currently the known public-theorem
 `interchange_psum` source, but they are worth cleaning eventually.
 
+## Paper Notes
+
+`Pythagorean-RHL/pyth-rhl.tex` has been updated to match the current
+program-logic surface:
+
+- Added a rule-inventory figure covering Hoare, additive-error,
+  Pythagorean, and compiler/oracle-replacement rules, now grouped by proof
+  role: semantic base rules, derived rules, and compiler theorems.
+- Clarified that legacy admitted non-option AE convenience lemmas are not the
+  paper-facing route; the proof uses completed-output/total variants.
+- Documented the scalar versus tuple compiler/oracle-replacement rules, with a
+  `\Codex{...}` note that the compiler-family soundness proof is the hardest
+  program-logic proof to explain later.
+- Replaced the concrete author list in `main.tex` with an author-list
+  placeholder.
+- Removed the scratch KL summability section from the compiled paper. The
+  useful point from that scratch section, namely that value-level KL and
+  summability use the same prefix-grouping argument, was folded into
+  `discrete-gaussian-analysis.tex`.
+- Updated Section 5.1.2 (`lmss.tex`) to remove the obsolete "Limitation of our
+  program logic" example. The query-bound adversary story now says that
+  data-dependent oracle calls are handled by the verified trace compiler, while
+  the raw fixed-tuple Pythagorean judgment remains a lower-level design choice.
+
+Paper build command currently succeeds:
+
+```sh
+make -C Pythagorean-RHL
+```
+
+The build still reports existing overfull/underfull boxes from long inference
+rules/equations and dense rule-table wrapping, but no fatal LaTeX errors.
+
 ## Verification Commands
 
 Known passing commands after the clean-coupling migration:
@@ -432,6 +478,7 @@ timeout 600s rocq c -Q theories Mending theories/LibExtras/SSProveExtras/SubDist
 timeout 600s rocq c -Q theories Mending theories/LibExtras/SSProveExtras/FreeProbProgExtras.v
 timeout 600s rocq c -Q theories Mending theories/Probability/Ae.v
 timeout 600s rocq c -Q theories Mending theories/Probability/OutputHeap.v
+timeout 600s rocq c -Q theories Mending theories/Probability/PythSeq.v
 timeout 600s rocq c -Q theories Mending theories/Probability/KL/Core.v
 timeout 600s rocq c -Q theories Mending theories/ProgramLogics/Ae.v
 timeout 600s rocq c -Q theories Mending theories/ProgramLogics/Pyth.v

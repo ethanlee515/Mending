@@ -506,9 +506,9 @@ have Hcont :
           (option (nat * heap))) / R}),
         pythDist P Q s2 /\
         dmargin (fun omega => tnth omega ord_max) P
-          =1 completed_output_heap (KL y) /\
+          =1 complete_output_heap (KL y) /\
         dmargin (fun omega => tnth omega ord_max) Q
-          =1 completed_output_heap (KR y) /\
+          =1 complete_output_heap (KR y) /\
         (forall x, x \in dinsupp (KL y) -> post x) /\
         (forall x, x \in dinsupp (KR y) -> post x).
   move=> [y mem] Hy.
