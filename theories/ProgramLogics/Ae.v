@@ -29,7 +29,7 @@ Definition clean_coupling {A1 A2 : choiceType}
     (c1 : {distr A1 / R}) (c2 : {distr A2 / R}) : Prop :=
   dmargin fst d =1 c1 /\ dmargin snd d =1 c2.
 
-Definition additiveErrorJudgmentOpt
+Definition additiveErrorJudgment
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
@@ -46,42 +46,22 @@ Definition additiveErrorJudgmentOpt
 Declare Scope AeNotations.
 Local Open Scope AeNotations.
 
-Notation "⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
-  (additiveErrorJudgmentOpt progL progR pre post ε) : AeNotations.
+Notation "⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
+  (additiveErrorJudgment progL progR pre post ε) : AeNotations.
 
-Definition additiveErrorJudgment
+Definition additiveErrorRawJudgment
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred ((outL_t * heap) * (outR_t * heap)))
   (ε : R) : Prop :=
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ lift_loss_post post ⦄.
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ lift_loss_post post ⦄.
 
-Notation "⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
-  (additiveErrorJudgment progL progR pre post ε) : AeNotations.
+Notation "⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
+  (additiveErrorRawJudgment progL progR pre post ε) : AeNotations.
 
 Lemma additiveErrorCoupleRule
-  {inL_t inR_t outL_t outR_t : ord_choiceType}
-  (progL : inL_t -> raw_code outL_t)
-  (progR : inR_t -> raw_code outR_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (post : pred ((outL_t * heap) * (outR_t * heap)))
-  (ε : R)
-  (wit : forall memL memR xL xR,
-      pre ((xL, memL), (xR, memR)) ->
-      {distr _ / R}) :
-  0 <= ε ->
-  (forall memL memR xL xR Hpre,
-    let out1 := Pr_code (progL xL) memL in
-    let out2 := Pr_code (progR xR) memR in
-    coupling_with_loss (wit memL memR xL xR Hpre) out1 out2) ->
-  (forall memL memR xL xR Hpre,
-    \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄.
-Admitted.
-
-Lemma additiveErrorCoupleOptRule
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
@@ -99,7 +79,7 @@ Lemma additiveErrorCoupleOptRule
       (complete out1) (complete out2)) ->
   (forall memL memR xL xR Hpre,
     \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄.
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄.
 Proof.
 move=> Heps Hcoupling Hpost.
 split; first exact: Heps.
@@ -110,47 +90,31 @@ split.
 - exact: Hpost.
 Qed.
 
-Lemma additiveErrorEpsNonneg
+Lemma additiveErrorRawEpsNonneg
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred ((outL_t * heap) * (outR_t * heap)))
   (ε : R) :
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
+  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
   0 <= ε.
 Proof.
 by move=> [Heps _].
 Qed.
 
-Lemma additiveErrorOptEpsNonneg
+Lemma additiveErrorEpsNonneg
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (post : pred (option (outL_t * heap) * option (outR_t * heap)))
   (ε : R) :
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
   0 <= ε.
 Proof.
 by move=> [Heps _].
 Qed.
-
-Lemma additiveErrorTvdEqRule
-  {inL_t inR_t out_t : ord_choiceType}
-  (progL : inL_t -> raw_code out_t)
-  (progR : inR_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (ε : R) :
-  0 <= ε ->
-  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
-    total_variation (Pr_code (progL xL) memL)
-                    (Pr_code (progR xR) memR) <= ε) ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
-	    fun outs =>
-	      let '((y_1, m_1'), (y_2, m_2')) := outs in
-	      (y_1 == y_2) && (m_1' == m_2') ⦄.
-Admitted.
 
 Lemma dmargin_comp
     {A B C : choiceType} (f : B -> C) (g : A -> B)
@@ -185,7 +149,7 @@ move=> HD [x|].
   by rewrite dunit1E mulr0.
 Qed.
 
-Lemma additiveErrorTvdEqTotalRule
+Lemma additiveErrorRawTvdEqTotalRule
   {inL_t inR_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
@@ -199,7 +163,7 @@ Lemma additiveErrorTvdEqTotalRule
   (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
     total_variation (Pr_code (progL xL) memL)
                     (Pr_code (progR xR) memR) <= ε) ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃
     fun outs =>
       let '((y_1, m_1'), (y_2, m_2')) := outs in
       (y_1 == y_2) && (m_1' == m_2') ⦄.
@@ -245,7 +209,7 @@ Definition same_output_heap_opt {out_t : choice_type}
     (outs : option (out_t * heap) * option (out_t * heap)) : bool :=
   outs.1 == outs.2.
 
-Lemma additiveErrorOptSameOutputTvdEqRule
+Lemma additiveErrorSameOutputTvdEqRule
   {inL_t inR_t out_t : choice_type}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
@@ -256,7 +220,7 @@ Lemma additiveErrorOptSameOutputTvdEqRule
     total_variation
       (complete (Pr_code (progL xL) memL))
       (complete (Pr_code (progR xR) memR)) <= ε) ->
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_output_heap_opt ⦄.
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_output_heap_opt ⦄.
 Proof.
 move=> Heps Htv.
 split; first exact: Heps.
@@ -287,7 +251,7 @@ Lemma additiveErrorCompletedOutputHeapTvdEqRule
     total_variation
       (complete_output_heap (Pr_code (progL xL) memL))
       (complete_output_heap (Pr_code (progR xR) memR)) <= ε) ->
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
     fun outs =>
     let '(outL, outR) := outs in
     outL == outR ⦄.
@@ -313,13 +277,13 @@ split.
   by case=> outL outR.
 Qed.
 
-Lemma additiveErrorOptSameOutputTvBound
+Lemma additiveErrorSameOutputTvBound
   {inL_t inR_t out_t : choice_type}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (ε : R) memL memR xL xR :
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_output_heap_opt ⦄ ->
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_output_heap_opt ⦄ ->
   pre ((xL, memL), (xR, memR)) ->
   total_variation
     (complete (Pr_code (progL xL) memL))
@@ -346,30 +310,30 @@ apply: (exact_coupling_eq_pr_total_variation d
 - exact: Hprob.
 Qed.
 
-Lemma additiveErrorOptSameOutputTriangleRule
+Lemma additiveErrorSameOutputTriangleRule
   {in_t out_t : choice_type}
   (progL progM progR : in_t -> raw_code out_t)
   (pre : pred ((in_t * heap) * (in_t * heap)))
   (ε ε' : R) :
   (forall memL memR xL xR,
     pre ((xL, memL), (xR, memR)) -> xL = xR /\ memL = memR) ->
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progM ⦃ same_output_heap_opt ⦄ ->
-  ⊨AE_opt ⦃ pre ⦄ progM ≈( ε' ) progR ⦃ same_output_heap_opt ⦄ ->
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε + ε' ) progR ⦃ same_output_heap_opt ⦄.
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progM ⦃ same_output_heap_opt ⦄ ->
+  ⊨AE ⦃ pre ⦄ progM ≈( ε' ) progR ⦃ same_output_heap_opt ⦄ ->
+  ⊨AE ⦃ pre ⦄ progL ≈( ε + ε' ) progR ⦃ same_output_heap_opt ⦄.
 Proof.
 move=> Hsame HLM HMR.
-apply: additiveErrorOptSameOutputTvdEqRule.
-- have Heps := additiveErrorOptEpsNonneg _ _ _ _ _ HLM.
-  have Heps' := additiveErrorOptEpsNonneg _ _ _ _ _ HMR.
+apply: additiveErrorSameOutputTvdEqRule.
+- have Heps := additiveErrorEpsNonneg _ _ _ _ _ HLM.
+  have Heps' := additiveErrorEpsNonneg _ _ _ _ _ HMR.
   lra.
 - move=> memL memR xL xR Hpre.
   have [Hx Hmem] := Hsame memL memR xL xR Hpre.
   subst xR; subst memR.
   have HtvLM :=
-    additiveErrorOptSameOutputTvBound
+    additiveErrorSameOutputTvBound
       progL progM pre ε memL memL xL xL HLM Hpre.
   have HtvMR :=
-    additiveErrorOptSameOutputTvBound
+    additiveErrorSameOutputTvBound
       progM progR pre ε' memL memL xL xL HMR Hpre.
   have Htri := total_variation_triangle
     (complete (Pr_code (progL xL) memL))
@@ -379,28 +343,7 @@ apply: additiveErrorOptSameOutputTvdEqRule.
   lra.
 Qed.
 
-Lemma additiveErrorTvdEqPostRule
-  {inL_t inR_t out_t : ord_choiceType}
-  (progL : inL_t -> raw_code out_t)
-  (progR : inR_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (post : pred (out_t * heap))
-  (ε : R) :
-  0 <= ε ->
-  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
-    total_variation (Pr_code (progL xL) memL)
-                    (Pr_code (progR xR) memR) <= ε) ->
-  (forall memL memR xL xR y,
-    pre ((xL, memL), (xR, memR)) ->
-    y \in dinsupp (Pr_code (progL xL) memL) ->
-    post y) ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
-	    fun outs =>
-	      let '((y_1, m_1'), (y_2, m_2')) := outs in
-	      post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2') ⦄.
-Admitted.
-
-Lemma additiveErrorTvdEqPostTotalRule
+Lemma additiveErrorRawTvdEqPostTotalRule
   {inL_t inR_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
@@ -419,7 +362,7 @@ Lemma additiveErrorTvdEqPostTotalRule
     pre ((xL, memL), (xR, memR)) ->
     y \in dinsupp (Pr_code (progL xL) memL) ->
     post y) ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃
+  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃
     fun outs =>
       let '((y_1, m_1'), (y_2, m_2')) := outs in
       post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2') ⦄.
@@ -496,16 +439,7 @@ split.
     by rewrite Hpost !eqxx.
 Qed.
 
-Lemma additiveErrorReflRule
-  {in_t out_t : ord_choiceType}
-  (prog : in_t -> raw_code out_t)
-  (pre : pred ((in_t * heap) * (in_t * heap))) :
-  (forall memL memR xL xR,
-    pre ((xL, memL), (xR, memR)) -> xL = xR /\ memL = memR) ->
-  ⊨AE ⦃ pre ⦄ prog ≈( 0 ) prog ⦃ fun outs => outs.1.1 == outs.2.1 ⦄.
-Admitted.
-
-Lemma additiveErrorConseqRule
+Lemma additiveErrorRawConseqRule
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
@@ -515,8 +449,8 @@ Lemma additiveErrorConseqRule
   (forall inps, pre' inps -> pre inps) ->
   (forall outs, post outs -> post' outs) ->
   ε <= ε' ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
-  ⊨AE ⦃ pre' ⦄ progL ≈( ε' ) progR ⦃ post' ⦄.
+  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
+  ⊨AE_raw ⦃ pre' ⦄ progL ≈( ε' ) progR ⦃ post' ⦄.
 Proof.
 move=> Hpre Hpost Herr [Heps Hae].
 split; first by lra.
@@ -533,7 +467,7 @@ have Hthreshold : 1 - ε' <= 1 - ε by lra.
 exact: (le_trans Hthreshold (le_trans Hprob Hmono)).
 Qed.
 
-Lemma additiveErrorOptConseqRule
+Lemma additiveErrorConseqRule
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
   (progR : inR_t -> raw_code outR_t)
@@ -543,8 +477,8 @@ Lemma additiveErrorOptConseqRule
   (forall inps, pre' inps -> pre inps) ->
   (forall outs, post outs -> post' outs) ->
   ε <= ε' ->
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
-  ⊨AE_opt ⦃ pre' ⦄ progL ≈( ε' ) progR ⦃ post' ⦄.
+  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
+  ⊨AE ⦃ pre' ⦄ progL ≈( ε' ) progR ⦃ post' ⦄.
 Proof.
 move=> Hpre Hpost Herr [Heps Hae].
 split; first by lra.
@@ -558,7 +492,7 @@ have Hthreshold : 1 - ε' <= 1 - ε by lra.
 exact: (le_trans Hthreshold (le_trans Hprob Hmono)).
 Qed.
 
-Lemma additiveErrorReflTotalRule
+Lemma additiveErrorRawReflTotalRule
   {in_t out_t : ord_choiceType}
   (prog : in_t -> raw_code out_t)
   (pre : pred ((in_t * heap) * (in_t * heap))) :
@@ -567,10 +501,10 @@ Lemma additiveErrorReflTotalRule
   (forall memL memR xL xR,
     pre ((xL, memL), (xR, memR)) ->
     dweight (Pr_code (prog xL) memL) = 1) ->
-  ⊨AE ⦃ pre ⦄ prog ≈( 0 ) prog ⦃ fun outs => outs.1.1 == outs.2.1 ⦄.
+  ⊨AE_raw ⦃ pre ⦄ prog ≈( 0 ) prog ⦃ fun outs => outs.1.1 == outs.2.1 ⦄.
 Proof.
 move=> Hsame Hweight.
-apply: (additiveErrorConseqRule
+apply: (additiveErrorRawConseqRule
   prog prog pre pre
   (fun outs =>
     let '((y_1, m_1'), (y_2, m_2')) := outs in
@@ -580,7 +514,7 @@ apply: (additiveErrorConseqRule
 - case=> [[yL memL] [yR memR]] /=.
   by move/andP=> [/eqP -> _]; rewrite eqxx.
 - exact: lexx.
-apply: (additiveErrorTvdEqTotalRule prog prog pre 0).
+apply: (additiveErrorRawTvdEqTotalRule prog prog pre 0).
 - exact: lexx.
 - exact: Hweight.
 - move=> memL memR xL xR Hpre.
@@ -593,7 +527,7 @@ apply: (additiveErrorTvdEqTotalRule prog prog pre 0).
   exact: total_variation_refl_le0.
 Qed.
 
-Definition additiveErrorOptSeqKernel
+Definition additiveErrorSeqKernel
   {midL_t midR_t outL_t outR_t : ord_choiceType}
   (contL : midL_t -> raw_code outL_t)
   (contR : midR_t -> raw_code outR_t)
@@ -623,7 +557,7 @@ Definition additiveErrorOptSeqKernel
   | _ => complete_bind_fallback_coupling KL KR xy
   end.
 
-Lemma additiveErrorOptSeqKernel_margins
+Lemma additiveErrorSeqKernel_margins
   {midL_t midR_t outL_t outR_t : ord_choiceType}
   (contL : midL_t -> raw_code outL_t)
   (contR : midR_t -> raw_code outR_t)
@@ -640,13 +574,13 @@ Lemma additiveErrorOptSeqKernel_margins
   (xy : option (midL_t * heap) * option (midR_t * heap)) :
   let KL ymem := Pr_code (contL ymem.1) ymem.2 in
   let KR ymem := Pr_code (contR ymem.1) ymem.2 in
-  clean_coupling (additiveErrorOptSeqKernel contL contR mid post ε' Hcont xy)
+  clean_coupling (additiveErrorSeqKernel contL contR mid post ε' Hcont xy)
     (complete_bind_kernel KL xy.1)
     (complete_bind_kernel KR xy.2).
 Proof.
 case: xy=> [[ymemL|] [ymemR|]] /=.
 - case: ymemL=> yL memL; case: ymemR=> yR memR /=.
-  rewrite /additiveErrorOptSeqKernel /=.
+  rewrite /additiveErrorSeqKernel /=.
   destruct (@idP (mid ((yL, memL), (yR, memR)))) as [Hmid|Hmid].
   + case: (boolp.constructive_indefinite_description
       (Hcont memL memR yL yR Hmid))=> d [[HdL HdR] Hprob] /=.
@@ -687,7 +621,7 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
   - exact: HdR.
 Qed.
 
-Definition additiveErrorOptSeqGood
+Definition additiveErrorSeqGood
   {midL_t midR_t : ord_choiceType}
   (mid : pred ((midL_t * heap) * (midR_t * heap)))
   (xy : option (midL_t * heap) * option (midR_t * heap)) : bool :=
@@ -697,7 +631,7 @@ Definition additiveErrorOptSeqGood
   | _ => false
   end.
 
-Lemma additiveErrorOptSeqKernel_event
+Lemma additiveErrorSeqKernel_event
   {midL_t midR_t outL_t outR_t : ord_choiceType}
   (contL : midL_t -> raw_code outL_t)
   (contR : midR_t -> raw_code outR_t)
@@ -712,13 +646,13 @@ Lemma additiveErrorOptSeqKernel_event
           (complete (Pr_code (contR yR) memR)) /\
         \P_[ d ] post >= 1 - ε')
   xy :
-  additiveErrorOptSeqGood mid xy ->
-  \P_[additiveErrorOptSeqKernel contL contR mid post ε' Hcont xy] post >=
+  additiveErrorSeqGood mid xy ->
+  \P_[additiveErrorSeqKernel contL contR mid post ε' Hcont xy] post >=
     1 - ε'.
 Proof.
 case: xy=> [[ymemL|] [ymemR|]] /=.
 - case: ymemL=> yL memL; case: ymemR=> yR memR /= Hgood.
-  rewrite /additiveErrorOptSeqKernel /=.
+  rewrite /additiveErrorSeqKernel /=.
   destruct (@idP (mid ((yL, memL), (yR, memR)))) as [Hmid|Hmid].
   + case: (boolp.constructive_indefinite_description
       (Hcont memL memR yL yR Hmid))=> d [[HdL HdR] Hprob] /=.
@@ -764,7 +698,7 @@ split.
     by apply: eq_in_dlet=> // y _ z'; rewrite HdR.
 Qed.
 
-Lemma additiveErrorOptSeqRule_coupling
+Lemma additiveErrorSeqRule_coupling
   {inL_t inR_t midL_t midR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code midL_t)
   (progR : inR_t -> raw_code midR_t)
@@ -774,8 +708,8 @@ Lemma additiveErrorOptSeqRule_coupling
   (mid : pred ((midL_t * heap) * (midR_t * heap)))
   (post : pred (option (outL_t * heap) * option (outR_t * heap)))
   (ε ε' : R) memL memR xL xR :
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
-  ⊨AE_opt ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
+  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
+  ⊨AE ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
   pre ((xL, memL), (xR, memR)) ->
   exists d,
     clean_coupling d
@@ -786,13 +720,13 @@ move=> [_ Hprefix] [_ Hcont] Hpre.
 have [d0 [Hd0 Hmidprob]] := Hprefix memL memR xL xR Hpre.
 pose KL (ymem : midL_t * heap) := Pr_code (contL ymem.1) ymem.2.
 pose KR (ymem : midR_t * heap) := Pr_code (contR ymem.1) ymem.2.
-pose K := additiveErrorOptSeqKernel contL contR mid post ε' Hcont.
+pose K := additiveErrorSeqKernel contL contR mid post ε' Hcont.
 exists (\dlet_(xy <- d0) K xy).
 have Hbind := coupling_bind_kernel d0
   (complete (Pr_code (progL xL) memL))
   (complete (Pr_code (progR xR) memR))
   K (complete_bind_kernel KL) (complete_bind_kernel KR)
-  Hd0 (additiveErrorOptSeqKernel_margins contL contR mid post ε' Hcont).
+  Hd0 (additiveErrorSeqKernel_margins contL contR mid post ε' Hcont).
 move: Hbind=> [HL HR].
 split.
 - move=> z.
@@ -809,7 +743,7 @@ split.
   by [].
 Qed.
 
-Lemma additiveErrorOptSeqRule
+Lemma additiveErrorSeqRule
   {inL_t inR_t midL_t midR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code midL_t)
   (progR : inR_t -> raw_code midR_t)
@@ -819,9 +753,9 @@ Lemma additiveErrorOptSeqRule
   (mid : pred ((midL_t * heap) * (midR_t * heap)))
   (post : pred (option (outL_t * heap) * option (outR_t * heap)))
   (ε ε' : R) :
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
-  ⊨AE_opt ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
-  ⊨AE_opt ⦃ pre ⦄
+  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
+  ⊨AE ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
+  ⊨AE ⦃ pre ⦄
     (fun xL => yL ← progL xL ;; contL yL)
     ≈( ε + ε' )
     (fun xR => yR ← progR xR ;; contR yR)
@@ -835,14 +769,14 @@ move=> memL memR xL xR Hpre.
 have [d0 [Hd0 Hmidprob]] := Hprefix memL memR xL xR Hpre.
 pose KL (ymem : midL_t * heap) := Pr_code (contL ymem.1) ymem.2.
 pose KR (ymem : midR_t * heap) := Pr_code (contR ymem.1) ymem.2.
-pose K := additiveErrorOptSeqKernel contL contR mid post ε' Hcont.
+pose K := additiveErrorSeqKernel contL contR mid post ε' Hcont.
 exists (\dlet_(xy <- d0) K xy).
 split.
 - have Hbind := coupling_bind_kernel d0
     (complete (Pr_code (progL xL) memL))
     (complete (Pr_code (progR xR) memR))
     K (complete_bind_kernel KL) (complete_bind_kernel KR)
-    Hd0 (additiveErrorOptSeqKernel_margins contL contR mid post ε' Hcont).
+    Hd0 (additiveErrorSeqKernel_margins contL contR mid post ε' Hcont).
   move: Hbind=> [HL HR].
   split.
   + move=> z.
@@ -858,7 +792,7 @@ split.
     rewrite Pr_code_bind.
     by [].
 - have Hgoodprob :
-      \P_[d0] (additiveErrorOptSeqGood mid) >= 1 - ε.
+      \P_[d0] (additiveErrorSeqGood mid) >= 1 - ε.
     rewrite (eq_pr (B := lift_loss_post mid)); first exact: Hmidprob.
     case=> [[ymemL|] [ymemR|]] /=.
     + by case: ymemL=> yL memL0; case: ymemR=> yR memR0.
@@ -866,14 +800,14 @@ split.
     + by case: ymemR=> yR memR0.
     + by [].
   apply: (pr_dlet_lower_bound_good d0 K
-    (additiveErrorOptSeqGood mid) post ε ε').
+    (additiveErrorSeqGood mid) post ε ε').
   + exact: Heps.
   + exact: Heps'.
   + exact: Hgoodprob.
-  + exact: (additiveErrorOptSeqKernel_event contL contR mid post ε' Hcont).
+  + exact: (additiveErrorSeqKernel_event contL contR mid post ε' Hcont).
 Qed.
 
-Lemma additiveErrorSeqRule
+Lemma additiveErrorRawSeqRule
   {inL_t inR_t midL_t midR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code midL_t)
   (progR : inR_t -> raw_code midR_t)
@@ -883,61 +817,24 @@ Lemma additiveErrorSeqRule
   (mid : pred ((midL_t * heap) * (midR_t * heap)))
   (post : pred ((outL_t * heap) * (outR_t * heap)))
   (ε ε' : R) :
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
-  ⊨AE ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
-  ⊨AE ⦃ pre ⦄
+  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
+  ⊨AE_raw ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
+  ⊨AE_raw ⦃ pre ⦄
     (fun xL => yL ← progL xL ;; contL yL)
     ≈( ε + ε' )
     (fun xR => yR ← progR xR ;; contR yR)
   ⦃ post ⦄.
 Proof.
-exact: additiveErrorOptSeqRule.
+exact: additiveErrorSeqRule.
 Qed.
 
-Lemma additiveErrorCompileCallsRule
-  (q : nat) (X Y I O : choice_type)
-  (L L' : Locations) (M : Interface)
-  (P' : raw_package) (fn : ident)
-  (prog : I -> raw_code O) :
-  ValidPackage L' [interface] M P' ->
-  fhas M (mkopsig fn X Y) ->
-  (forall x, ValidCode L M (prog x)) ->
-  ⊨AE ⦃ fun inps =>
-          let '((xL, memL), (xR, memR)) := inps in
-          (xL == xR) && (memL == memR) ⦄
-    (fun x => code_link
-      (compile_calls q (X := X) (Y := Y) P' fn (prog x))
-      P')
-    ≈( 0 )
-    (fun x => code_link (prog x) P')
-  ⦃ fun outs =>
-      let '((yL, memL), (yR, memR)) := outs in
-      (yL == yR) && (memL == memR) ⦄.
-Proof.
-move=> HP' Hfn Hprog.
-apply: additiveErrorTvdEqRule.
-- exact: lexx.
-- move=> memL memR xL xR Hpre.
-  move/andP: Hpre => [/eqP -> /eqP ->].
-  rewrite (@compile_calls_correct_code_link q X Y O L L' M P' fn (prog xR)
-    HP' Hfn (Hprog xR)).
-  rewrite /total_variation.
-  rewrite (_ : sum (fun y =>
-      `|Pr_code (code_link (prog xR) P') memR y -
-        Pr_code (code_link (prog xR) P') memR y|) = 0).
-    by rewrite mulr0 lexx.
-  rewrite -(@sum0 R (O * heap)%type).
-  apply/eq_sum => y.
-  by rewrite subrr normr0.
-Qed.
-
-Lemma additiveErrorTvBound
+Lemma additiveErrorRawTvBound
   {inL_t inR_t out_t : ord_choiceType}
   (progL : inL_t -> raw_code out_t)
   (progR : inR_t -> raw_code out_t)
   (pre : pred ((inL_t * heap) * (inR_t * heap)))
   (ε : R) memL memR xL xR :
-	  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ fun outs => outs.1.1 == outs.2.1 ⦄ ->
+	  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ fun outs => outs.1.1 == outs.2.1 ⦄ ->
 	  pre ((xL, memL), (xR, memR)) ->
 	  total_variation (dmargin fst (Pr_code (progL xL) memL))
 	                  (dmargin fst (Pr_code (progR xR) memR)) <= ε.

@@ -122,8 +122,8 @@ Probability and analysis:
   probability facts.
 * `theories/Probability/DiscreteGaussians/` contains the discrete-Gaussian
   analysis.
-* `theories/Security/GaussianVector.v` packages the vector-Gaussian facts used
-  by noise flooding.
+* `theories/Security/NoiseFloodingSecurity/GaussianBasics.v` packages the
+  vector-Gaussian facts used by noise flooding.
 * `theories/Probability/OutputHeap.v` and `theories/Probability/PythSeq.v`
   contain the completed-output and trace-sequencing infrastructure.
 * `theories/LibExtras/` contains local MathComp and SSProve helper lemmas.

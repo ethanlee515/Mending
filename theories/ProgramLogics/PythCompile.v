@@ -3485,7 +3485,7 @@ Lemma compileRule
   ⦃ fun out =>
     let '(y, mem) := out in
     call_invariant mem ⦄ ->
-  ⊨AE_opt ⦃ fun inps =>
+  ⊨AE ⦃ fun inps =>
           let '((xL, memL), (xR, memR)) := inps in
           (xL == xR) && (memL == memR) &&
           call_invariant memL ⦄

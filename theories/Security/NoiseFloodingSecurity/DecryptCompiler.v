@@ -267,7 +267,7 @@ Module NoiseFloodingSecureDecryptCompiler
       decrypt_count_over_bound max_queries memL.
 
   Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_ae max_queries :
-    ⊨AE_opt ⦃ same_input_decrypt_over_bound_pre max_queries ⦄
+    ⊨AE ⦃ same_input_decrypt_over_bound_pre max_queries ⦄
       (fun i : nat =>
         resolve (IndCpadGame.IndCpadOracle max_queries)
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
@@ -277,7 +277,7 @@ Module NoiseFloodingSecureDecryptCompiler
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
     ⦃ same_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameResultTvdEqRule.
+    apply: additiveErrorSameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR iL iR Hpre.
       rewrite /same_input_decrypt_over_bound_pre in Hpre.
@@ -289,7 +289,7 @@ Module NoiseFloodingSecureDecryptCompiler
 
   Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_output_ae
       max_queries :
-    ⊨AE_opt ⦃ same_input_decrypt_over_bound_pre max_queries ⦄
+    ⊨AE ⦃ same_input_decrypt_over_bound_pre max_queries ⦄
       (fun i : nat =>
         resolve (IndCpadGame.IndCpadOracle max_queries)
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
@@ -299,7 +299,7 @@ Module NoiseFloodingSecureDecryptCompiler
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
     ⦃ same_output_heap_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR iL iR Hpre.
       rewrite /same_input_decrypt_over_bound_pre in Hpre.

@@ -521,7 +521,7 @@ Module NoiseFloodingSecureOracleSetup
         Hpost Hnone).
   Qed.
 
-  Lemma additiveErrorOptSameResultTvdEqRule
+  Lemma additiveErrorSameResultTvdEqRule
       {inL_t inR_t out_t : choice_type}
       (progL : inL_t -> raw_code out_t)
       (progR : inR_t -> raw_code out_t)
@@ -533,7 +533,7 @@ Module NoiseFloodingSecureOracleSetup
       total_variation
         (complete (dmargin fst (Pr_code (progL xL) memL)))
         (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε) ->
-    ⊨AE_opt ⦃ pre ⦄
+    ⊨AE ⦃ pre ⦄
       progL ≈( ε ) progR
     ⦃ same_result_opt ⦄.
   Proof.
@@ -689,23 +689,23 @@ Module NoiseFloodingSecureOracleSetup
     by move/andP=> [/eqP -> _]; rewrite /same_result_opt /= eqxx.
   Qed.
 
-  Lemma additiveErrorOptSeqSameResultSimDecryptReductionRule
+  Lemma additiveErrorSeqSameResultSimDecryptReductionRule
       {inL_t inR_t mid_t out_t : choice_type}
       (progL : inL_t -> raw_code mid_t)
       (progR : inR_t -> raw_code mid_t)
       (contL contR : mid_t -> raw_code out_t)
       (pre : pred ((inL_t * heap) * (inR_t * heap))) :
-    ⊨AE_opt ⦃ pre ⦄
+    ⊨AE ⦃ pre ⦄
       progL
       ≈( 0 )
       progR
     ⦃ same_result_sim_decrypt_reduction_opt ⦄ ->
-    ⊨AE_opt ⦃ same_input_sim_decrypt_reduction_pre ⦄
+    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
       contL
       ≈( 0 )
       contR
     ⦃ same_result_sim_decrypt_reduction_opt ⦄ ->
-    ⊨AE_opt ⦃ pre ⦄
+    ⊨AE ⦃ pre ⦄
       (fun xL => yL ← progL xL ;; contL yL)
       ≈( 0 )
       (fun xR => yR ← progR xR ;; contR yR)
@@ -719,7 +719,7 @@ Module NoiseFloodingSecureOracleSetup
     pose post := (@same_result_sim_decrypt_reduction_opt out_t).
     pose KL (ymem : mid_t * heap) := Pr_code (contL ymem.1) ymem.2.
     pose KR (ymem : mid_t * heap) := Pr_code (contR ymem.1) ymem.2.
-    pose K := additiveErrorOptSeqKernel contL contR mid post 0 Hcont.2.
+    pose K := additiveErrorSeqKernel contL contR mid post 0 Hcont.2.
     exists (\dlet_(xy <- d0) K xy).
     split.
     - have Hbind := coupling_bind_kernel d0
@@ -727,7 +727,7 @@ Module NoiseFloodingSecureOracleSetup
         (complete (Pr_code (progR xR) memR))
         K (complete_bind_kernel KL) (complete_bind_kernel KR)
         Hd0
-        (additiveErrorOptSeqKernel_margins
+        (additiveErrorSeqKernel_margins
           contL contR mid post 0 Hcont.2).
       move: Hbind=> [HL HR].
       split.
@@ -753,18 +753,18 @@ Module NoiseFloodingSecureOracleSetup
           * case: ymemL=> yL memL'.
             case: ymemR=> yR memR' /= Hmid.
             have Hgood :
-                additiveErrorOptSeqGood mid
+                additiveErrorSeqGood mid
                   (Some (yL, memL'), Some (yR, memR')).
-              by rewrite /additiveErrorOptSeqGood /mid
+              by rewrite /additiveErrorSeqGood /mid
                 /same_input_sim_decrypt_reduction_pre.
-            exact: (additiveErrorOptSeqKernel_event
+            exact: (additiveErrorSeqKernel_event
               contL contR mid post 0 Hcont.2 _ Hgood).
           * by case: ymemL.
           * by case: ymemR.
           * have HKnone :
                 K (None, None) =1 dunit (None, None).
               move=> z.
-              rewrite /K /additiveErrorOptSeqKernel
+              rewrite /K /additiveErrorSeqKernel
                 /complete_bind_fallback_coupling /complete_bind_kernel
                 /product_coupling.
               by rewrite !dlet_unit.

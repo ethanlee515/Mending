@@ -337,7 +337,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_encrypt_resolve_linked_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : message * message =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -348,7 +348,7 @@ Module NoiseFloodingSecureOperationBridges
         ind_cpa_reduction_sim_encrypt_linked_code max_queries x)
     ⦃ same_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameResultTvdEqRule.
+    apply: additiveErrorSameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR [m0 m1] [m0' m1'] Hpre.
       rewrite /same_input_sim_decrypt_reduction_pre in Hpre.
@@ -360,7 +360,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_encrypt_resolve_linked_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : message * message =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -466,7 +466,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_encrypt_resolve_outer_link_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : message * message =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -1045,7 +1045,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_eval1_resolve_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : unary_gate * nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -1058,7 +1058,7 @@ Module NoiseFloodingSecureOperationBridges
             (chProd unary_gate nat) ciphertext) x)
     ⦃ same_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameResultTvdEqRule.
+    apply: additiveErrorSameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR [gate r] [gate' r'] Hpre.
       rewrite /same_input_sim_decrypt_reduction_pre in Hpre.
@@ -1070,7 +1070,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_eval1_resolve_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : unary_gate * nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -1196,7 +1196,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_eval1_resolve_outer_link_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : unary_gate * nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -1682,7 +1682,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_eval2_resolve_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : (binary_gate * nat) * nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -1695,7 +1695,7 @@ Module NoiseFloodingSecureOperationBridges
             (chProd (chProd binary_gate nat) nat) ciphertext) x)
     ⦃ same_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameResultTvdEqRule.
+    apply: additiveErrorSameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR [[gate ri] rj] [[gate' ri'] rj'] Hpre.
       rewrite /same_input_sim_decrypt_reduction_pre in Hpre.
@@ -1707,7 +1707,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_eval2_resolve_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : (binary_gate * nat) * nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -1864,7 +1864,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_eval2_resolve_outer_link_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : (binary_gate * nat) * nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -2510,7 +2510,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_decrypt_resolve_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -2521,7 +2521,7 @@ Module NoiseFloodingSecureOperationBridges
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
     ⦃ same_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameResultTvdEqRule.
+    apply: additiveErrorSameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR i i' Hpre.
       rewrite /same_input_sim_decrypt_reduction_pre in Hpre.
@@ -2533,7 +2533,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_decrypt_resolve_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
@@ -2666,7 +2666,7 @@ Module NoiseFloodingSecureOperationBridges
 
   Lemma ind_cpad_sim_decrypt_reduction_decrypt_resolve_outer_link_rel_ae
       max_queries :
-    ⊨AE_opt
+    ⊨AE
     ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : nat =>
         resolve (IndCpadSimDecryptOracle max_queries)

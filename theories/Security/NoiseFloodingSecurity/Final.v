@@ -57,7 +57,7 @@ Module NoiseFloodingSecure
     fseparate (loc (ind_cpa_reduction_moved_adversary A))
       IndCpaSecurity.IndCpaGame.IndCpa_locs ->
     sim_decrypt_reduction_adv_continuation_witness A guessL guessR ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (fun _ : chUnit =>
         init ← ind_cpad_challenge_init_code tt ;;
         guessL init)
@@ -480,7 +480,7 @@ Module NoiseFloodingSecure
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
-    ⊨AE_opt ⦃ same_input_invariant_pre challenge_heap_valid ⦄
+    ⊨AE ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_compiled_real_guess_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_guess_code A max_queries)
@@ -523,7 +523,7 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ same_input_invariant_pre challenge_heap_valid ⦄
+    ⊨AE ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_compiled_real_guess_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_guess_code A max_queries)
@@ -1126,7 +1126,7 @@ Module NoiseFloodingSecure
       (A : nom_package) :
     fseparate (loc (ind_cpa_reduction_moved_adversary A))
       IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       ind_cpad_challenge_init_code
       ≈( 0 )
       ind_cpa_reduction_challenge_init_code
@@ -1152,13 +1152,13 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_linked_to_factored_outer_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_linked_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpa_reduction_linked_game_code A max_queries)
       (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -1168,7 +1168,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - exact: lexx.
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -1180,13 +1180,13 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_factored_outer_to_linked_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_linked_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
       (ind_cpa_reduction_linked_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -1196,7 +1196,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - exact: lexx.
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -1208,13 +1208,13 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_unfresh_linked_to_factored_outer_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_unfresh_factored_outer_linked_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
       (ind_cpa_reduction_unfresh_factored_outer_linked_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -1224,7 +1224,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - exact: lexx.
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -1236,13 +1236,13 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_unfresh_factored_outer_to_linked_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_unfresh_factored_outer_linked_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpa_reduction_unfresh_factored_outer_linked_game_code A max_queries)
       (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -1252,7 +1252,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - exact: lexx.
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -1276,13 +1276,13 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_game_code_linked_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_linked_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpa_reduction_game_code A max_queries)
       (ind_cpa_reduction_linked_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -1292,7 +1292,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - by [].
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -1304,13 +1304,13 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_linked_game_code_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_linked_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpa_reduction_linked_game_code A max_queries)
       (ind_cpa_reduction_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -1320,7 +1320,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - by [].
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -1331,7 +1331,7 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_reduction_challenge_init_rel_total_ae :
-    ⊨AE ⦃ game_initial_pre ⦄
+    ⊨AE_raw ⦃ game_initial_pre ⦄
       ind_cpad_challenge_init_code
       ≈( 0 )
       ind_cpa_reduction_challenge_init_code
@@ -1423,13 +1423,13 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_reduction_challenge_init_rel_ae :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       ind_cpad_challenge_init_code
       ≈( 0 )
       ind_cpa_reduction_challenge_init_code
     ⦃ same_result_sim_decrypt_reduction_opt ⦄.
   Proof.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       ind_cpad_challenge_init_code
       ind_cpa_reduction_challenge_init_code
       game_initial_pre game_initial_pre
@@ -1451,12 +1451,12 @@ Module NoiseFloodingSecure
   Lemma ind_cpad_reduction_factored_result_bridge_from_guess
       (guessL guessR :
         (bool * (pk_t * evk_t))%type -> raw_code bool) :
-    ⊨AE_opt ⦃ same_input_sim_decrypt_reduction_pre ⦄
+    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
       guessL
       ≈( 0 )
       guessR
     ⦃ same_result_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (fun _ : chUnit =>
         init ← ind_cpad_challenge_init_code tt ;;
         guessL init)
@@ -1468,12 +1468,12 @@ Module NoiseFloodingSecure
   Proof.
     move=> Hguess.
     have Hguess_game :
-        ⊨AE_opt ⦃ same_input_sim_decrypt_reduction_pre ⦄
+        ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
           guessL
           ≈( 0 )
           guessR
         ⦃ same_game_result_opt ⦄.
-      apply: (additiveErrorOptConseqRule
+      apply: (additiveErrorConseqRule
         guessL guessR
         same_input_sim_decrypt_reduction_pre
         same_input_sim_decrypt_reduction_pre
@@ -1484,7 +1484,7 @@ Module NoiseFloodingSecure
       - exact: lexx.
       - exact: Hguess.
     have -> : (0 : R) = 0 + 0 by rewrite addr0.
-    exact: (additiveErrorOptSeqRule
+    exact: (additiveErrorSeqRule
       ind_cpad_challenge_init_code
       ind_cpa_reduction_challenge_init_code
       guessL guessR
@@ -1512,7 +1512,7 @@ Module NoiseFloodingSecure
   Lemma ind_cpad_sim_decrypt_to_factored_reduction_from_guess_ae
       (A : nom_package) max_queries
       (guessR : (bool * (pk_t * evk_t))%type -> raw_code bool) :
-    ⊨AE_opt ⦃ same_input_sim_decrypt_reduction_pre ⦄
+    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun init =>
         code_link
           (ind_cpad_open_guess_code A init)
@@ -1520,7 +1520,7 @@ Module NoiseFloodingSecure
       ≈( 0 )
       guessR
     ⦃ same_result_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_factored_game_code_from_guess guessR)
@@ -1548,7 +1548,7 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_sim_decrypt_to_direct_reduction_from_guess_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ same_input_sim_decrypt_reduction_pre ⦄
+    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun init =>
         code_link
           (ind_cpad_open_guess_code A init)
@@ -1556,7 +1556,7 @@ Module NoiseFloodingSecure
       ≈( 0 )
       (ind_cpa_reduction_direct_guess_code A max_queries)
     ⦃ same_result_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_direct_factored_game_code A max_queries)
@@ -1575,7 +1575,7 @@ Module NoiseFloodingSecure
           (ind_cpad_open_guess_code A init)
           (IndCpadSimDecryptOracle max_queries))
       (ind_cpa_reduction_direct_guess_code A max_queries) ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_direct_factored_game_code A max_queries)
@@ -1609,7 +1609,7 @@ Module NoiseFloodingSecure
       IndCpadGame.IndCpadAdv_export A ->
     fseparate (loc (ind_cpa_reduction_moved_adversary A))
       IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_direct_factored_game_code A max_queries)
@@ -1625,7 +1625,7 @@ Module NoiseFloodingSecure
   Lemma ind_cpad_sim_decrypt_to_direct_reduction_no_sep_ae
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_direct_factored_game_code A max_queries)
@@ -1638,13 +1638,13 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_challenge_init_code_ae :
-    ⊨AE ⦃ game_initial_pre ⦄
+    ⊨AE_raw ⦃ game_initial_pre ⦄
       ind_cpad_challenge_init_code
       ≈( 0 )
       ind_cpad_challenge_init_code
     ⦃ same_input_invariant_pre challenge_heap_valid ⦄.
   Proof.
-    apply: (additiveErrorConseqRule
+    apply: (additiveErrorRawConseqRule
       ind_cpad_challenge_init_code
       ind_cpad_challenge_init_code
       game_initial_pre game_initial_pre
@@ -1659,7 +1659,7 @@ Module NoiseFloodingSecure
       subst initR; subst memR.
       by rewrite /same_input_invariant_pre Hinv !eqxx.
     - by [].
-    apply: (additiveErrorTvdEqPostTotalRule
+    apply: (additiveErrorRawTvdEqPostTotalRule
       ind_cpad_challenge_init_code
       ind_cpad_challenge_init_code
       game_initial_pre
@@ -1690,7 +1690,7 @@ Module NoiseFloodingSecure
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_factored_compiled_real_guess_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_factored_compiled_sim_decrypt_guess_game_code A max_queries)
@@ -1699,7 +1699,7 @@ Module NoiseFloodingSecure
     move=> A_valid Hprefix_vector.
     have -> : compile_security_error max_queries =
         0 + compile_security_error max_queries by lra.
-    exact: (additiveErrorOptSeqRule
+    exact: (additiveErrorSeqRule
       ind_cpad_challenge_init_code
       ind_cpad_challenge_init_code
       (ind_cpad_compiled_real_guess_code A max_queries)
@@ -1717,7 +1717,7 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_factored_compiled_real_guess_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_factored_compiled_sim_decrypt_guess_game_code A max_queries)
@@ -1735,7 +1735,7 @@ Module NoiseFloodingSecure
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_compiled_real_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
@@ -1766,7 +1766,7 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_compiled_real_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
@@ -1784,7 +1784,7 @@ Module NoiseFloodingSecure
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
@@ -1809,7 +1809,7 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
@@ -1826,14 +1826,14 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
       ≈( 0 )
       (ind_cpad_sim_decrypt_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
     move=> A_valid.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
       (ind_cpad_sim_decrypt_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -1843,7 +1843,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - by [].
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -1863,21 +1863,21 @@ Module NoiseFloodingSecure
     by inversion Hpre.
   Qed.
 
-  Lemma additiveErrorOptSameGameOutputTriangleRule
+  Lemma additiveErrorSameGameOutputTriangleRule
       (progL progM progR : chUnit -> raw_code bool)
       (ε ε' : R) :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL ≈( ε ) progM
     ⦃ same_game_output_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progM ≈( ε' ) progR
     ⦃ same_game_output_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL ≈( ε + ε' ) progR
     ⦃ same_game_output_opt ⦄.
   Proof.
     move=> HLM HMR.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       progL progR
       game_initial_pre game_initial_pre
       same_output_heap_opt same_game_output_opt
@@ -1886,10 +1886,10 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - exact: lexx.
-    apply: (additiveErrorOptSameOutputTriangleRule
+    apply: (additiveErrorSameOutputTriangleRule
       progL progM progR game_initial_pre ε ε'
       game_initial_pre_same_input).
-    - apply: (additiveErrorOptConseqRule
+    - apply: (additiveErrorConseqRule
         progL progM
         game_initial_pre game_initial_pre
         same_game_output_opt same_output_heap_opt
@@ -1899,7 +1899,7 @@ Module NoiseFloodingSecure
         exact: same_game_output_same_output_heap_opt.
       + exact: lexx.
       + exact: HLM.
-    - apply: (additiveErrorOptConseqRule
+    - apply: (additiveErrorConseqRule
         progM progR
         game_initial_pre game_initial_pre
         same_game_output_opt same_output_heap_opt
@@ -1911,7 +1911,7 @@ Module NoiseFloodingSecure
       + exact: HMR.
   Qed.
 
-  Lemma additiveErrorOptSameGameResultTvdEqRule
+  Lemma additiveErrorSameGameResultTvdEqRule
       (progL progR : chUnit -> raw_code bool)
       (ε : R) :
     0 <= ε ->
@@ -1920,7 +1920,7 @@ Module NoiseFloodingSecure
       total_variation
         (complete (dmargin fst (Pr_code (progL xL) memL)))
         (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε) ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL ≈( ε ) progR
     ⦃ same_game_result_opt ⦄.
   Proof.
@@ -1966,13 +1966,13 @@ Module NoiseFloodingSecure
       by rewrite /same_game_result_opt /strip.
   Qed.
 
-  Lemma additiveErrorOptSameGameResultReflRule
+  Lemma additiveErrorSameGameResultReflRule
       (prog : chUnit -> raw_code bool) :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       prog ≈( 0 ) prog
     ⦃ same_game_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameGameResultTvdEqRule.
+    apply: additiveErrorSameGameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       have [Hx Hmem] := game_initial_pre_same_input
@@ -1981,15 +1981,15 @@ Module NoiseFloodingSecure
       exact: total_variation_refl_le0.
   Qed.
 
-  Lemma additiveErrorOptSameGameResultRenameRule
+  Lemma additiveErrorSameGameResultRenameRule
       (prog : chUnit -> raw_code bool) {π} :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       prog
       ≈( 0 )
       (fun x => π ∙ prog x)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameGameResultTvdEqRule.
+    apply: additiveErrorSameGameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -2001,17 +2001,17 @@ Module NoiseFloodingSecure
       exact: (dmargin_fst_Pr_code_rename_empty (prog tt) out).
   Qed.
 
-  Lemma additiveErrorOptSameGameResultAlphaRule
+  Lemma additiveErrorSameGameResultAlphaRule
       (progL progR : chUnit -> raw_code bool) :
     (forall x, progL x ≡ progR x) ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL
       ≈( 0 )
       progR
     ⦃ same_game_result_opt ⦄.
   Proof.
     move=> Halpha.
-    apply: additiveErrorOptSameGameResultTvdEqRule.
+    apply: additiveErrorSameGameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -2027,35 +2027,35 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_unfresh_open_to_open_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_unfresh_open_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_open_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameGameResultAlphaRule.
+    apply: additiveErrorSameGameResultAlphaRule.
     exact: ind_cpa_reduction_unfresh_open_game_code_alpha.
   Qed.
 
   Lemma ind_cpa_reduction_unfresh_linked_to_linked_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_linked_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameGameResultAlphaRule.
+    apply: additiveErrorSameGameResultAlphaRule.
     exact: ind_cpa_reduction_unfresh_linked_game_code_alpha.
   Qed.
 
-  Lemma additiveErrorOptSameGameResultTvBound
+  Lemma additiveErrorSameGameResultTvBound
     {inL_t inR_t : choice_type}
     (progL : inL_t -> raw_code bool)
     (progR : inR_t -> raw_code bool)
     (pre : pred ((inL_t * heap) * (inR_t * heap)))
     (ε : R) memL memR xL xR :
-    ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_result_opt ⦄ ->
+    ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_result_opt ⦄ ->
     pre ((xL, memL), (xR, memR)) ->
     total_variation (complete (dmargin fst (Pr_code (progL xL) memL)))
                     (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε.
@@ -2110,33 +2110,33 @@ Module NoiseFloodingSecure
     - exact: Hpost'.
   Qed.
 
-  Lemma additiveErrorOptSameGameResultTriangleRule
+  Lemma additiveErrorSameGameResultTriangleRule
       (progL progM progR : chUnit -> raw_code bool)
       (ε ε' : R) :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL ≈( ε ) progM
     ⦃ same_game_result_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progM ≈( ε' ) progR
     ⦃ same_game_result_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL ≈( ε + ε' ) progR
     ⦃ same_game_result_opt ⦄.
   Proof.
     move=> HLM HMR.
-    apply: additiveErrorOptSameGameResultTvdEqRule.
-    - have Heps := additiveErrorOptEpsNonneg _ _ _ _ _ HLM.
-      have Heps' := additiveErrorOptEpsNonneg _ _ _ _ _ HMR.
+    apply: additiveErrorSameGameResultTvdEqRule.
+    - have Heps := additiveErrorEpsNonneg _ _ _ _ _ HLM.
+      have Heps' := additiveErrorEpsNonneg _ _ _ _ _ HMR.
       lra.
     - move=> memL memR xL xR Hpre.
       have [Hx Hmem] := game_initial_pre_same_input
         memL memR xL xR Hpre.
       subst xR; subst memR.
       have HtvLM :=
-        additiveErrorOptSameGameResultTvBound
+        additiveErrorSameGameResultTvBound
           progL progM game_initial_pre ε memL memL xL xL HLM Hpre.
       have HtvMR :=
-        additiveErrorOptSameGameResultTvBound
+        additiveErrorSameGameResultTvBound
           progM progR game_initial_pre ε' memL memL xL xL HMR Hpre.
       have Htri := total_variation_triangle
         (complete (dmargin fst (Pr_code (progL xL) memL)))
@@ -2146,17 +2146,17 @@ Module NoiseFloodingSecure
       lra.
   Qed.
 
-  Lemma additiveErrorOptSameGameOutputToResult
+  Lemma additiveErrorSameGameOutputToResult
       (progL progR : chUnit -> raw_code bool) ε :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL ≈( ε ) progR
     ⦃ same_game_output_opt ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       progL ≈( ε ) progR
     ⦃ same_game_result_opt ⦄.
   Proof.
     move=> Hae.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       progL progR game_initial_pre game_initial_pre
       same_game_output_opt same_game_result_opt ε ε).
     - by [].
@@ -2167,13 +2167,13 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpa_reduction_direct_factored_to_unfresh_factored_outer_linked_ae
       (A : nom_package) max_queries :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpa_reduction_direct_factored_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_unfresh_factored_outer_linked_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    apply: additiveErrorOptSameGameResultTvdEqRule.
+    apply: additiveErrorSameGameResultTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -2195,14 +2195,14 @@ Module NoiseFloodingSecure
        [max_queries] selected decrypt calls have been compiled, any later
        decrypt call assert-fails on both the real and simulator packages
        because they share the same decrypt counter. *)
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
     move=> A_valid.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
       (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -2212,7 +2212,7 @@ Module NoiseFloodingSecure
     - move=> outs.
       exact: same_output_heap_game_output_opt.
     - exact: lexx.
-    apply: additiveErrorOptSameOutputTvdEqRule.
+    apply: additiveErrorSameOutputTvdEqRule.
     - exact: lexx.
     - move=> memL memR xL xR Hpre.
       rewrite /game_initial_pre in Hpre.
@@ -2253,7 +2253,7 @@ Module NoiseFloodingSecure
   Lemma ind_cpad_sim_decrypt_to_ind_cpa_reduction_linked_ae
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_linked_game_code A max_queries)
@@ -2267,7 +2267,7 @@ Module NoiseFloodingSecure
       ind_cpa_reduction_direct_factored_to_unfresh_factored_outer_linked_ae
         A max_queries.
     have Hunfresh_factored :=
-      additiveErrorOptSameGameOutputToResult
+      additiveErrorSameGameOutputToResult
         (ind_cpa_reduction_unfresh_factored_outer_linked_game_code
           A max_queries)
         (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
@@ -2277,26 +2277,26 @@ Module NoiseFloodingSecure
     have Hunfresh_linked :=
       ind_cpa_reduction_unfresh_linked_to_linked_ae A max_queries.
     have H1 :=
-      additiveErrorOptSameGameResultTriangleRule
+      additiveErrorSameGameResultTriangleRule
         (ind_cpad_sim_decrypt_game_code A max_queries)
         (ind_cpa_reduction_direct_factored_game_code A max_queries)
         (ind_cpa_reduction_unfresh_factored_outer_linked_game_code
           A max_queries)
         0 0 Hdirect Hdirect_unfresh_factored.
     have H2 :=
-      additiveErrorOptSameGameResultTriangleRule
+      additiveErrorSameGameResultTriangleRule
         (ind_cpad_sim_decrypt_game_code A max_queries)
         (ind_cpa_reduction_unfresh_factored_outer_linked_game_code
           A max_queries)
         (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
         (0 + 0) 0 H1 Hunfresh_factored.
     have H3 :=
-      additiveErrorOptSameGameResultTriangleRule
+      additiveErrorSameGameResultTriangleRule
         (ind_cpad_sim_decrypt_game_code A max_queries)
         (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
         (ind_cpa_reduction_linked_game_code A max_queries)
         ((0 + 0) + 0) 0 H2 Hunfresh_linked.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpad_sim_decrypt_game_code A max_queries)
       (ind_cpa_reduction_linked_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -2311,7 +2311,7 @@ Module NoiseFloodingSecure
   Lemma ind_cpad_sim_decrypt_to_ind_cpa_reduction_ae
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_sim_decrypt_game_code A max_queries)
       ≈( 0 )
       (ind_cpa_reduction_game_code A max_queries)
@@ -2322,18 +2322,18 @@ Module NoiseFloodingSecure
       ind_cpad_sim_decrypt_to_ind_cpa_reduction_linked_ae
         A max_queries A_valid.
     have Houter :=
-      additiveErrorOptSameGameOutputToResult
+      additiveErrorSameGameOutputToResult
         (ind_cpa_reduction_linked_game_code A max_queries)
         (ind_cpa_reduction_game_code A max_queries)
         0
         (ind_cpa_reduction_linked_game_code_ae A max_queries).
     have H :=
-      additiveErrorOptSameGameResultTriangleRule
+      additiveErrorSameGameResultTriangleRule
         (ind_cpad_sim_decrypt_game_code A max_queries)
         (ind_cpa_reduction_linked_game_code A max_queries)
         (ind_cpa_reduction_game_code A max_queries)
         0 0 Hlinked Houter.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpad_sim_decrypt_game_code A max_queries)
       (ind_cpa_reduction_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -2345,21 +2345,21 @@ Module NoiseFloodingSecure
     - exact: H.
   Qed.
 
-  Lemma additiveErrorOptTvBound
+  Lemma additiveErrorTvBound
     {inL_t inR_t : choice_type}
     (progL : inL_t -> raw_code bool)
     (progR : inR_t -> raw_code bool)
     (pre : pred ((inL_t * heap) * (inR_t * heap)))
     (ε : R) memL memR xL xR :
-    ⊨AE_opt ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_output_opt ⦄ ->
+    ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_output_opt ⦄ ->
     pre ((xL, memL), (xR, memR)) ->
     total_variation (complete (dmargin fst (Pr_code (progL xL) memL)))
                     (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε.
   Proof.
     move=> Hae Hpre.
-    apply: (additiveErrorOptSameGameResultTvBound
+    apply: (additiveErrorSameGameResultTvBound
       progL progR pre ε memL memR xL xR).
-    - apply: (additiveErrorOptConseqRule
+    - apply: (additiveErrorConseqRule
         progL progR pre pre same_game_output_opt same_game_result_opt ε ε).
       + by [].
       + exact: same_game_output_result_opt.
@@ -2383,7 +2383,7 @@ Module NoiseFloodingSecure
   (* Converts a whole-game AE judgment into the sampled-game advantage bound. *)
   Lemma ind_cpa_reduction_bound_from_additive_error
     (A : nom_package) max_queries ε :
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( ε )
       (ind_cpa_reduction_game_code A max_queries)
@@ -2398,7 +2398,7 @@ Module NoiseFloodingSecure
     have Hpre : game_initial_pre ((tt, empty_heap), (tt, empty_heap)).
       by rewrite /game_initial_pre.
     have Htv :=
-      additiveErrorOptSameGameResultTvBound
+      additiveErrorSameGameResultTvBound
         _ _ _ _ empty_heap empty_heap tt tt Hae Hpre.
     have Hpoint :
       `|IndCpadGame.success_probability max_queries A -
@@ -2442,14 +2442,14 @@ Module NoiseFloodingSecure
       ≈( s )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ fun _ : bool * heap => true ⦄ ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( ε )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
     move=> Hbound Hpyth.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpad_game_code A max_queries)
       (ind_cpa_reduction_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -2469,7 +2469,7 @@ Module NoiseFloodingSecure
     (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpa_reduction_game_code A max_queries)
@@ -2488,26 +2488,26 @@ Module NoiseFloodingSecure
     have Hred :=
       ind_cpad_sim_decrypt_to_ind_cpa_reduction_ae
         A max_queries A_valid.
-    have H1 := additiveErrorOptSameGameOutputTriangleRule
+    have H1 := additiveErrorSameGameOutputTriangleRule
       (ind_cpad_game_code A max_queries)
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
       (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
       (compile_security_error max_queries) 0 Hleft Hmixed.
-    have H2 := additiveErrorOptSameGameOutputTriangleRule
+    have H2 := additiveErrorSameGameOutputTriangleRule
       (ind_cpad_game_code A max_queries)
       (ind_cpad_compiled_sim_decrypt_self_link_game_code A max_queries)
       (ind_cpad_sim_decrypt_game_code A max_queries)
       (compile_security_error max_queries + 0) 0 H1 Hself.
-    have H2_result := additiveErrorOptSameGameOutputToResult
+    have H2_result := additiveErrorSameGameOutputToResult
       (ind_cpad_game_code A max_queries)
       (ind_cpad_sim_decrypt_game_code A max_queries)
       (compile_security_error max_queries + 0 + 0) H2.
-    have H3 := additiveErrorOptSameGameResultTriangleRule
+    have H3 := additiveErrorSameGameResultTriangleRule
       (ind_cpad_game_code A max_queries)
       (ind_cpad_sim_decrypt_game_code A max_queries)
       (ind_cpa_reduction_game_code A max_queries)
       (compile_security_error max_queries + 0 + 0) 0 H2_result Hred.
-    apply: (additiveErrorOptConseqRule
+    apply: (additiveErrorConseqRule
       (ind_cpad_game_code A max_queries)
       (ind_cpa_reduction_game_code A max_queries)
       game_initial_pre game_initial_pre
@@ -2523,7 +2523,7 @@ Module NoiseFloodingSecure
   Lemma ind_cpa_reduction_additive_error_from_compile
     (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpa_reduction_game_code A max_queries)
@@ -2540,7 +2540,7 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( security_loss max_queries / 2 )
       (ind_cpa_reduction_game_code A max_queries)
@@ -2556,7 +2556,7 @@ Module NoiseFloodingSecure
   Lemma ind_cpa_reduction_additive_error
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE_opt ⦃ game_initial_pre ⦄
+    ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( security_loss max_queries / 2 )
       (ind_cpa_reduction_game_code A max_queries)

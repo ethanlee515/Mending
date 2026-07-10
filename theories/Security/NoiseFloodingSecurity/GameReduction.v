@@ -2027,7 +2027,7 @@ Module NoiseFloodingSecureGameReduction
     fhas IndCpadGame.IndCpadAdv_import o ->
     fseparate (loc (ind_cpa_reduction_moved_adversary A))
       IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    ⊨AE_opt ⦃ same_input_sim_decrypt_reduction_pre ⦄
+    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : src o =>
         resolve (IndCpadSimDecryptOracle max_queries) o x)
       ≈( 0 )
@@ -2312,7 +2312,7 @@ Module NoiseFloodingSecureGameReduction
   Lemma ind_cpad_sim_decrypt_reduction_resolve_outer_link_rel_ae
       max_queries (o : opsig) :
     fhas IndCpadGame.IndCpadAdv_import o ->
-    ⊨AE_opt ⦃ same_input_sim_decrypt_reduction_pre ⦄
+    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
       (fun x : src o =>
         resolve (IndCpadSimDecryptOracle max_queries) o x)
       ≈( 0 )

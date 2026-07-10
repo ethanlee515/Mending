@@ -435,7 +435,7 @@ Lemma MicciancioWalterRule
   (s : (ℓ.+1).-tuple R) :
   ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR ⦃ post ⦄ ->
   let delta := pythagorean_tv_bound s in
-  ⊨AE_opt ⦃ pre ⦄ progL ≈( delta ) progR ⦃
+  ⊨AE ⦃ pre ⦄ progL ≈( delta ) progR ⦃
     fun outs =>
     let '(outL, outR) := outs in
     outL == outR ⦄.
