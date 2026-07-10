@@ -30,6 +30,8 @@ winning-probability bound uses twice this compile distance.
 This repository is intended for users who already have some Rocq/opam
 experience.  The development needs SSProve and MathComp, plus the MathComp
 algebra tactics package used by the Gaussian arithmetic proofs.
+We expect a reasonably recent Rocq installation; the current development has
+been checked with Rocq 9.
 
 If you already have a Rocq switch with the following packages, no special
 repository-local setup is intended:
@@ -55,14 +57,14 @@ may still use the transitional `coq-` prefix.
 Generate the Rocq makefile and build the development:
 
 ```bash
-coq_makefile -f _CoqProject -o Makefile.coq
-make -f Makefile.coq
+rocq makefile -f _RocqProject -o Makefile.rocq
+make -f Makefile.rocq
 ```
 
 To check only the main security theorem:
 
 ```bash
-make -f Makefile.coq theories/Security/NoiseFloodingSecurity/Final.vo
+make -f Makefile.rocq theories/Security/NoiseFloodingSecurity/Final.vo
 ```
 
 To inspect theorem assumptions, instantiate `NoiseFloodingSecure` with a
