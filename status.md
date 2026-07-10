@@ -7,7 +7,7 @@ Compact handoff for the current formalization state.
 The main security file builds:
 
 ```sh
-timeout 600s rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
+timeout 600s rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity/Final.v
 ```
 
 The public theorem is still not `Print Assumptions` clean. The current
@@ -45,7 +45,7 @@ Latest `Print Assumptions Secure.is_secure` grouping:
   `realsum.__admitted__interchange_psum`.
 - Expected scheme/correctness assumptions:
   the abstract scheme types and algorithms, `keygen_lossless`,
-  `dec'_correct`, `keygen_perfect_correct`, `encrypt_perfect_correct`,
+  `deterministic_dec_correct`, `keygen_perfect_correct`, `encrypt_perfect_correct`,
   `eval1_perfect_correct`, and `eval2_perfect_correct`.
 - Expected reduction assumptions:
   `IndCpaSecurity.security_bound` and `IndCpaSecurity.is_secure`.
@@ -320,7 +320,7 @@ Definition clean_coupling d P Q :=
 
 - Migrated `ProgramLogics/Ae.v` to `clean_coupling`.
 - Migrated `PythCompile.diagonalCoupling` to `clean_coupling`.
-- Migrated the local coupling helpers in `NoiseFloodingSecurity.v` to
+- Migrated the local coupling helpers in the noise-flooding security proof to
   `clean_coupling`.
 - `rg -n "\bcoupling\b|\blmg\b|\brmg\b"` over the migrated AE/security files
   now finds no real proof dependency on SSProve `coupling`; only a comment
@@ -460,6 +460,26 @@ program-logic surface:
   program logic" example. The query-bound adversary story now says that
   data-dependent oracle calls are handled by the verified trace compiler, while
   the raw fixed-tuple Pythagorean judgment remains a lower-level design choice.
+- Updated the LMSS hybrid-chain prose to match the current theorem: the
+  multi-hop sequence has one nonzero compile/Micciancio-Walter hop with loss
+  `sqrt(q * epsilon_nf / 2)`, and the remaining bounded-query, compiler
+  correctness, endpoint-identification, and package-linking bridges are exact
+  or zero-error. The public `is_secure` bound uses twice the compile distance
+  because it is stated as a winning-probability bound
+  (`security_loss_halfE`).
+- Updated `README.md` into a short user's manual: main theorem location,
+  repository map, program-logic/probability file guide, expected public
+  assumption shape, deterministic-decryption note for `deterministic_dec_correct`, and a
+  checked `Secure.is_secure` probe snippet.
+- Renamed the deterministic decryption interface from `dec'`/`dec'_correct` to
+  `deterministic_dec`/`deterministic_dec_correct` in `ApproxFHE.v` and the
+  security proof.
+- Promoted `NoiseFloodingSecurity.v` into a folder-backed proof layout. There
+  is no compatibility facade; the proof body lives in
+  `theories/Security/NoiseFloodingSecurity/` as `Prelude`, `GaussianBasics`,
+  `OracleSetup`, `OperationBridges`, `DecryptCompiler`, `GameReduction`, and
+  `Final`. The public functor is now
+  `Mending.Security.NoiseFloodingSecurity.Final.NoiseFloodingSecure`.
 
 Paper build command currently succeeds:
 
@@ -475,7 +495,7 @@ rules/equations and dense rule-table wrapping, but no fatal LaTeX errors.
 Known passing commands after the clean-coupling migration:
 
 ```sh
-timeout 600s make -f Makefile.coq theories/Security/NoiseFloodingSecurity.vo
+timeout 600s make -f Makefile.coq theories/Security/NoiseFloodingSecurity/Final.vo
 timeout 600s rocq c -Q theories Mending theories/LibExtras/MathcompExtras/RealSumExtras.v
 timeout 600s rocq c -Q theories Mending theories/LibExtras/MathcompExtras/DistrExtras.v
 timeout 600s rocq c -Q theories Mending theories/LibExtras/SSProveExtras/SubDistrExtras.v
@@ -487,13 +507,13 @@ timeout 600s rocq c -Q theories Mending theories/Probability/KL/Core.v
 timeout 600s rocq c -Q theories Mending theories/ProgramLogics/Ae.v
 timeout 600s rocq c -Q theories Mending theories/ProgramLogics/Pyth.v
 timeout 600s rocq c -Q theories Mending theories/ProgramLogics/PythCompile.v
-timeout 600s rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
+timeout 600s rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity/Final.v
 ```
 
 Public theorem probe:
 
 ```coq
-From Mending.Security Require Import NoiseFloodingSecurity.
+From Mending.Security.NoiseFloodingSecurity Require Import Final.
 From Mending.Schemes Require Import ApproxFHE Indcpa.
 From Mending.Constructions Require Import NoiseFlooding.
 

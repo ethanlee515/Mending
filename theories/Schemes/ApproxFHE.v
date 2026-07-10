@@ -132,10 +132,10 @@ End ApproxFheMetric.
 (* Correctness of each individual algorithm in the FHE 4-tuple *)
 Module Type ApproxCorrectness (Import Scheme: ApproxFheScheme) (Import M: ApproxFheMetric(Scheme)).
   (* For simplicity, we consider only pure and deterministic decryption. *)
-  Parameter (dec' : sk_t → ciphertext → message).
+  Parameter (deterministic_dec : sk_t → ciphertext → message).
   (* We require consistency later with the given scheme. *)
-  Axiom dec'_correct :
-    ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => ((dec_out == (dec' sk c)) : bool)) = 1.
+  Axiom deterministic_dec_correct :
+    ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => ((dec_out == (deterministic_dec sk c)) : bool)) = 1.
   (* Catch-all error probability for any step going wrong.
    * Should be negligible. *)
   Parameter (p_gate_error : R).
@@ -145,7 +145,7 @@ Module Type ApproxCorrectness (Import Scheme: ApproxFheScheme) (Import M: Approx
   Definition is_underlying_plaintext sk (c : ciphertext) m :=
     match c with
     | None => false
-    | Some (data, error_bound) => Order.le (metric (dec' sk c) m) error_bound
+    | Some (data, error_bound) => Order.le (metric (deterministic_dec sk c) m) error_bound
     end.
   (* Correctness of keygen.
    * We ask for a predicate of "good keys".
@@ -155,7 +155,7 @@ Module Type ApproxCorrectness (Import Scheme: ApproxFheScheme) (Import M: Approx
     let bad_keys (keys : pk_t × evk_t × sk_t) :=
       let '(pk, evk, sk) := keys in ~~ (good_keys pk evk sk)
     in
-    \P_[ keygen ] bad_keys < p_gate_error. 
+    \P_[ keygen ] bad_keys < p_gate_error.
   (* Conditioned on the key being good,
    * Encryption outputs good ciphertexts with overwhelming probability. *)
   Axiom encrypt_approx_correct :
@@ -191,13 +191,13 @@ End ApproxCorrectness.
 Module Type ApproxCorrectnessPerfect
   (Import Scheme: ApproxFheScheme) (Import M: ApproxFheMetric(Scheme)).
   (* For simplicity, we consider only pure and deterministic decryption. *)
-  Parameter (dec' : sk_t → ciphertext → message).
-  Axiom dec'_correct :
-    ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => ((dec_out == (dec' sk c)) : bool)) = 1.
+  Parameter (deterministic_dec : sk_t → ciphertext → message).
+  Axiom deterministic_dec_correct :
+    ∀ sk c, \P_[ decrypt sk c ] (fun dec_out => ((dec_out == (deterministic_dec sk c)) : bool)) = 1.
   Definition is_underlying_plaintext sk (c : ciphertext) m :=
     match c with
     | None => false
-    | Some (data, error_bound) => Order.le (metric (dec' sk c) m) error_bound
+    | Some (data, error_bound) => Order.le (metric (deterministic_dec sk c) m) error_bound
     end.
   Parameter (good_keys : pk_t → evk_t → sk_t → bool).
   Axiom keygen_perfect_correct :
