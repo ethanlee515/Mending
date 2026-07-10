@@ -489,6 +489,211 @@ split.
   + move=> z; exact: (Hcond Q HQ z a).
 Qed.
 
+Definition pythCallErrorBlock {ℓ : nat} (s : (ℓ.+1).-tuple R) :=
+  cat_tuple [tuple 0] s.
+
+Definition pythCallErrorBase {ℓ : nat} (s : (ℓ.+1).-tuple R) :=
+  cat_tuple (pythCallErrorBlock s) [tuple 0].
+
+Definition pythCallErrorStep {ℓ1 ℓ2 : nat}
+    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :=
+  cat_tuple (pythCallErrorBlock s) tail.
+
+Definition pythCallContErrorBase {ℓ : nat} (s : (ℓ.+1).-tuple R) :=
+  cat_tuple s [tuple 0].
+
+Definition pythCallContErrorStep {ℓ1 ℓ2 : nat}
+    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :=
+  cat_tuple s tail.
+
+Definition pythErrorTuple := {ℓ : nat & (ℓ.+1).-tuple R}.
+
+Definition packPythErrorTuple {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) : pythErrorTuple :=
+  existT _ ℓ s.
+
+Definition pythErrorTupleIndex (e : pythErrorTuple) : nat :=
+  projT1 e.
+
+Definition pythErrorTupleTuple (e : pythErrorTuple) :
+    (pythErrorTupleIndex e).+1.-tuple R :=
+  projT2 e.
+
+Definition pythErrorTupleSum (e : pythErrorTuple) : R :=
+  tuple_sum (pythErrorTupleTuple e).
+
+Definition pythErrorTupleNonneg (e : pythErrorTuple) : Prop :=
+  forall i, 0 <= tnth (pythErrorTupleTuple e) i.
+
+Definition pythErrorTupleTvBound (e : pythErrorTuple) : R :=
+  pythagorean_tv_bound (pythErrorTupleTuple e).
+
+Fixpoint pythCallErrorsTuple {ℓ : nat}
+    (q : nat) (s : (ℓ.+1).-tuple R) : pythErrorTuple :=
+  match q with
+  | 0 => packPythErrorTuple (pythCallErrorBase s)
+  | q'.+1 =>
+      packPythErrorTuple
+        (pythCallErrorStep s
+          (pythErrorTupleTuple (pythCallErrorsTuple q' s)))
+  end.
+
+Lemma pythCallErrorBlock_nonneg {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  (forall i : 'I_(ℓ.+1), 0 <= tnth s i) ->
+  forall i, 0 <= tnth (pythCallErrorBlock s) i.
+Proof.
+move=> Hs i.
+apply: (cat_tuple_nonneg [tuple 0] s i).
+- by move=> j; rewrite [j]ord1.
+- exact: Hs.
+Qed.
+
+Lemma pythCallErrorBase_nonneg {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  (forall i : 'I_(ℓ.+1), 0 <= tnth s i) ->
+  forall i, 0 <= tnth (pythCallErrorBase s) i.
+Proof.
+move=> Hs i.
+apply: (cat_tuple_nonneg (pythCallErrorBlock s) [tuple 0] i).
+- exact: pythCallErrorBlock_nonneg.
+- by move=> j; rewrite [j]ord1.
+Qed.
+
+Lemma pythCallErrorStep_nonneg {ℓ1 ℓ2 : nat}
+    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :
+  (forall i : 'I_(ℓ1.+1), 0 <= tnth s i) ->
+  (forall i : 'I_(ℓ2.+1), 0 <= tnth tail i) ->
+  forall i, 0 <= tnth (pythCallErrorStep s tail) i.
+Proof.
+move=> Hs Htail i.
+apply: (cat_tuple_nonneg (pythCallErrorBlock s) tail i).
+- exact: pythCallErrorBlock_nonneg.
+- exact: Htail.
+Qed.
+
+Lemma pythCallContErrorBase_nonneg {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  (forall i : 'I_(ℓ.+1), 0 <= tnth s i) ->
+  forall i, 0 <= tnth (pythCallContErrorBase s) i.
+Proof.
+move=> Hs i.
+apply: (cat_tuple_nonneg s [tuple 0] i).
+- exact: Hs.
+- by move=> j; rewrite [j]ord1.
+Qed.
+
+Lemma pythCallContErrorStep_nonneg {ℓ1 ℓ2 : nat}
+    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :
+  (forall i : 'I_(ℓ1.+1), 0 <= tnth s i) ->
+  (forall i : 'I_(ℓ2.+1), 0 <= tnth tail i) ->
+  forall i, 0 <= tnth (pythCallContErrorStep s tail) i.
+Proof.
+move=> Hs Htail i.
+apply: (cat_tuple_nonneg s tail i).
+- exact: Hs.
+- exact: Htail.
+Qed.
+
+Lemma tuple_sum_pythCallErrorBlock {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  tuple_sum (pythCallErrorBlock s) = tuple_sum s.
+Proof.
+by rewrite /pythCallErrorBlock tuple_sum_cat tuple_sum_singleton add0r.
+Qed.
+
+Lemma tuple_sum_pythCallErrorBase {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  tuple_sum (pythCallErrorBase s) = tuple_sum s.
+Proof.
+rewrite /pythCallErrorBase tuple_sum_cat tuple_sum_pythCallErrorBlock.
+by rewrite tuple_sum_singleton addr0.
+Qed.
+
+Lemma tuple_sum_pythCallErrorStep {ℓ1 ℓ2 : nat}
+    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :
+  tuple_sum (pythCallErrorStep s tail) =
+  tuple_sum s + tuple_sum tail.
+Proof.
+by rewrite /pythCallErrorStep tuple_sum_cat tuple_sum_pythCallErrorBlock.
+Qed.
+
+Lemma tuple_sum_pythCallContErrorBase {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  tuple_sum (pythCallContErrorBase s) = tuple_sum s.
+Proof.
+rewrite /pythCallContErrorBase tuple_sum_cat tuple_sum_singleton.
+by rewrite addr0.
+Qed.
+
+Lemma tuple_sum_pythCallContErrorStep {ℓ1 ℓ2 : nat}
+    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :
+  tuple_sum (pythCallContErrorStep s tail) =
+  tuple_sum s + tuple_sum tail.
+Proof.
+by rewrite /pythCallContErrorStep tuple_sum_cat.
+Qed.
+
+Lemma pythCallErrorBaseE {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  pythCallErrorBase s = cat_tuple [tuple 0] (pythCallContErrorBase s).
+Proof.
+by apply: val_inj.
+Qed.
+
+Lemma pythCallErrorStepE {ℓ1 ℓ2 : nat}
+    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :
+  pythCallErrorStep s tail =
+  cat_tuple [tuple 0] (pythCallContErrorStep s tail).
+Proof.
+by apply: val_inj.
+Qed.
+
+Lemma pythagorean_tv_bound_pythCallErrorBase {ℓ : nat}
+    (s : (ℓ.+1).-tuple R) :
+  pythagorean_tv_bound (pythCallErrorBase s) =
+  pythagorean_tv_bound s.
+Proof.
+by rewrite /pythagorean_tv_bound tuple_sum_pythCallErrorBase.
+Qed.
+
+Lemma pythCallErrorsTuple_nonneg {ℓ : nat}
+    (q : nat) (s : (ℓ.+1).-tuple R) :
+  (forall i : 'I_(ℓ.+1), 0 <= tnth s i) ->
+  pythErrorTupleNonneg (pythCallErrorsTuple q s).
+Proof.
+move=> Hs.
+elim: q=> [|q IH] /=.
+- exact: pythCallErrorBase_nonneg.
+- exact: (pythCallErrorStep_nonneg s
+    (pythErrorTupleTuple (pythCallErrorsTuple q s)) Hs IH).
+Qed.
+
+Lemma tuple_sum_pythCallErrorsTuple {ℓ : nat}
+    (q : nat) (s : (ℓ.+1).-tuple R) :
+  pythErrorTupleSum (pythCallErrorsTuple q s) = q.+1%:R * tuple_sum s.
+Proof.
+elim: q=> [|q IH] /=.
+- by rewrite /pythErrorTupleSum /= tuple_sum_pythCallErrorBase mul1r.
+- rewrite /pythErrorTupleSum /= tuple_sum_pythCallErrorStep.
+  change
+    (tuple_sum s + pythErrorTupleSum (pythCallErrorsTuple q s) =
+      q.+2%:R * tuple_sum s).
+  by rewrite IH -[q.+2%:R]natr1 mulrDl mul1r addrC.
+Qed.
+
+Lemma pythagorean_tv_bound_pythCallErrorsTuple {ℓ : nat}
+    (q : nat) (s : (ℓ.+1).-tuple R) :
+  pythErrorTupleTvBound (pythCallErrorsTuple q s) =
+  Num.sqrt ((q.+1%:R * tuple_sum s) / 2).
+Proof.
+rewrite /pythErrorTupleTvBound /pythagorean_tv_bound.
+change
+  (Num.sqrt (pythErrorTupleSum (pythCallErrorsTuple q s) / 2) =
+   Num.sqrt ((q.+1%:R * tuple_sum s) / 2)).
+by rewrite tuple_sum_pythCallErrorsTuple.
+Qed.
+
 Fixpoint pythCallErrors (q : nat) (eps : R) : (q.*2).+3.-tuple R :=
   if q is q'.+1 then
     cat_tuple [tuple 0; eps] (pythCallErrors q' eps)
@@ -528,26 +733,12 @@ Proof.
 elim: q=> [|q IH].
 - rewrite /tuple_sum /= !big_ord_recl big_ord0 /=.
   by rewrite !(tnth_nth 0) /= !addr0 !add0r mul1r.
-- rewrite /tuple_sum /= big_ord_recl /= big_ord_recl /=.
-  rewrite !(tnth_nth 0) /=.
-  have Htail :
-      \sum_(i < q.+1.*2.+1)
-        tnth (cat_tuple [tuple 0; eps] (pythCallErrors q eps))
-          (lift ord0 (lift ord0 i)) =
-      tuple_sum (pythCallErrors q eps).
-    rewrite /tuple_sum.
-    apply: eq_bigr=> i _.
-    have Hi : (1.+1 <= lift ord0 (lift ord0 i))%N by [].
-    rewrite (cat_tuple_tnth_suffix [tuple 0; eps] (pythCallErrors q eps)
-      (lift ord0 (lift ord0 i)) Hi).
-    have -> :
-        @Ordinal (q.*2.+3) (lift ord0 (lift ord0 i) - 2)
-          (@cat_tuple_suffix_bound 1 (q.*2.+2)
-            (lift ord0 (lift ord0 i)) Hi) = i.
-      apply: val_inj.
-      by rewrite /= /bump !leq0n !add1n !subSS subn0.
-    by [].
-  rewrite Htail IH add0r.
+- change
+    (tuple_sum (cat_tuple [tuple 0; eps] (pythCallErrors q eps)) =
+      q.+2%:R * eps).
+  rewrite tuple_sum_cat IH.
+  rewrite /tuple_sum /= !big_ord_recl big_ord0 /=.
+  rewrite !(tnth_nth 0) /= !addr0 !add0r.
   by rewrite -[q.+2%:R]natr1 mulrDl mul1r addrC.
 Qed.
 

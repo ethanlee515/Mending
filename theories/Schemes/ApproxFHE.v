@@ -107,13 +107,21 @@ Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
   Parameter dim : nat.
   (* We only care about metrics that are locally isometric to Z^n.
    * e.g., polynomials of some fixed degree whose coefficients belong to a finite field. *)
-  (* TODO Why not just assume center maps to 0^n? *)
+  (* Charts are origin-centered: each chosen center maps to the zero vector. *)
   Parameter isometry_radius : message -> nat.
   Parameter isometry : message -> message -> dim.-tuple int.
   Parameter inverse_isometry : message -> dim.-tuple int -> message.
+  Axiom isometry_center0 :
+    forall (center : message), isometry center center = ivec_zero.
+  Axiom metric_chartE :
+    forall (center m : message),
+    metric center m = ivec_dist ivec_zero (isometry center m).
+  Axiom inverse_isometry_shift :
+    forall (centerL centerR : message) (v : dim.-tuple int),
+    inverse_isometry centerR v =
+    inverse_isometry centerL (ivec_add v (isometry centerL centerR)).
   Axiom inv_isoK :
     forall (center : message) (m : message),
-    metric center m <= isometry_radius center ->
     inverse_isometry center (isometry center m) = m.
   Axiom isoK :
     forall (center : message) (v : dim.-tuple int),

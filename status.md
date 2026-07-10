@@ -2,362 +2,472 @@
 
 Compact handoff for the current formalization state.
 
-## Build Gate
+## Current Result
 
-Latest targeted Coq checks after restoring the local-isometry fields and
-threading finite encoding as explicit security evidence:
+The main security file builds:
 
 ```sh
-timeout 600s rocq c -Q theories Mending theories/Schemes/ApproxFHE.v
-timeout 600s rocq c -Q theories Mending theories/Schemes/Indcpa.v
-timeout 600s rocq c -Q theories Mending theories/Schemes/Indcpad.v
-timeout 600s rocq c -Q theories Mending theories/Constructions/NoiseFlooding.v
-timeout 600s rocq c -Q theories Mending theories/Security/IndcpadSimulator.v
 timeout 600s rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
 ```
 
-Latest hygiene checks after the current handoff update:
+The public theorem is still not `Print Assumptions` clean. The current
+remaining `realsum.__admitted__interchange_psum` source is no longer our KL
+chain, maximal-coupling construction, or local use of SSProve's
+`coupling`/`lmg`/`rmg`.
 
-```sh
-git diff --check
-rg -n "Admitted\.|Axiom |admit" \
-  theories/ProgramLogics/PythCompile.v \
-  theories/Security/NoiseFloodingSecurity.v \
-  theories/Probability/Ae.v
-rg -n "inv_isoK|isoK|isometry_radius|iso_correct" \
-  theories/Schemes/ApproxFHE.v
-rg -n "local_chart_metric_to_ivec_dist|local_chart_center_metric_to_ivec_dist|noise_flooding_vector_pythDist_from_metric_chart" \
-  theories/Security/NoiseFloodingSecurity.v
-rg -n "Parameter chart_center_dist_le_metric|Axiom chart_center_dist_le_metric" \
-  theories
-```
-
-The focused admit/axiom scan, removed local-chart-helper scan, and
-metric-interface chart-center scan are expected to produce no output. The
-local-isometry scan should show the restored active assumptions in
-`ApproxFHE.v`.
-
-Keep this focused gate green after local proof edits:
-
-```sh
-rocq c -Q theories Mending theories/LibExtras/MathcompExtras/DistrExtras.v
-rocq c -Q theories Mending theories/Schemes/Utils/IntVec.v
-rocq c -Q theories Mending theories/Probability/KL/Core.v
-rocq c -Q theories Mending theories/Schemes/ApproxFHE.v
-rocq c -Q theories Mending theories/Probability/KL/Pyth.v
-rocq c -Q theories Mending theories/Constructions/NoiseFlooding.v
-rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
-git diff --check
-rg -n "Admitted\.|Axiom |admit" \
-  theories/ProgramLogics/PythCompile.v \
-  theories/Security/NoiseFloodingSecurity.v \
-  theories/Probability/Ae.v
-```
-
-Broader gate to keep green before major handoff/merge:
-
-```sh
-rocq c -Q theories Mending theories/LibExtras/MathcompExtras/DistrExtras.v
-rocq c -Q theories Mending theories/Schemes/Utils/IntVec.v
-rocq c -Q theories Mending theories/Probability/KL/Core.v
-rocq c -Q theories Mending theories/Probability/KL/Pinsker.v
-rocq c -Q theories Mending theories/Schemes/ApproxFHE.v
-rocq c -Q theories Mending theories/Schemes/Indcpa.v
-rocq c -Q theories Mending theories/Schemes/Indcpad.v
-rocq c -Q theories Mending theories/Probability/DiscreteGaussians/DiscreteGaussianKL.v
-rocq c -Q theories Mending theories/LibExtras/SSProveExtras/DiscreteGaussian.v
-rocq c -Q theories Mending theories/Probability/ConditionalCoordinate.v
-rocq c -Q theories Mending theories/Probability/KL/ChainPointwise.v
-rocq c -Q theories Mending theories/Probability/DletTuple.v
-rocq c -Q theories Mending theories/Probability/KL/Pyth.v
-rocq c -Q theories Mending theories/Probability/PythSeq.v
-rocq c -Q theories Mending theories/ProgramLogics/Pyth.v
-rocq c -Q theories Mending theories/ProgramLogics/PythCompile.v
-rocq c -Q theories Mending theories/Constructions/NoiseFlooding.v
-rocq c -Q theories Mending theories/Security/IndcpadSimulator.v
-rocq c -Q theories Mending theories/LibExtras/SSProveExtras/NominalExtras.v
-rocq c -Q theories Mending theories/Probability/Ae.v
-rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
-git diff --check
-rg -n "Admitted\.|Axiom |admit" \
-  theories/ProgramLogics/PythCompile.v \
-  theories/Security/NoiseFloodingSecurity.v \
-  theories/Probability/Ae.v
-```
-
-Known warnings remain from existing notation/deprecation warnings in
-`Pinsker.v`, `DletTuple.v`, `NoiseFlooding.v`, `IndcpadSimulator.v`,
-`PythSeq.v`, `PythCompile.v`, and `Ae.v`.
-
-## Main Chain
-
-Intended loss:
+After migrating the local AE/security coupling layer to pointwise marginals,
+focused probes show:
 
 ```coq
-security_loss max_queries =
-  2 * sqrt ((max_queries * (dim / (2 * gaussian_width_multiplier^2))) / 2)
-
-compile_security_error max_queries = security_loss max_queries / 2
+Print Assumptions clean_coupling.          (* clean, modulo foundations *)
+Print Assumptions coupling_bind_kernel.    (* clean, modulo foundations *)
+Print Assumptions complete.
+Print Assumptions complete_dweight.
+Print Assumptions complete_bind.
 ```
 
-Current hybrid chain:
+But these are still dirty:
 
 ```coq
-ind_cpad_game_code
-  -- compile_security_error max_queries -->
-ind_cpad_compiled_sim_decrypt_game_code
-  -- 0 -->
-ind_cpad_compiled_sim_decrypt_self_link_game_code
-  -- 0 -->
-ind_cpad_sim_decrypt_game_code
-  -- 0, direct/factored reduction bridge -->
-ind_cpa_reduction_direct_factored_game_code
-  -- 0, unfresh/factored linked bridge -->
-ind_cpa_reduction_unfresh_linked_game_code
-  -- 0, alpha/freshening bridge -->
-ind_cpa_reduction_linked_game_code
-  -- 0 -->
-ind_cpa_reduction_game_code
+Print Assumptions raw_code.
+Print Assumptions Pr_code.
+Print Assumptions raw_package.
+Print Assumptions additiveErrorJudgmentOpt.
+Print Assumptions additiveErrorOptSeqRule.
+Print Assumptions Secure.is_secure.
 ```
 
-The chart-route assembly theorem is
-`ind_cpa_reduction_additive_error_from_compile`, now with explicit
-`finite_encoding_cert` and `chart_center_dist_le_metric_cert` premises. The
-direct assembly theorem is
-`ind_cpa_reduction_additive_error_from_compile_ready_vector_bound`, with
-`finite_encoding_cert` and `decrypt_prefix_ready_vector_bound_cert` premises.
-The final endpoint is intentionally result-level via `same_game_result_opt`.
-The chain is closed modulo the scheme, correctness, IND-CPA, the metric
-interface assumptions, `finite_encoding_cert`, and whichever explicit route
-certificate is chosen.
+Latest `Print Assumptions Secure.is_secure` grouping:
+
+- External/foundational residue:
+  `Axioms.R`, proof irrelevance, propositional extensionality, functional
+  extensionality, constructive indefinite description, and
+  `realsum.__admitted__interchange_psum`.
+- Expected scheme/correctness assumptions:
+  the abstract scheme types and algorithms, `keygen_lossless`,
+  `dec'_correct`, `keygen_perfect_correct`, `encrypt_perfect_correct`,
+  `eval1_perfect_correct`, and `eval2_perfect_correct`.
+- Expected reduction assumptions:
+  `IndCpaSecurity.security_bound` and `IndCpaSecurity.is_secure`.
+- Expected noise-flooding/metric assumptions:
+  `Params.gaussian_width_multiplier`, `Params.gt0_gaussian_width_multiplier`,
+  `Metric.dim`, `Metric.metric`, `Metric.isometry`,
+  `Metric.inverse_isometry`, `Metric.isometry_center0`,
+  `Metric.metric_chartE`, and `Metric.inverse_isometry_shift`.
+
+Notably absent from the current public endpoint assumptions:
+`finite_encoding_cert`, `chart_center_dist_le_metric_cert`,
+`finite_common_inverse_isometry_encoding`, `inv_isoK`, `isoK`, and
+`iso_correct`.
+
+The new frontier is therefore SSProve's program/package semantics themselves.
+`raw_code`, `Pr_code`, and `raw_package` expose the admitted interchange axiom,
+so any theorem whose proof depends on those constants can inherit it even if
+all local probability lemmas are clean.
+
+SSProve dirty slice:
+
+- Inherited through MathComp `experimental_reals/distr.v`:
+  `__deprecated__dlet_dlet` depends on
+  `realsum.__admitted__interchange_psum`. SSProve uses it in
+  `Crypt/rhl_semantics/only_prob/SubDistr.v` (`SDistr_assoc`, the main route
+  to dirty `P_OP`/`raw_code`), plus `Couplings.v`, `Theta_dens.v`,
+  `Crypt/nominal/Pr.v` (`dlet_dlet_ext`), `pkg_rhl.v`,
+  `TotalProbability.v`, and some rules proofs.
+- Direct SSProve uses of the admitted interchange are currently
+  `Crypt/rules/RulesStateProb.v:SD_commutativity` and
+  `Crypt/nominal/Pr.v:Lossless_sample`.
+
+If the MathComp Analysis PR on `experimental-reals-fixes` lands and SSProve is
+rebuilt against it, most inherited uses should become clean without changing
+Mending. Direct SSProve references may still require a small upstream SSProve
+source refresh/name update, so avoid carrying a local SSProve fork unless this
+becomes publication-blocking.
+
+Minimal upstream boundary found so far:
+
+```coq
+From SSProve.Crypt.rhl_semantics Require Import FreeProbProg.
+From SSProve.Crypt Require Import SubDistr.
+From SSProve Require Import pkg_core_definition.
+
+Print Assumptions SDistr.       (* dirty *)
+Print Assumptions SDistr_bind.  (* clean, modulo foundations *)
+Print Assumptions SDistr_unit.  (* clean, modulo foundations *)
+Print Assumptions P_OP.         (* dirty *)
+Print Assumptions P_AR.         (* dirty *)
+Print Assumptions Op.           (* dirty *)
+Print Assumptions Arit.         (* dirty *)
+Print Assumptions opsig.        (* clean *)
+Print Assumptions Location.     (* clean *)
+Print Assumptions Interface.    (* clean *)
+```
+
+`pkg_core_definition.v` imports `RulesStateProb`; its `raw_code` sampler
+constructor mentions `op : Op`, where `Op := FreeProbProg.P_OP` and
+`P_OP := { X : choice_type & SDistr X }`. The packaged `SDistr` relative
+monad is already dirty, even though the raw bind/unit functions are clean.
+The deepest confirmed root is in SSProve's `SubDistr.v`: `SDistr_assoc` uses
+mathcomp's deprecated `__deprecated__dlet_dlet`, and that theorem proves
+general bind associativity by calling `__admitted__interchange_psum`.
+
+Concrete upstream dirty uses:
+
+```text
+~/.opam/Mending/.opam-switch/sources/rocq-ssprove/theories/Crypt/rhl_semantics/only_prob/SubDistr.v
+```
+
+`SDistr_assoc` currently finishes with:
+
+```coq
+apply __deprecated__dlet_dlet.
+```
+
+and mathcomp's `__deprecated__dlet_dlet` calls:
+
+```coq
+rewrite __admitted__interchange_psum.
+```
+
+```text
+~/.opam/Mending/.opam-switch/sources/rocq-ssprove/theories/Crypt/rules/RulesStateProb.v
+```
+
+`SD_commutativity` currently finishes with:
+
+```coq
+apply __admitted__interchange_psum.
+```
+
+There is also a downstream dirty use in:
+
+```text
+~/.opam/Mending/.opam-switch/sources/rocq-ssprove/theories/Crypt/nominal/Pr.v
+```
+
+In `Lossless_sample`, SSProve proves losslessness of sampled code by rewriting:
+
+```coq
+rewrite __admitted__interchange_psum.
+```
+
+The nominal file also defines `HasAction` instances for `raw_code` and
+`raw_package`, but the smaller root is already visible before importing the
+nominal semantics.
+
+## Cleaned In Recent Passes
+
+The following focused probes now list only the usual foundational axioms, not
+`realsum.__admitted__interchange_psum`:
+
+```coq
+Print Assumptions conditional_coordinate_zero_prefix.
+Print Assumptions coordinate_finite_kl_absolute_continuous.
+Print Assumptions coordinate_bounded_kl_finite_kl.
+Print Assumptions pythDist_final_total_variation.
+Print Assumptions maximal_coupling_total_variation.
+Print Assumptions dmargin_comp.
+Print Assumptions clean_coupling.
+Print Assumptions coupling_bind_kernel.
+```
+
+Main changes:
+
+- Restored `RealSumExtras.interchange_psum_proved` from commit `ca0e8e75`,
+  along with its helper `summable_pair_from_rows_psum`. A direct probe shows it
+  does not depend on `realsum.__admitted__interchange_psum`; it only reports
+  the usual MathComp classical/funext foundations. This gives us a clean local
+  replacement when a proof really needs the full countable `psum`
+  interchange.
+- Compared the upstream/community-service branch
+  `ethanlee515/analysis:experimental-reals-fixes` at
+  `e5c6b8f0790fb07540d2b1cf6badc21c409a6e1a`. Besides
+  `interchange_psum`, that branch proves `psumB` and `interchange_sup`, and
+  updates `experimental_reals/distr.v` so `dlet_dlet`, `dlet_dmargin`,
+  `dmargin_dlet`, `dfst_dswap`, `dsnd_dswap`, `dsndE`, and `pr_dlet` use the
+  proved names while keeping deprecated aliases. Current grep finds no local
+  Mending references to `__admitted__psumB` or `__admitted__interchange_sup`,
+  so those two proofs are not current blockers. If future assumption probes
+  expose them, restore the local `psumB_proved`/`interchange_sup_proved`
+  mirrors from `ca0e8e75` or port the upstream proof shape.
+- Added clean generic marginal lemmas in `DistrExtras.v`, including
+  `pr_dmargin_pred1_clean` and `dlet_dmargin_partition`.
+- Added clean independent-product lemmas in `DistrExtras.v`:
+
+```coq
+dlet_pairE :
+  (\dlet_(x <- P) \dlet_(y <- Q) dunit (x, y)) xy = P xy.1 * Q xy.2
+
+dlet_pair_revE :
+  (\dlet_(y <- Q) \dlet_(x <- P) dunit (x, y)) xy = P xy.1 * Q xy.2
+
+dlet_pairC :
+  (\dlet_(x <- P) \dlet_(y <- Q) dunit (x, y)) =1
+  (\dlet_(y <- Q) \dlet_(x <- P) dunit (x, y))
+
+dlet_pair_bindE :
+  (\dlet_(xy <- \dlet_(x <- P) \dlet_(y <- Q) dunit (x, y)) F xy) =1
+  (\dlet_(x <- P) \dlet_(y <- Q) F (x, y))
+
+dlet_pair_bind_revE :
+  (\dlet_(xy <- \dlet_(y <- Q) \dlet_(x <- P) dunit (x, y)) F xy) =1
+  (\dlet_(y <- Q) \dlet_(x <- P) F (x, y))
+
+dlet_commut_indep_clean :
+  (\dlet_(x <- P) \dlet_(y <- Q) F x y) =1
+  (\dlet_(y <- Q) \dlet_(x <- P) F x y)
+```
+
+  `Print Assumptions dlet_pairC` is clean modulo foundational axioms. This is
+  a proof-shaped replacement for the special independent-sampling
+  commutativity that SSProve currently proves via general
+  `__admitted__interchange_psum`. `dlet_commut_indep_clean` lifts that
+  special pair commutation through clean bind associativity, giving a clean
+  replacement for SSProve's `Pr.v:dlet_commut`/`RulesStateProb.SD_commutativity'`
+  route.
+- Added clean losslessness and SSProve-carrier bridge lemmas:
+
+```coq
+dlet_dlet_clean :
+  (\dlet_(x <- \dlet_(y <- mu) f1 y) f2 x) =1
+  (\dlet_(y <- mu) \dlet_(x <- f1 y) f2 x)
+
+dweight_dlet_lossless :
+  dweight D = 1 ->
+  (forall x, dweight (K x) = 1) ->
+  dweight (\dlet_(x <- D) K x) = 1
+
+SDistr_assoc_clean :
+  SDistr_bind A C (SDistr_bind B C f ∙ g) =
+  SDistr_bind B C f ∙ SDistr_bind A B g
+
+SDistr_clean :
+  ord_relativeMonad choice_incl
+
+SDistr_bind_pairC :
+  SDistr_bind X (X * Y)%type
+    (fun x => SDistr_bind Y (X * Y)%type
+      (fun y => SDistr_unit (X * Y)%type (x, y)) q) p =
+  SDistr_bind Y (X * Y)%type
+    (fun y => SDistr_bind X (X * Y)%type
+      (fun x => SDistr_unit (X * Y)%type (x, y)) p) q
+
+SDistr_bind_commut_clean :
+  SDistr_bind X Z (fun x =>
+    SDistr_bind Y Z (fun y => g x y) q) p =
+  SDistr_bind Y Z (fun y =>
+    SDistr_bind X Z (fun x => g x y) p) q
+
+SDistr_bind_lossless :
+  dweight p = 1 ->
+  (forall x, dweight (k x) = 1) ->
+  dweight (SDistr_bind X Y k p) = 1
+
+P_OP_clean :
+  Type
+
+P_AR_clean :
+  P_OP_clean -> choiceType
+
+rFreePr_clean :
+  ord_relativeMonad choice_incl
+
+rFreeProb_squ_clean :
+  ord_relativeMonad _
+```
+
+  `Print Assumptions dlet_dlet_clean` is clean modulo foundational axioms.
+  `SDistr_assoc_clean`, `SDistr_clean`, `SDistr_bind_pairC`,
+  `SDistr_bind_commut_clean`, and `SDistr_bind_lossless` live in
+  `LibExtras/SSProveExtras/SubDistrExtras.v`. They use the clean raw
+  `SDistr_carrier`/`SDistr_bind`/`SDistr_unit` interface. `SDistr_clean`
+  packages the same carrier/bind/unit into an assumption-clean relative monad
+  by using `SDistr_assoc_clean` instead of SSProve's dirty `SDistr_assoc`.
+  These are exact patch candidates for SSProve's `SubDistr.SDistr_assoc`,
+  `RulesStateProb.SD_commutativity`, and `Pr.v:Lossless_sample` proof shapes.
+- Added `LibExtras/SSProveExtras/FreeProbProgExtras.v`. It rebuilds the
+  probabilistic sampler signature and free probabilistic monad using
+  `SDistr_clean`:
+
+```coq
+P_OP_clean :=
+  { X : choice_type & ord_relmonObj SDistr_clean X }
+
+P_AR_clean op :=
+  projT1 op
+```
+
+  `Print Assumptions P_OP_clean`, `P_AR_clean`, `rFreePr_clean`,
+  `rFreeProb_squ_clean`, `P_OP_cleanE`, `rFreePr_cleanE`, and
+  `rFreeProb_squ_cleanE` are clean modulo foundational axioms. The equalities
+  are reflexive, so the clean sampler/free-monad data is definitionally the
+  same as SSProve's aliases once the clean `SDistr` carrier is projected
+  explicitly. No old-name bridge for `P_AR` is kept: mentioning SSProve's old
+  dependent `P_AR` name in a theorem statement re-exposes the dirty `SDistr`
+  packaging.
+- Reproved conditional-coordinate and KL/Pyth bridge lemmas without dirty
+  marginal rewrites.
+- Reproved maximal-coupling margin/probability lemmas without deprecated
+  `pr_dlet`/marginal rewrites where needed.
+- Added local `clean_coupling`:
+
+```coq
+Definition clean_coupling d P Q :=
+  dmargin fst d =1 P /\ dmargin snd d =1 Q.
+```
+
+- Migrated `ProgramLogics/Ae.v` to `clean_coupling`.
+- Migrated `PythCompile.diagonalCoupling` to `clean_coupling`.
+- Migrated the local coupling helpers in `NoiseFloodingSecurity.v` to
+  `clean_coupling`.
+- `rg -n "\bcoupling\b|\blmg\b|\brmg\b"` over the migrated AE/security files
+  now finds no real proof dependency on SSProve `coupling`; only a comment
+  remains in `PythCompile.v`.
+
+## Metric Interface Ground Truth
+
+Current chart assumptions are intentionally the one-chart/origin-centered
+version:
+
+```coq
+isometry_center0 :
+  forall center, isometry center center = ivec_zero
+
+metric_chartE :
+  forall center m,
+    metric center m = ivec_dist ivec_zero (isometry center m)
+
+inverse_isometry_shift :
+  forall centerL centerR v,
+    inverse_isometry centerR v =
+    inverse_isometry centerL (ivec_add v (isometry centerL centerR))
+```
+
+This replaced the false common-inverse-isometry direction. The intended chart
+compatibility remains:
+
+```text
+I_b^{-1}(x) = I_a^{-1}(x + I_a(b))
+metric a b = ivec_dist 0 (I_a(b))
+I_a(a) = 0
+```
+
+`inv_isoK`, `isoK`, `isometry_radius`, and `iso_correct` remain restored in
+`ApproxFHE.v` for the user's original metric interface record. They are not
+the current proof route.
+
+The old `finite_encoding_cert`/`chart_center_dist_le_metric_cert` route still
+exists as legacy scaffolding for older lemmas, but it is explicitly marked
+obsolete in `NoiseFloodingSecurity.v` and is not used by the public endpoint.
+In particular, `finite_common_inverse_isometry_encoding` should not guide new
+work; it conflicts with the intended origin-centered chart story. The current
+endpoint uses the one-chart vector comparison plus `metric_chartE` instead.
 
 ## Current Frontier
 
-Important blocker: the current `finite_encoding_cert` is proof-shaped in a way
-that is likely false for the intended origin-centered chart model. In
-particular, the fields
-`finite_common_inverse_isometry_encoding_left/right` ask for one common
-encoding map whose pushforward agrees with both
-`encode ∘ inverse_isometry centerL` and
-`encode ∘ inverse_isometry centerR` when both tuple Gaussians are centered at
-their own chart origins. If the intended chart law includes
-`isometry a a = 0` and `isometry b b = 0`, this would force the flooded
-message distributions around `a` and `b` to be equal rather than merely close.
-That is not the noise-flooding statement, so this certificate should be
-replaced before further concrete-instance work.
+The next hard question is how to avoid or clean the SSProve semantic constants
+that themselves expose `realsum.__admitted__interchange_psum`.
 
-The same coordinate-system problem affects the current
-`chart_center_dist_le_metric_cert` and
-`challenge_decrypt_prefix_row_vector_bound` route. They compare
-`isometry a a` with `isometry b b`; under origin-centered charts both sides are
-the zero vector, so the bound becomes vacuous. The vector KL comparison should
-instead happen in one chart, comparing centers `0` and `isometry a b`.
+Current policy after discussion: do not contort the local noise-flooding proof
+only to avoid an external mathcomp/SSProve admit. Since
+`interchange_psum_proved` has been restored, use it where it is a direct
+replacement; otherwise treat any remaining upstream admitted interchange as
+acceptable scaffolding for now and keep it explicitly documented in
+`Print Assumptions` probes.
 
-Intended fix: refactor the geometry around origin-centered charts and one-chart
-comparisons. A plausible replacement interface is:
+Known dirty probes:
 
 ```coq
-(* zero denotes the all-zero dim.-tuple int; concrete name TBD. *)
-isometry_center0 :
-  forall c, isometry c c = zero
+From SSProve.Crypt.nominal Require Import Pr.
+From SSProve Require Import pkg_core_definition pkg_advantage.
 
-metric_chartE :
-  forall a b, metric a b = ivec_dist zero (isometry a b)
-
-inverse_isometry_shift :
-  forall a b x,
-    inverse_isometry b x =
-    inverse_isometry a (ivec_add x (isometry a b))
+Print Assumptions raw_code.
+Print Assumptions Pr_code.
+Print Assumptions raw_package.
 ```
 
-Here `metric_chartE` is meant literally: the distance from `a` to `b` is the
-norm of `b`'s coordinate in the chart centered at `a`. For the torus/plaintext
-space with `isometry a b` chosen as the coordinate-wise shortest integer
-representative of `b - a` modulo `q`, this is exactly the usual torus max
-distance and should be a reviewer-friendly axiom.
+Possible strategies:
 
-Then the message-level KL bridge should data-process the vector KL comparison
-through `encode ∘ inverse_isometry a`, comparing vector Gaussians centered at
-`zero` and `isometry a b`. This avoids any false equality between floods around
-different messages.
+- Patch or locally shadow SSProve's `SubDistr.SD_assoc`/`SDistr` packaging to
+  use `dlet_dlet_clean`/`SDistr_assoc_clean`. The local `SDistr_clean` proves
+  this patch is feasible.
+- `FreeProbProgExtras.v` shows that the sampler/free-monad data can be rebuilt
+  cleanly and remains definitionally equal to the old aliases. This suggests
+  the upstream patch can be surgical: rebuild `FreeProbProg.P_OP/P_AR` and
+  `rFreePr` from the cleaned `SDistr` package, or replace the upstream `SDistr`
+  proof and recompile SSProve.
+- Then recheck whether `P_OP/P_AR`, `Op/Arit`, and `raw_code` become clean
+  under the patched compiled names. If not, continue tracing other dirty
+  obligations inside the program semantics.
+- Patch or shadow `RulesStateProb.SD_commutativity` to use
+  `SDistr_bind_pairC` instead of the general admitted `interchange_psum`.
+- Patch or shadow `RulesStateProb.SD_commutativity'` and `Pr.v:dlet_commut`
+  with `SDistr_bind_commut_clean`/`dlet_commut_indep_clean`.
+- Separately inspect `Pr.v:Lossless_sample`; it may also be replaceable by
+  `SDistr_bind_lossless`/`dweight_dlet_lossless` rather than general
+  interchange.
+- If the compiled SSProve constants cannot be repaired locally, decide whether
+  to vendor/patch SSProve or introduce a local wrapper layer for the needed
+  program/package interface.
 
-Preferred refactor: avoid computing `KL(f # P, f # Q)` as a standalone
-distribution fact. Instead, keep the flood as a two-step program:
+Lower-priority cleanup still visible by grep:
+
+```sh
+rg -n "__deprecated__dlet_dmargin|__deprecated__dmargin_dlet" \
+  theories/ProgramLogics theories/Security theories/Probability -g'*.v'
+```
+
+Those remaining deprecated rewrites are not currently the known public-theorem
+`interchange_psum` source, but they are worth cleaning eventually.
+
+## Verification Commands
+
+Known passing commands after the clean-coupling migration:
+
+```sh
+timeout 600s make -f Makefile.coq theories/Security/NoiseFloodingSecurity.vo
+timeout 600s rocq c -Q theories Mending theories/LibExtras/MathcompExtras/RealSumExtras.v
+timeout 600s rocq c -Q theories Mending theories/LibExtras/MathcompExtras/DistrExtras.v
+timeout 600s rocq c -Q theories Mending theories/LibExtras/SSProveExtras/SubDistrExtras.v
+timeout 600s rocq c -Q theories Mending theories/LibExtras/SSProveExtras/FreeProbProgExtras.v
+timeout 600s rocq c -Q theories Mending theories/Probability/Ae.v
+timeout 600s rocq c -Q theories Mending theories/Probability/OutputHeap.v
+timeout 600s rocq c -Q theories Mending theories/Probability/KL/Core.v
+timeout 600s rocq c -Q theories Mending theories/ProgramLogics/Ae.v
+timeout 600s rocq c -Q theories Mending theories/ProgramLogics/Pyth.v
+timeout 600s rocq c -Q theories Mending theories/ProgramLogics/PythCompile.v
+timeout 600s rocq c -Q theories Mending theories/Security/NoiseFloodingSecurity.v
+```
+
+Public theorem probe:
 
 ```coq
-v <$ vector_gaussian ;;
-ret (inverse_isometry a v)
+From Mending.Security Require Import NoiseFloodingSecurity.
+From Mending.Schemes Require Import ApproxFHE Indcpa.
+From Mending.Constructions Require Import NoiseFlooding.
+
+Module Probe
+  (Scheme : ApproxFheScheme)
+  (Metric : ApproxFheMetric(Scheme))
+  (Correctness : ApproxCorrectnessPerfect(Scheme)(Metric))
+  (IndCpaSecurity : IsIndCpa(Scheme))
+  (Params : NoiseFloodingParams).
+  Module Secure :=
+    NoiseFloodingSecure(Scheme)(Metric)(Correctness)(IndCpaSecurity)(Params).
+  Print Assumptions Secure.is_secure.
+End Probe.
 ```
 
-After rewriting both sides into one chart, the first step compares vector
-Gaussians and pays the known coordinate-wise KL cost; the second step applies
-the same deterministic continuation `inverse_isometry a` and should cost zero
-by the sequencing/Pythagorean rule. This is the real data-processing argument,
-but phrased operationally so the proof does not need a finite-codomain
-`KL(f # P, f # Q)` lemma.
+Current expected result: still includes `realsum.__admitted__interchange_psum`,
+now traced to SSProve semantic constants rather than local coupling.
 
-The active security route now uses finite message encodings and direct
-vector-center bounds rather than an opaque message-space Gaussian KL axiom.
-The local Gaussian KL bound is proved for integer vectors, lifted through
-finite-output KL data processing, and then packaged as message-level
-`pythDist`/program-logic wrappers.
+## Estimate
 
-The direct ready-vector Hoare obligation is now named:
+The lower-level KL/Pyth/maximal-coupling work is no longer the bottleneck.
+The remaining uncertainty is semantic infrastructure:
 
-```coq
-decrypt_prefix_ready_vector_bound_cert max_queries
-```
-
-That alias abbreviates the certificate that `ind_cpad_decrypt_prefix_code`
-returns rows satisfying:
-
-```coq
-challenge_decrypt_prefix_row_ready_vector_bound
-```
-
-The chart-center route instantiates the certificate with:
-
-```coq
-ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-```
-
-This closed proof derives vector-ready rows from row-ready rows using
-`chart_center_dist_le_metric_cert`. For concrete instances that can prove the
-vector-center bound directly, the premised route carries
-`decrypt_prefix_ready_vector_bound_cert` through code, resolve, compile,
-reduction, and the final theorem:
-
-```coq
-ind_cpad_decrypt_code_pyth1_from_metric_encoding_ready_vector_bound
-ind_cpad_decrypt_resolve_pyth1_from_metric_encoding_ready_vector_bound
-ind_cpad_compiled_guess_decrypt_replacement_from_compile_ready_vector_bound
-ind_cpad_game_to_compiled_sim_decrypt_additive_error_ready_vector_bound
-ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
-ind_cpa_reduction_additive_error_ready_vector_bound
-ind_cpa_reduction_bound_ready_vector_bound
-is_secure_ready_vector_bound
-```
-
-The public theorem `is_secure` is now the chart-route theorem and takes
-`finite_encoding_cert` and `chart_center_dist_le_metric_cert` explicitly. The
-theorem `is_secure_ready_vector_bound` is the direct route and takes
-`finite_encoding_cert` and `decrypt_prefix_ready_vector_bound_cert`
-explicitly. `NoiseFloodingSecure` no longer ascribes the closed `IsIndCpad`
-module type, because chart/encoding evidence is no longer hidden in the metric
-interface.
-
-## Useful Proof Surfaces
-
-Finite-encoding/KL bridge:
-
-```coq
-kl_dmargin_ord_bound
-kl_dmargin_ord_common_bound
-kl_dmargin_finite_encoding_common_bound
-kl_dmargin_finite_encoding_common_bound_comp
-kl_dmargin_finite_encoding_common_bound_comp_eq
-kl_dmargin_finite_encoding_common_bound_comp_eq_in
-```
-
-Noise-flooding/message bridge:
-
-```coq
-noise_flooding_vector_kl_bound
-noise_flooding_message_gaussian_kl_from_finite_encoding_vector_bound
-noise_flooding_message_gaussian_kl_from_finite_encoding
-noise_flooding_message_gaussian_pythDist_from_finite_encoding_vector_bound
-noise_flooding_successful_decrypt_code_pyth_from_metric_encoding_vector_bound
-noise_flooding_successful_decrypt_code_pyth1_from_metric_encoding_vector_bound
-```
-
-Metric-interface helpers:
-
-```coq
-shifted_tuple_gaussian_n_dg_shiftedE
-shifted_tuple_gaussian_dinsupp
-common_inverse_isometry_encoding_left_n_dg_shifted
-common_inverse_isometry_encoding_right_n_dg_shifted
-```
-
-The local-isometry obligations `inv_isoK`, `isoK`, `isometry_radius`, and
-`iso_correct` are restored in `ApproxFheMetric` as active assumptions. The
-current finite-encoding/vector-ready security route does not consume them
-directly yet, but they remain in the interface as the intended local-isometry
-contract. The older local-chart helper lemmas in `NoiseFloodingSecurity.v`
-remain removed/unused.
-`chart_center_dist_le_metric` was also removed from `ApproxFheMetric`; the
-security file now names that route-specific evidence as:
-
-```coq
-chart_center_dist_le_metric_cert
-```
-
-Finite message encoding is now carried by the security file as:
-
-```coq
-finite_encoding_cert
-```
-
-This record should be treated as provisional: keep the finite encoding and
-injectivity pieces if needed for finite-output KL data processing, but do not
-try to prove the current `finite_common_inverse_isometry_encoding*` fields for
-the intended `(Z mod q)^n` chart model.
-
-## Remaining Gaps
-
-Before doing more proof work, replace the bad common-encoding certificate with
-chart laws that match the intended geometry. A plausible replacement interface
-is:
-
-```coq
-(* zero denotes the all-zero dim.-tuple int; concrete name TBD. *)
-isometry_center0 :
-  forall c, isometry c c = zero
-
-metric_chartE :
-  forall a b, metric a b = ivec_dist zero (isometry a b)
-
-inverse_isometry_shift :
-  forall a b x,
-    inverse_isometry b x =
-    inverse_isometry a (ivec_add x (isometry a b))
-```
-
-For the intended torus model, `metric_chartE` is just the statement that
-`isometry a b` is the shortest representative of `b - a` and `metric` is the
-corresponding max norm.
-
-With this shape, the right comparison is:
-
-```coq
-encode ∘ inverse_isometry a
-```
-
-applied to vector Gaussians centered at `zero` and `isometry a b`,
-respectively. That matches noise flooding: the distributions are close by the
-integer-vector Gaussian KL bound; they are not required to be equal.
-
-After that refactor, final security should use either the chart-law route above
-or a concrete proof of the reshaped direct obligation:
-
-```coq
-decrypt_prefix_ready_vector_bound_cert max_queries
-```
-
-The direct route should also compare vector centers in one chart, not compare
-`isometry a a` with `isometry b b`.
-
-## Next Work
-
-1. Refactor the message-KL bridge away from
-   `finite_common_inverse_isometry_encoding*` and direct
-   `KL(f # P, f # Q)` facts, toward the origin-centered chart laws and
-   sample-then-map sequencing described above.
-2. Refactor `challenge_decrypt_prefix_row_vector_bound`,
-   `chart_center_dist_le_metric_cert`, and their theorem wrappers so the vector
-   bound is stated in one chart.
-3. Keep only the finite encoding/injectivity assumptions that are actually
-   needed for finite-output KL data processing.
-4. Decide whether the concrete proof should use the chart-law route or the
-   direct `decrypt_prefix_ready_vector_bound_cert` route.
-5. Keep the focused gate green after each proof step.
+- If `interchange_psum` is confined to a small SSProve semantic lemma that can
+  be locally reproved or bypassed: several focused days.
+- If `raw_code`/`Pr_code`/`raw_package` intrinsically depend on the admitted
+  interchange theorem throughout SSProve: likely one or more weeks, and perhaps
+  an upstream-cleanup task rather than a local refactor.

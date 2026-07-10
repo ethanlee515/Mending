@@ -129,6 +129,102 @@ Proof.
 by rewrite ltn_add2l ltn_ord.
 Qed.
 
+Definition catTupleSuffix
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (omega : (ℓ1.+1 + ℓ2.+1).-tuple A) :
+  (ℓ2.+1).-tuple A :=
+  [tuple tnth omega
+      (Ordinal (catTupleSuffixOrdinal_bound (ℓ1 := ℓ1) j))
+    | j < ℓ2.+1].
+
+Definition catTuplePrefixFull
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (omega : (ℓ1.+1 + ℓ2.+1).-tuple A) :
+  (ℓ1.+1).-tuple A :=
+  [tuple tnth omega (lshift ℓ2.+1 j) | j < ℓ1.+1].
+
+Lemma catTuplePrefixFull_cat
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (omega1 : (ℓ1.+1).-tuple A)
+  (omega2 : (ℓ2.+1).-tuple A) :
+  catTuplePrefixFull (cat_tuple omega1 omega2) = omega1.
+Proof.
+apply: eq_from_tnth=> i.
+rewrite /catTuplePrefixFull tnth_mktuple.
+have Hi : (lshift ℓ2.+1 i < ℓ1.+1)%N by exact: ltn_ord i.
+rewrite (cat_tuple_tnth_prefix_choice omega1 omega2 (lshift ℓ2.+1 i) Hi).
+have -> : Ordinal Hi = i by apply: val_inj.
+by [].
+Qed.
+
+Lemma catTupleSuffix_cat
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (omega1 : (ℓ1.+1).-tuple A)
+  (omega2 : (ℓ2.+1).-tuple A) :
+  catTupleSuffix (cat_tuple omega1 omega2) = omega2.
+Proof.
+apply: eq_from_tnth=> i.
+rewrite /catTupleSuffix tnth_mktuple.
+pose k : 'I_(ℓ1.+1 + ℓ2.+1) :=
+  Ordinal (catTupleSuffixOrdinal_bound (ℓ1 := ℓ1) i).
+have Hk : (ℓ1.+1 <= k)%N by rewrite /k /= leq_addr.
+rewrite (cat_tuple_tnth_suffix_choice omega1 omega2 k Hk).
+have -> : Ordinal (cat_tuple_suffix_bound k Hk) = i.
+  apply: val_inj.
+  by rewrite /= /k /= addKn.
+by [].
+Qed.
+
+Lemma catTuple_eta
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (omega : (ℓ1.+1 + ℓ2.+1).-tuple A) :
+  cat_tuple (catTuplePrefixFull omega) (catTupleSuffix omega) = omega.
+Proof.
+apply: eq_from_tnth=> i.
+case Hi : (i < ℓ1.+1)%N.
+- rewrite (cat_tuple_tnth_prefix_choice
+    (catTuplePrefixFull omega) (catTupleSuffix omega) i Hi).
+  rewrite /catTuplePrefixFull tnth_mktuple.
+  have -> : lshift ℓ2.+1 (Ordinal Hi) = i by apply: val_inj.
+  by [].
+- have Hge : (ℓ1.+1 <= i)%N by rewrite leqNgt Hi.
+  rewrite (cat_tuple_tnth_suffix_choice
+    (catTuplePrefixFull omega) (catTupleSuffix omega) i Hge).
+  rewrite /catTupleSuffix tnth_mktuple.
+  have -> :
+      Ordinal (catTupleSuffixOrdinal_bound
+        (ℓ1 := ℓ1) (Ordinal (cat_tuple_suffix_bound i Hge))) = i.
+    apply: val_inj.
+    by rewrite /= subnKC.
+  by [].
+Qed.
+
+Lemma cat_tuple_fixed_prefix_injective
+  {ℓ1 ℓ2 : nat}
+  {A : choiceType}
+  (omega1 : (ℓ1.+1).-tuple A) :
+  injective (fun omega2 : (ℓ2.+1).-tuple A =>
+    cat_tuple omega1 omega2).
+Proof.
+move=> omega2 omega2' Homega.
+apply: eq_from_tnth=> i.
+pose k : 'I_(ℓ1.+1 + ℓ2.+1) :=
+  Ordinal (catTupleSuffixOrdinal_bound (ℓ1 := ℓ1) i).
+have Hk : (ℓ1.+1 <= k)%N by rewrite /k /= leq_addr.
+have Htnth := congr1 (fun omega => tnth omega k) Homega.
+move: Htnth.
+rewrite !cat_tuple_tnth_suffix_choice.
+have -> : Ordinal (cat_tuple_suffix_bound k Hk) = i.
+  apply: val_inj.
+  by rewrite /= /k /= addKn.
+by [].
+Qed.
+
 Definition tuple_prefix {n : nat} {A : Type}
     (i : 'I_n) (a : forall j : 'I_n, A) : i.-tuple A :=
   [tuple a (widen_ord (ltnW (ltn_ord i)) j) | j < i].
@@ -359,6 +455,32 @@ Definition l2_norm (eps_lst : list R) := Num.sqrt (sum_squares eps_lst).
 
 Definition tuple_sum {n : nat} (s : n.-tuple R) : R :=
   \sum_(i < n) tnth s i.
+
+Lemma tuple_sum_cat {n m : nat} (s1 : n.-tuple R) (s2 : m.-tuple R) :
+  tuple_sum (cat_tuple s1 s2) = tuple_sum s1 + tuple_sum s2.
+Proof.
+rewrite /tuple_sum.
+rewrite big_split_ord /=.
+congr (_ + _).
+- apply: eq_bigr=> i _.
+  rewrite (tnth_nth 0) nth_cat size_tuple.
+  have Hi : (lshift m i < n)%N by exact: ltn_ord i.
+  rewrite Hi.
+  by rewrite (tnth_nth 0).
+- apply: eq_bigr=> i _.
+  rewrite (tnth_nth 0) nth_cat size_tuple.
+  have Hi : (rshift n i < n)%N = false by rewrite /= ltnNge leq_addr.
+  rewrite Hi.
+  have -> : (rshift n i - n = i)%N by rewrite /= addKn.
+  by rewrite (tnth_nth 0).
+Qed.
+
+Lemma tuple_sum_singleton (x : R) :
+  tuple_sum [tuple x] = x.
+Proof.
+rewrite /tuple_sum big_ord_recl big_ord0 /=.
+by rewrite (tnth_nth x) /= addr0.
+Qed.
 
 Definition tuple_sum_squares {n : nat} (s : n.-tuple R) : R :=
   \sum_(i < n) (tnth s i) ^+ 2.

@@ -586,7 +586,7 @@ rewrite /conditional_coordinate.
 rewrite (pr_pred1
   (dmargin (fun omega : n.-tuple A => tnth omega i)
     (dcond P (fun omega : n.-tuple A => tuple_prefix_eq a omega))) b).
-rewrite pr_dmargin pr_dcond /prc.
+  rewrite pr_dmargin_pred1_clean pr_dcond /prc.
 set p0 := \P_[P] [eta tuple_prefix_eq a].
 set q0 := \P_[P]
   [predI [pred x0 | tnth x0 i \in pred1 b] & [eta tuple_prefix_eq a]].
@@ -1378,8 +1378,19 @@ rewrite sumN.
 have HsumA : sum A = psum A by rewrite -psum_sum // => x; exact: ge0_psum.
 have HsumB : sum B = psum B by rewrite -psum_sum // => x; exact: ge0_psum.
 rewrite HsumA HsumB.
-rewrite -(psum_pair (S := fpos F) (summable_fpos Hsumm)).
-rewrite -(psum_pair (S := fneg F) (summable_fneg Hsumm)).
+have HAeq : psum A = psum (fpos F).
+  rewrite /A.
+  rewrite (partition_psum (S := fpos F) (fun xy : T * U => xy.1));
+    last exact: summable_fpos.
+  apply/eq_psum=> x.
+  by rewrite (psum_pair_fst_fiberR (fpos F) x (fun xy => ge0_fpos F xy)).
+have HBeq : psum B = psum (fneg F).
+  rewrite /B.
+  rewrite (partition_psum (S := fneg F) (fun xy : T * U => xy.1));
+    last exact: summable_fneg.
+  apply/eq_psum=> x.
+  by rewrite (psum_pair_fst_fiberR (fneg F) x (fun xy => ge0_fneg F xy)).
+rewrite HAeq HBeq.
 by rewrite /sum.
 Qed.
 

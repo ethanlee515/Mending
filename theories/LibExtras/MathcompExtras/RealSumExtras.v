@@ -203,6 +203,62 @@ apply/andP; split.
 - exact: minr_ler.
 Qed.
 
+Lemma summable_pair_from_rows_psum
+    {T U : choiceType} (S : T -> U -> R) :
+  (forall x, summable (S x)) ->
+  summable (fun x => psum (S x)) ->
+  summable (fun xy : T * U => S (fst xy) (snd xy)).
+Proof.
+move=> Hrow Hrows.
+exists (psum (fun x => psum (S x)))=> J.
+rewrite (@big_fset_seq R 0 +%R (T * U)%type J
+  (fun xy : T * U => `|S (fst xy) (snd xy)|)).
+rewrite (@partition_big_imfset R 0 +%R _ _ fst J
+  (fun xy : T * U => `|S (fst xy) (snd xy)|)).
+pose X := [fset fst xy | xy in J]%fset.
+have HX := gerfin_psum X Hrows.
+rewrite (@big_fset_seq R 0 +%R T X
+  (fun x => `|psum (S x)|)) in HX.
+apply: (le_trans _ HX).
+apply: ler_sum=> x _.
+rewrite ger0_norm ?ge0_psum //.
+set F := [fset xy in J | fst xy == x]%fset.
+have Hfiber :
+    \sum_(xy <- J | fst xy == x) `|S (fst xy) (snd xy)| =
+    \sum_(xy <- F) `|S x (snd xy)|.
+  rewrite /F big_fset /=.
+  apply: eq_bigr=> xy /eqP Hx.
+  by rewrite Hx.
+rewrite Hfiber.
+have Huniq : uniq [seq snd xy | xy <- enum_fset F].
+  rewrite map_inj_in_uniq ?uniq_fset_keys //.
+  move=> [x1 y1] [x2 y2].
+  rewrite /F !in_fset /=.
+  move=> /andP[_ /eqP Hx1] /andP[_ /eqP Hx2] Hy.
+  congr (_, _).
+    move: Hx1 Hx2=> /= Hx1 Hx2.
+    by rewrite Hx1 Hx2.
+  exact: Hy.
+rewrite -(big_map snd predT (fun y => `|S x y|)).
+exact: (gerfinseq_psum Huniq (Hrow x)).
+Qed.
+
+Lemma interchange_psum_proved
+    {T U : choiceType} (S : T -> U -> R) :
+  (forall x, summable (S x)) ->
+  summable (fun x => psum (fun y => S x y)) ->
+  psum (fun x => psum (fun y => S x y)) =
+  psum (fun y => psum (fun x => S x y)).
+Proof.
+move=> Hrow Hrows.
+pose P := fun xy : T * U => S (fst xy) (snd xy).
+have HP : summable P.
+  exact: (summable_pair_from_rows_psum S Hrow Hrows).
+change (psum (fun x : T => psum (fun y : U => P (x, y))) =
+        psum (fun y : U => psum (fun x : T => P (x, y)))).
+by rewrite -(@psum_pair R T U P HP) (@psum_pair_swap R T U P HP).
+Qed.
+
 End RealSumExtras.
 
 Fixpoint max_nat_lst (s : list nat) : nat :=

@@ -103,10 +103,10 @@ Lemma dmargin_comp
   dmargin f (dmargin g D) =1 dmargin (fun x => f (g x)) D.
 Proof.
 move=> z.
-rewrite dmarginE __deprecated__dlet_dlet.
+rewrite [dmargin f _]dmarginE dmargin_dlet_partition.
 transitivity ((\dlet_(x <- D) dunit (f (g x))) z).
 - apply: eq_in_dlet=> // x _ z'.
-  by rewrite dlet_unit.
+  by rewrite dmargin_dunit.
 - by rewrite dmarginE.
 Qed.
 

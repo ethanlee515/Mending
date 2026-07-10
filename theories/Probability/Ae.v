@@ -172,20 +172,7 @@ Lemma dweight_dlet {T U : choiceType}
   dweight (\dlet_(x <- D) K x) =
   psum (fun x => D x * dweight (K x)).
 Proof.
-pose b := true.
-pose B : {distr bool / R} := dunit b.
-have Hleft :
-    (\dlet_(_ <- \dlet_(x <- D) K x) B) b =
-    dweight (\dlet_(x <- D) K x).
-  rewrite dletC /B dunit1E eqxx.
-  by rewrite mulr1.
-rewrite -Hleft.
-rewrite (__deprecated__dlet_dlet K (fun _ : U => B) D b).
-rewrite dletE.
-apply/eq_psum=> x.
-congr (_ * _).
-rewrite /B dletC dunit1E eqxx mulr1.
-by rewrite pr_predT.
+exact: dweight_dlet_sum.
 Qed.
 
 Lemma complete_bind_some
@@ -216,7 +203,8 @@ rewrite (psum_option_split (fun x : option T =>
 - rewrite /complete_bind_kernel dunit1E eqxx mulr1 completeE /=.
   rewrite (eq_psum
     (F2 := fun x : T => D x - D x * dweight (K x))).
-    rewrite (@psumB R _ D (fun x => D x * dweight (K x))).
+    rewrite (@psum_sub_bounded_nonneg R T D
+      (fun x => D x * dweight (K x))).
     + rewrite -pr_predT -dweight_dlet.
       lra.
     + move=> x.
@@ -373,7 +361,7 @@ Lemma shared_complete_sample_coupling_margin_l
 Proof.
 move=> z.
 rewrite /shared_complete_sample_coupling.
-rewrite __deprecated__dmargin_dlet.
+rewrite dmargin_dlet_partition.
 transitivity ((\dlet_(x <- complete D) dunit (omap f x)) z).
 - apply: eq_in_dlet=> // x _ z'.
   case: x=> [x|].
@@ -390,7 +378,7 @@ Lemma shared_complete_sample_coupling_margin_r
 Proof.
 move=> z.
 rewrite /shared_complete_sample_coupling.
-rewrite __deprecated__dmargin_dlet.
+rewrite dmargin_dlet_partition.
 transitivity ((\dlet_(x <- complete D) dunit (omap g x)) z).
 - apply: eq_in_dlet=> // x _ z'.
   case: x=> [x|].
@@ -439,10 +427,10 @@ Lemma product_coupling_margin_l
   dmargin fst (product_coupling P Q) =1 P.
 Proof.
 move=> HQ x0.
-rewrite /product_coupling __deprecated__dmargin_dlet.
+rewrite /product_coupling dmargin_dlet_partition.
 transitivity ((\dlet_(x <- P) dunit x) x0).
 - apply: eq_in_dlet=> // x _ z.
-  rewrite __deprecated__dmargin_dlet.
+  rewrite dmargin_dlet_partition.
   transitivity ((\dlet_(y <- Q) dunit x) z).
   + apply: eq_in_dlet=> // y _ z'.
     exact: dmargin_dunit_fst_pair.
@@ -458,10 +446,10 @@ Lemma product_coupling_margin_r
   dmargin snd (product_coupling P Q) =1 Q.
 Proof.
 move=> HP y0.
-rewrite /product_coupling __deprecated__dmargin_dlet.
+rewrite /product_coupling dmargin_dlet_partition.
 transitivity ((\dlet_(x <- P) Q) y0).
 - apply: eq_in_dlet=> // x _ z.
-  rewrite __deprecated__dmargin_dlet.
+  rewrite dmargin_dlet_partition.
   transitivity ((\dlet_(y <- Q) dunit y) z).
   + apply: eq_in_dlet=> // y _ z'.
     exact: dmargin_dunit_snd_pair.
@@ -750,7 +738,7 @@ Proof.
 rewrite !pr_predT.
 rewrite (eq_psum (F2 := fun x => P x - overlap_distr P Q x)); last first.
   by move=> x; rewrite residual_distrE.
-rewrite (@psumB R T P (overlap_distr P Q)).
+rewrite (@psum_sub_bounded_nonneg R T P (overlap_distr P Q)).
 - by [].
 - move=> x.
   apply/andP; split; first exact: ge0_mu.
@@ -869,13 +857,13 @@ Lemma residual_product_margin_l {T : choiceType}
   dmargin fst (residual_product P Q) =1 residual_distr P Q.
 Proof.
 move=> HQpos z.
-rewrite /residual_product __deprecated__dmargin_dlet.
+rewrite /residual_product dmargin_dlet_partition.
 transitivity ((\dlet_(x <- residual_distr P Q) dunit x) z).
   apply: eq_in_dlet=> // x _ z'.
-  rewrite dmarginE __deprecated__dlet_dlet.
+  rewrite dmargin_dlet_partition.
   transitivity ((\dlet_(y <- normalize_distr (residual_distr Q P)) dunit x) z').
     apply: eq_in_dlet=> // y _ w.
-    by rewrite dlet_unit.
+    exact: dmargin_dunit_fst_pair.
   exact: dlet_const_dunit (dweight_normalize_distr _ HQpos) z'.
 by rewrite dlet_dunit_id.
 Qed.
@@ -887,16 +875,16 @@ Lemma residual_product_margin_r {T : choiceType}
   dmargin snd (residual_product P Q) =1 residual_distr Q P.
 Proof.
 move=> Hweights HQpos z.
-rewrite /residual_product __deprecated__dmargin_dlet.
+rewrite /residual_product dmargin_dlet_partition.
 transitivity
   ((\dlet_(x <- residual_distr P Q)
       normalize_distr (residual_distr Q P)) z).
   apply: eq_in_dlet=> // x _ z'.
-  rewrite dmarginE __deprecated__dlet_dlet.
+  rewrite dmargin_dlet_partition.
   transitivity
     ((\dlet_(y <- normalize_distr (residual_distr Q P)) dunit y) z').
     apply: eq_in_dlet=> // y _ w.
-    by rewrite dlet_unit.
+    exact: dmargin_dunit_snd_pair.
   by rewrite dlet_dunit_id.
 rewrite dlet_const_kernelE normalize_distrE /normalize_mass.
 case: ifP=> [/eqP HQ0|_].
@@ -916,10 +904,10 @@ Lemma diagonal_overlap_margin_l {T : choiceType}
   dmargin fst (diagonal_overlap P Q) =1 overlap_distr P Q.
 Proof.
 move=> x.
-rewrite /diagonal_overlap dmarginE __deprecated__dlet_dlet.
+rewrite /diagonal_overlap dmargin_dlet_partition.
 transitivity ((\dlet_(y <- overlap_distr P Q) dunit y) x).
   apply: eq_in_dlet=> // y _ z.
-  by rewrite dlet_unit.
+  exact: dmargin_dunit_fst_pair.
 by rewrite dlet_dunit_id.
 Qed.
 
@@ -928,10 +916,10 @@ Lemma diagonal_overlap_margin_r {T : choiceType}
   dmargin snd (diagonal_overlap P Q) =1 overlap_distr P Q.
 Proof.
 move=> x.
-rewrite /diagonal_overlap dmarginE __deprecated__dlet_dlet.
+rewrite /diagonal_overlap dmargin_dlet_partition.
 transitivity ((\dlet_(y <- overlap_distr P Q) dunit y) x).
   apply: eq_in_dlet=> // y _ z.
-  by rewrite dlet_unit.
+  exact: dmargin_dunit_snd_pair.
 by rewrite dlet_dunit_id.
 Qed.
 
@@ -1167,6 +1155,21 @@ apply/negP=> Hx.
 by move: (Hsupp x Hx); rewrite Hpx.
 Qed.
 
+Lemma pr_eq_dweight_of_support {A : choiceType}
+    (D : {distr A / R}) (p : pred A) :
+  (forall x, x \in dinsupp D -> p x) ->
+  \P_[D] p = dweight D.
+Proof.
+move=> Hsupp.
+rewrite pr_predT /pr.
+apply/eq_psum=> x.
+case Hpx: (p x); first by rewrite mul1r.
+rewrite mul0r.
+apply/esym/dinsuppPn.
+apply/negP=> Hx.
+by move: (Hsupp x Hx); rewrite Hpx.
+Qed.
+
 Lemma support_of_pr_ge1 {A : choiceType}
     (D : {distr A / R}) (p : pred A) :
   dweight D = 1 ->
@@ -1272,13 +1275,14 @@ Lemma diagonal_overlap_eq_pr {T : choiceType}
   \P_[diagonal_overlap P Q] (fun xy => xy.1 == xy.2) =
   dweight (overlap_distr P Q).
 Proof.
-rewrite /diagonal_overlap __deprecated__pr_dlet.
-rewrite (expectation_ext (overlap_distr P Q)
-  (fun x => \P_[dunit (x, x)] (fun xy => xy.1 == xy.2))
-  (fun _ => 1)); last first.
-  move=> x.
-  by rewrite pr_dunit /= eqxx.
-by rewrite exp_cst mulr1.
+rewrite (pr_eq_dweight_of_support (diagonal_overlap P Q)); last first.
+  move=> [x y] Hxy.
+  move: Hxy.
+  rewrite /diagonal_overlap=> /dinsupp_dlet [z _ Hz].
+  move: Hz.
+  rewrite dunit1E pnatr_eq0 eqb0 negbK=> /eqP Hz.
+  by move: Hz=> [-> ->]; rewrite eqxx.
+exact: dweight_diagonal_overlap.
 Qed.
 
 Lemma exact_coupling_eq_pr_le_overlap

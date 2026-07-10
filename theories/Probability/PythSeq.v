@@ -81,20 +81,7 @@ Lemma dweight_dlet
   dweight (\dlet_(x <- D) K x) =
   psum (fun x => D x * dweight (K x)).
 Proof.
-pose b := true.
-pose B : {distr bool / R} := dunit b.
-  have Hleft :
-    (\dlet_(_ <- \dlet_(x <- D) K x) B) b =
-    dweight (\dlet_(x <- D) K x).
-  rewrite dletC /B dunit1E eqxx.
-  by rewrite mulr1.
-rewrite -Hleft.
-rewrite (__deprecated__dlet_dlet K (fun _ : U => B) D b).
-rewrite dletE.
-apply/eq_psum=> x.
-congr (_ * _).
-rewrite dletC /B dunit1E eqxx.
-by rewrite mulr1.
+exact: dweight_dlet_sum.
 Qed.
 
 Definition completedPythKernelSpec
@@ -222,9 +209,9 @@ rewrite (dlet_complete_some (dmargin (@pack_output_heap mid_t) ML)
   (completedSemanticBindKernel KL mid) packed); last first.
   by rewrite /completedSemanticBindKernel dunit1E.
 rewrite completeE /=.
-rewrite (dlet_dmargin ML (@pack_output_heap mid_t)
+rewrite (dlet_dmargin_pack_output_heap ML
   (fun x => completedSemanticBindKernel KL mid (Some x)) (Some packed)).
-rewrite (dmargin_dlet ML (@pack_output_heap out_t) KL packed).
+rewrite (dmargin_dlet_pack_output_heap ML KL packed).
 rewrite !dletE.
 apply/eq_psum=> y.
 case Hy0: (ML y == 0).
@@ -257,7 +244,7 @@ rewrite (eq_psum
       dweight ML - dweight (\dlet_(y <- ML) KL y).
     rewrite (eq_psum
       (F2 := fun y => ML y - ML y * dweight (KL y))).
-      rewrite (@psumB R _ ML
+      rewrite (@psum_sub_bounded_nonneg R _ ML
         (fun y => ML y * dweight (KL y))).
       - rewrite pr_predT dweight_dlet.
         by [].
@@ -292,7 +279,7 @@ move=> Hmid.
 rewrite /completed_output_heap.
 rewrite dlet_complete_none.
 rewrite dmargin_dweight dunit1E eqxx mulr1.
-rewrite (dlet_dmargin ML (@pack_output_heap mid_t)
+rewrite (dlet_dmargin_pack_output_heap ML
   (fun x => completedSemanticBindKernel KL mid (Some x)) None).
 rewrite -(completed_output_heap_bind_none_mass ML KL).
 congr (_ + _).
@@ -1442,7 +1429,7 @@ rewrite -(eq_in_dlet (mu := P0)
   (f := fun omega => completedSemanticBindKernel KL mid (final omega))
   (g := fun omega => dmargin (fun omega2 => tnth omega2 ord_max)
           (completedPythTraceKernelL mid K omega))).
-  rewrite -(dlet_dmargin P0 final
+  rewrite -(dlet_dmargin_final P0
     (completedSemanticBindKernel KL mid) z).
   rewrite -(eq_in_dlet
     (mu := completed_output_heap ML)
@@ -1487,7 +1474,7 @@ rewrite -(eq_in_dlet (mu := Q0)
   (f := fun omega => completedSemanticBindKernel KR mid (final omega))
   (g := fun omega => dmargin (fun omega2 => tnth omega2 ord_max)
           (completedPythTraceKernelR mid K omega))).
-  rewrite -(dlet_dmargin Q0 final
+  rewrite -(dlet_dmargin_final Q0
     (completedSemanticBindKernel KR mid) z).
   rewrite -(eq_in_dlet
     (mu := completed_output_heap MR)

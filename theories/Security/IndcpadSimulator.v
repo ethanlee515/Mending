@@ -9,7 +9,7 @@ From Stdlib Require Import BinInt.
 
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr.
+From mathcomp Require Import all_boot all_order all_algebra reals distr realsum.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import Adv.
@@ -18,12 +18,14 @@ From Mending.Schemes Require Import Indcpa Indcpad ApproxFHE.
 From mathcomp Require Import seq ssrZ.
 From extructures Require Import ord fset fmap.
 From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
+From Mending.Probability.KL Require Core.
 From Mending.Schemes.Utils Require Import IntVec.
 From Mending.LibExtras.SSProveExtras Require Import ChoiceVector DiscreteGaussian.
 From Mending.LibExtras.MathcompExtras Require Import DTuple ListExtras.
 From SSProve Require Import choice_type.
 
 Import PackageNotation.
+Import GRing.Theory Num.Theory.
 Local Open Scope package_scope.
 Local Open Scope sep_scope.
 Local Open Scope seq_scope.
@@ -82,64 +84,142 @@ Module IndCpadSimulator (Import S: ApproxFheScheme)
       cons_tuple (int_of_Z h) (toIntVec t)
     end.
 
+  Fixpoint toChIntVec {n : nat} : n.-tuple int -> chVec chInt n :=
+    match n with
+    | 0 => fun _ => tt
+    | S n' => fun v =>
+      (Z_of_int (thead v), toChIntVec (behead_tuple v))
+    end.
+
   Fixpoint zeroChVec (n : nat) : chVec chInt n :=
     match n with
     | 0 => tt
     | S n' => (BinNums.Z0, zeroChVec n')
     end.
 
+  Lemma toIntVec_toChIntVec {n : nat} (v : n.-tuple int) :
+    toIntVec (toChIntVec v) = v.
+  Proof.
+    elim: n v=> [|n IH] v.
+    - by rewrite [v](tuple0 v).
+    rewrite /= IH Z_of_intK.
+    by rewrite [RHS](tuple_eta v).
+  Qed.
+
+  Lemma toChIntVec_toIntVec {n : nat} (v : chVec chInt n) :
+    toChIntVec (toIntVec v) = v.
+  Proof.
+    elim: n v=> [|n IH] v.
+    - by case: v.
+    by case: v=> h t /=; rewrite theadE behead_tuple_cons int_of_ZK (IH t).
+  Qed.
+
+  Lemma toIntVec_injective {n : nat} :
+    injective (@toIntVec n).
+  Proof.
+    move=> x y Hxy.
+    by rewrite -(toChIntVec_toIntVec x) Hxy toChIntVec_toIntVec.
+  Qed.
+
+  Local Open Scope ring_scope.
+
+  Lemma dlet_pairE {A B : choiceType}
+      (P : distr R A) (Q : distr R B) (y : (A * B)%type) :
+    (\dlet_(x <- P)
+     \dlet_(xs <- Q)
+       dunit (x, xs)) y =
+      (P y.1 * Q y.2)%R.
+  Proof.
+    case: y=> y1 y2.
+    rewrite !dletE.
+    rewrite (psum_finseq (r := [:: y1])).
+    - rewrite big_seq1 ger0_norm ?mulr_ge0 ?ge0_mu //.
+      congr (_ * _)%R.
+      rewrite dletE.
+      rewrite (psum_finseq (r := [:: y2])).
+      + rewrite big_seq1 dunit1E eqxx mulr1.
+        by rewrite ger0_norm ?ge0_mu.
+      + by [].
+      move=> x Hnz.
+      rewrite inE.
+      apply/eqP.
+      move: Hnz.
+      rewrite !inE dunit1E.
+      rewrite mulf_eq0 negb_or=> /andP[_ Hunit].
+      move: Hunit.
+      rewrite pnatr_eq0 eqb0 negbK=> /eqP Hpair.
+      exact: (congr1 snd Hpair).
+    - by [].
+    move=> x Hnz.
+    rewrite inE.
+    case: (x =P y1)=> [Hx|Hx].
+      by [].
+    move: Hnz.
+    rewrite !inE dletE.
+    have Hinner0 :
+        psum (fun xs : B => (Q xs * dunit (x, xs) (y1, y2))%R) = (0 : R).
+      apply: psum_eq0=> xs.
+      rewrite dunit1E.
+      apply/eqP.
+      rewrite mulf_eq0.
+      apply/orP; right.
+      rewrite pnatr_eq0 eqb0.
+      apply/negP=> /eqP Hpair.
+      have Hx_eq : x = y1 by exact: (congr1 fst Hpair).
+      by case: Hx.
+    by rewrite Hinner0 mulr0 eqxx.
+  Qed.
+
+  Lemma ssp_dg_zero_Z_of_intE (s : R) (x : int) :
+    ssp_dg BinNums.Z0 s (Z_of_int x) =
+      centered_discrete_gaussian s x.
+  Proof.
+    rewrite /ssp_dg.
+    change (int_of_Z BinNums.Z0) with (0 : int).
+    rewrite (@Core.dmargin_injectiveE R int 'int Z_of_int
+      (discrete_gaussian 0 s) Z_of_int_injective x).
+    by rewrite discrete_gaussian_centered_subE subr0.
+  Qed.
+
+  Lemma discrete_gaussians_zero_toChIntVecE {n : nat}
+      (s : R) (y : n.-tuple int) :
+    discrete_gaussians (zeroChVec n) s (toChIntVec y) =
+      n_dg n s y.
+  Proof.
+    elim: n y=> [|n IH] y.
+    - rewrite [y](tuple0 y) /discrete_gaussians /n_dg /nfold_distr /=.
+      by rewrite !dunit1E eqxx.
+    case/tupleP: y=> x xs.
+    rewrite /discrete_gaussians /=.
+    rewrite theadE.
+    have Hbehead :
+        behead_tuple [tuple of x :: xs] = xs.
+      by apply: val_inj.
+    rewrite Hbehead.
+    rewrite dlet_pairE.
+    rewrite ssp_dg_zero_Z_of_intE.
+    rewrite n_dg_consE theadE Hbehead.
+    by rewrite IH.
+  Qed.
+
   Lemma dmargin_toIntVec_discrete_gaussians_zero (n : nat) (s : R) :
     dmargin (@toIntVec n) (discrete_gaussians (zeroChVec n) s) =1
       n_dg n s.
   Proof.
-    elim: n=> [|n IH] y.
-    - rewrite /discrete_gaussians /n_dg /nfold_distr /=.
-      by rewrite dmargin_dunit.
-    rewrite /discrete_gaussians /=.
-    transitivity
-      ((dlet (fun x : 'int =>
-          \dlet_(ys <- n_dg n s)
-            dunit (cons_tuple (int_of_Z x) ys))
-        (ssp_dg BinNums.Z0 s)) y).
-    - rewrite dmargin_dlet.
-      apply: eq_in_dlet=> // x _ z.
-      rewrite dmargin_dlet.
-      transitivity
-        ((\dlet_(ys <- dmargin (@toIntVec n)
-            (discrete_gaussians (zeroChVec n) s))
-          dunit (cons_tuple (int_of_Z x) ys)) z).
-      + transitivity
-          ((\dlet_(xs <- discrete_gaussians (zeroChVec n) s)
-            dunit (cons_tuple (int_of_Z x) (toIntVec xs))) z).
-        * apply: eq_in_dlet=> // xs _ w.
-          by rewrite dmargin_dunit.
-        rewrite -(dlet_dmargin (discrete_gaussians (zeroChVec n) s)
-          (@toIntVec n)
-          (fun ys => dunit (cons_tuple (int_of_Z x) ys)) z).
-        by [].
-      apply: eq_in_dlet.
-      + by move=> ys _ w.
-      exact: IH.
-    have Hscalar :
-        dmargin (fun z : 'int => int_of_Z z) (ssp_dg BinNums.Z0 s) =1
-          centered_discrete_gaussian s.
-      apply: dmargin_int_of_Z_ssp_dg_centered.
-      change (int_of_Z BinNums.Z0) with (0 : int).
+    move=> y.
+    transitivity (discrete_gaussians (zeroChVec n) s (toChIntVec y)).
+    - transitivity
+        (dmargin (@toIntVec n) (discrete_gaussians (zeroChVec n) s)
+          (toIntVec (toChIntVec y))).
+      + by rewrite toIntVec_toChIntVec.
+      rewrite (Core.dmargin_injectiveE
+        (@toIntVec n) (discrete_gaussians (zeroChVec n) s)
+        toIntVec_injective (toChIntVec y)).
       by [].
-    rewrite -(dlet_dmargin (ssp_dg BinNums.Z0 s)
-      (fun z : 'int => int_of_Z z)
-      (fun x : int =>
-        \dlet_(ys <- n_dg n s) dunit (cons_tuple x ys)) y).
-    rewrite /n_dg /nfold_distr /=.
-    apply: eq_in_dlet.
-    - move=> x _ z.
-      have Hbehead :
-          behead_tuple (nseq_tuple n.+1 (centered_discrete_gaussian s)) =
-          nseq_tuple n (centered_discrete_gaussian s).
-        by apply: val_inj.
-      by rewrite Hbehead.
-    exact: Hscalar.
+    exact: discrete_gaussians_zero_toChIntVecE.
   Qed.
+
+  Local Close Scope ring_scope.
 
   Definition IndCpadOracle (max_queries: nat) : IndCpaSim_t :=
     [package oracle_mem_spec ;

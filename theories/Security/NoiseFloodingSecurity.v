@@ -439,11 +439,134 @@ Module NoiseFloodingSecure
     exact: n_dg_shiftedE.
   Qed.
 
+  Lemma inverse_isometry_shift_n_dg
+      (centerL centerR : message) stdev :
+    dmargin (fun v => inverse_isometry centerR v) (n_dg dim stdev) =1
+    dmargin
+      (fun v => inverse_isometry centerL
+        (ivec_add v (isometry centerL centerR)))
+      (n_dg dim stdev).
+  Proof.
+    move=> y.
+    apply: dmargin_fun_ext=> v.
+    exact: inverse_isometry_shift.
+  Qed.
+
+  Lemma inverse_isometry_shifted_gaussian_one_chart
+      (centerL centerR : message) stdev :
+    dmargin (fun v => inverse_isometry centerR v) (n_dg dim stdev) =1
+    dmargin (fun v => inverse_isometry centerL v)
+      (n_dg_shifted (isometry centerL centerR) stdev).
+  Proof.
+    move=> y.
+    rewrite -(dmargin_ext
+      (fun v => inverse_isometry centerL v)
+      (dmargin (fun noise => ivec_add noise (isometry centerL centerR))
+        (n_dg dim stdev))
+      (n_dg_shifted (isometry centerL centerR) stdev)
+      (n_dg_shiftedE (isometry centerL centerR) stdev) y).
+    rewrite (dmargin_comp
+      (fun v => inverse_isometry centerL v)
+      (fun noise => ivec_add noise (isometry centerL centerR))
+      (n_dg dim stdev) y).
+    apply: dmargin_fun_ext=> v.
+    exact: inverse_isometry_shift.
+  Qed.
+
+  Lemma n_dg_shifted_ivec_zeroE {n : nat} stdev :
+    n_dg_shifted (ivec_zero : n.-tuple int) stdev =1
+    n_dg n stdev.
+  Proof.
+    move=> y.
+    rewrite -(n_dg_shiftedE (ivec_zero : n.-tuple int) stdev y).
+    rewrite (dmargin_fun_ext
+      (fun noise : n.-tuple int => ivec_add noise ivec_zero)
+      (fun noise : n.-tuple int => noise)
+      (n_dg n stdev) _ y); last
+      exact: ivec_add0r.
+    have Hid : injective (fun noise : n.-tuple int => noise) by [].
+    exact: (dmargin_injectiveE
+      (fun noise : n.-tuple int => noise) (n_dg n stdev) Hid y).
+  Qed.
+
+  Lemma noise_flooding_vector_pythDist_one_chart
+      error_bound (centerL centerR : message) :
+    (metric centerL centerR <= error_bound)%N ->
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    pythDist
+      (n_dg dim stdev)
+      (n_dg_shifted (isometry centerL centerR) stdev)
+      [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim].
+  Proof.
+    move=> Hmetric stdev.
+    apply: (pythDist_ext
+      (n_dg_shifted (ivec_zero : dim.-tuple int) stdev)
+      (n_dg dim stdev)
+      (n_dg_shifted (isometry centerL centerR) stdev)
+      (n_dg_shifted (isometry centerL centerR) stdev)
+      [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim]).
+    - exact: n_dg_shifted_ivec_zeroE.
+    - by [].
+    apply: (noise_flooding_vector_pythDist
+      error_bound (ivec_zero : dim.-tuple int)
+      (isometry centerL centerR)).
+    by rewrite -metric_chartE.
+  Qed.
+
+  Lemma noise_flooding_vector_kl_bound_one_chart
+      error_bound (centerL centerR : message) :
+    (metric centerL centerR <= error_bound)%N ->
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    finite_kl
+      (n_dg dim stdev)
+      (n_dg_shifted (isometry centerL centerR) stdev) /\
+    δ_KL
+      (n_dg dim stdev)
+      (n_dg_shifted (isometry centerL centerR) stdev) <=
+      noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+  Proof.
+    move=> Hmetric stdev.
+    have Hpyth :
+        pythDist
+          (n_dg dim stdev)
+          (n_dg_shifted (isometry centerL centerR) stdev)
+          [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim].
+      exact: (noise_flooding_vector_pythDist_one_chart
+        error_bound centerL centerR Hmetric).
+    split.
+    - exact: (pythDist_finite_kl _ _ _ Hpyth).
+    have Hbound := pythDist_kl_bound _ _ _ Hpyth.
+    rewrite (eq_bigr
+      (fun _ : 'I_dim =>
+        1 / (2 * gaussian_width_multiplier ^+ 2)) _ ) in Hbound.
+    - by rewrite noise_flooding_coordinate_epsilon_sum in Hbound.
+    - move=> i _.
+      by rewrite tnth_mktuple.
+  Qed.
+
+  (* Legacy route: this certificate was used by an older two-chart/finite-
+     encoding proof shape.  It is no longer used by the public security
+     theorem.  Under origin-centered charts, the meaningful comparison is the
+     one-chart vector bound through metric_chartE, not a comparison between
+     isometry centerL centerL and isometry centerR centerR. *)
   Definition chart_center_dist_le_metric_cert : Prop :=
     forall (centerL centerR : message),
       (ivec_dist (isometry centerL centerL) (isometry centerR centerR)
         <= metric centerL centerR)%N.
 
+  Record finite_message_encoding_cert := {
+    finite_message_encoding_dim : nat;
+    finite_message_encode : message -> 'I_finite_message_encoding_dim;
+    finite_message_encode_injective : injective finite_message_encode
+  }.
+
+  (* Legacy route: finite_common_inverse_isometry_encoding tries to use one
+     common pushed-forward message encoding for two origin-centered charts.
+     That is not the current noise-flooding argument and should not be used for
+     new work.  The current route compares integer-vector Gaussians in one
+     chart, then applies the deterministic continuation operationally. *)
   Record finite_encoding_cert := {
     finite_encoding_dim : nat;
     finite_encode_message : message -> 'I_finite_encoding_dim;
@@ -463,6 +586,15 @@ Module NoiseFloodingSecure
       dmargin (fun v => finite_encode_message (inverse_isometry centerR v))
         (Metric.shifted_tuple_gaussian (isometry centerR centerR) stdev)
   }.
+
+  Definition finite_message_encoding_of_legacy
+      (Henc : finite_encoding_cert) : finite_message_encoding_cert :=
+    {|
+      finite_message_encoding_dim := finite_encoding_dim Henc;
+      finite_message_encode := finite_encode_message Henc;
+      finite_message_encode_injective :=
+        finite_encode_message_injective Henc
+    |}.
 
   Lemma common_inverse_isometry_encoding_left_n_dg_shifted
       (Henc : finite_encoding_cert)
@@ -906,6 +1038,46 @@ Module NoiseFloodingSecure
     by rewrite Hcenter ivec_dist_refl.
   Qed.
 
+  Lemma noise_flooding_message_gaussian_kl_one_chart_from_finite_encoding
+      (Henc : finite_message_encoding_cert)
+      error_bound (centerL centerR : message) :
+    (metric centerL centerR <= error_bound)%N ->
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    let DL :=
+      dmargin (fun v => inverse_isometry centerL v)
+        (n_dg dim stdev) in
+    let DR :=
+      dmargin (fun v => inverse_isometry centerL v)
+        (n_dg_shifted (isometry centerL centerR) stdev) in
+    finite_kl DL DR /\
+    δ_KL DL DR <=
+      noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+  Proof.
+    move=> Hmetric stdev DL DR.
+    have [Hvecfin Hveckl] :=
+      noise_flooding_vector_kl_bound_one_chart
+        error_bound centerL centerR Hmetric.
+    rewrite /DL /DR /stdev.
+    apply: (kl_dmargin_finite_encoding_common_bound_comp_eq
+      (finite_message_encode Henc)
+      (fun v => finite_message_encode Henc (inverse_isometry centerL v))
+      (fun v => inverse_isometry centerL v)
+      (fun v => inverse_isometry centerL v)
+      (n_dg dim
+        (noise_flooding_dg_stdev
+          gaussian_width_multiplier error_bound))
+      (n_dg_shifted (isometry centerL centerR)
+        (noise_flooding_dg_stdev
+          gaussian_width_multiplier error_bound))
+      (noise_flooding_per_query_epsilon
+        dim gaussian_width_multiplier)
+      (finite_message_encode_injective Henc)
+      Hvecfin Hveckl).
+    - by [].
+    - by [].
+  Qed.
+
   Lemma noise_flooding_message_gaussian_kl :
     finite_encoding_cert ->
     chart_center_dist_le_metric_cert ->
@@ -1104,6 +1276,50 @@ Module NoiseFloodingSecure
       by rewrite dlet_unit.
     apply: dmargin_ext.
     exact: n_dg_shiftedE.
+  Qed.
+
+  Lemma noise_flooding_decrypt_some_centered
+      sk data error_bound :
+    let c : ciphertext := Some (data, error_bound) in
+    NF.decrypt sk c =1
+      dmargin
+        (fun v => inverse_isometry (dec' sk c) v)
+        (n_dg dim
+          (noise_flooding_dg_stdev
+            gaussian_width_multiplier error_bound)).
+  Proof.
+    move=> c y.
+    rewrite (noise_flooding_decrypt_some_shifted sk data error_bound y).
+    rewrite (isometry_center0 (dec' sk c)).
+    apply: dmargin_ext.
+    exact: n_dg_shifted_ivec_zeroE.
+  Qed.
+
+  Lemma simulator_decrypt_noise_centered m error_bound :
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    simulator_successful_decrypt_distribution m error_bound =1
+    dmargin (fun v => inverse_isometry m v) (n_dg dim stdev).
+  Proof.
+    move=> stdev y.
+    rewrite (simulator_decrypt_noise_shifted m error_bound y).
+    rewrite (isometry_center0 m).
+    apply: dmargin_ext.
+    exact: n_dg_shifted_ivec_zeroE.
+  Qed.
+
+  Lemma simulator_decrypt_noise_one_chart
+      (centerL centerR : message) error_bound :
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    simulator_successful_decrypt_distribution centerR error_bound =1
+    dmargin (fun v => inverse_isometry centerL v)
+      (n_dg_shifted (isometry centerL centerR) stdev).
+  Proof.
+    move=> stdev y.
+    rewrite (simulator_decrypt_noise_centered centerR error_bound y).
+    exact: (inverse_isometry_shifted_gaussian_one_chart
+      centerL centerR stdev y).
   Qed.
 
   Lemma simulator_successful_decrypt_distribution_mass1 m error_bound :
@@ -1600,6 +1816,50 @@ Module NoiseFloodingSecure
     by rewrite dlet_unit Pr_code_ret.
   Qed.
 
+  Lemma sampleRaw_ext
+      {T : choice_type} (D E : {distr T / R}) mem :
+    D =1 E ->
+    Pr_code (sampleRaw D) mem =1 Pr_code (sampleRaw E) mem.
+  Proof.
+    move=> HDE out.
+    rewrite !sampleRawE.
+    apply: dmargin_ext=> y.
+    exact: HDE.
+  Qed.
+
+  Lemma sampleRaw_bind_retE
+      {T U : choice_type} (D : {distr T / R}) (f : T -> U) mem :
+    Pr_code
+      (x ← sampleRaw D ;;
+       ret (f x))
+      mem =1
+    Pr_code (sampleRaw (dmargin f D)) mem.
+  Proof.
+    move=> out.
+    rewrite Pr_code_bind.
+    transitivity
+      ((\dlet_(x_mem <- Pr_code (sampleRaw D) mem)
+        dunit (f x_mem.1, x_mem.2)) out).
+    - apply: eq_in_dlet=> // x_mem _ out'.
+      by rewrite Pr_code_ret.
+    transitivity
+      ((\dlet_(x_mem <- dmargin (fun x => (x, mem)) D)
+        dunit (f x_mem.1, x_mem.2)) out).
+    - apply: eq_in_dlet=> //.
+      exact: sampleRawE.
+    transitivity
+      ((dmargin
+        (fun x_mem : T * heap => (f x_mem.1, x_mem.2))
+        (dmargin (fun x => (x, mem)) D)) out).
+    - by rewrite dmarginE.
+    rewrite (dmargin_comp
+      (fun x_mem : T * heap => (f x_mem.1, x_mem.2))
+      (fun x : T => (x, mem)) D out).
+    rewrite sampleRawE.
+    symmetry.
+    exact: (dmargin_comp (fun y : U => (y, mem)) f D out).
+  Qed.
+
   Lemma sampleRaw_dmargin_someE
       {T : choice_type} (D : {distr T / R}) mem :
     Pr_code (sampleRaw (dmargin (@Some T) D)) mem =1
@@ -1675,6 +1935,122 @@ Module NoiseFloodingSecure
           gaussian_width_multiplier error_bound)) out).
   Qed.
 
+  Lemma noise_flooding_decrypt_centered_codeE
+      sk data error_bound mem :
+    let c : ciphertext := Some (data, error_bound) in
+    Pr_code
+      (noise <$ (chVec chInt dim;
+        discrete_gaussians (IndCpaDSim.zeroChVec dim)
+          (noise_flooding_dg_stdev
+            gaussian_width_multiplier error_bound)) ;;
+       ret (inverse_isometry (dec' sk c)
+         (IndCpaDSim.toIntVec noise)))
+      mem =1
+    Pr_code (sampleRaw (NF.decrypt sk c)) mem.
+  Proof.
+    move=> c out.
+    set stdev := noise_flooding_dg_stdev
+      gaussian_width_multiplier error_bound.
+    set center := dec' sk c.
+    rewrite Pr_code_sample.
+    transitivity
+      ((dmargin
+        (fun noise =>
+          (inverse_isometry center
+            (IndCpaDSim.toIntVec noise), mem))
+        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev)) out).
+    - rewrite dmarginE.
+      apply: eq_in_dlet=> // noise _ out'.
+      by rewrite Pr_code_ret.
+    transitivity
+      ((dmargin
+        (fun v => (inverse_isometry center v, mem))
+        (n_dg dim stdev)) out).
+    - rewrite -(dmargin_comp
+        (fun v => (inverse_isometry center v, mem))
+        (@IndCpaDSim.toIntVec dim)
+        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev) out).
+      apply: dmargin_ext.
+      exact: IndCpaDSim.dmargin_toIntVec_discrete_gaussians_zero.
+    rewrite sampleRawE.
+    rewrite -(dmargin_comp
+      (fun y => (y, mem))
+      (fun v => inverse_isometry center v)
+      (n_dg dim stdev) out).
+    apply: dmargin_ext=> y.
+    symmetry.
+    rewrite /center /stdev.
+    exact: noise_flooding_decrypt_some_centered.
+  Qed.
+
+  Lemma simulator_one_chart_codeE
+      (centerL centerR : message) error_bound mem :
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    Pr_code
+      (noise <$ (chVec chInt dim;
+        discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev) ;;
+       ret (inverse_isometry centerL
+         (ivec_add (IndCpaDSim.toIntVec noise)
+           (isometry centerL centerR))))
+      mem =1
+    Pr_code
+      (sampleRaw
+        (simulator_successful_decrypt_distribution
+          centerR error_bound))
+      mem.
+  Proof.
+    move=> stdev out.
+    set shift := isometry centerL centerR.
+    rewrite Pr_code_sample.
+    transitivity
+      ((dmargin
+        (fun noise =>
+          (inverse_isometry centerL
+            (ivec_add (IndCpaDSim.toIntVec noise) shift), mem))
+        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev)) out).
+    - rewrite dmarginE.
+      apply: eq_in_dlet=> // noise _ out'.
+      by rewrite Pr_code_ret.
+    transitivity
+      ((dmargin
+        (fun v =>
+          (inverse_isometry centerL (ivec_add v shift), mem))
+        (n_dg dim stdev)) out).
+    - rewrite -(dmargin_comp
+        (fun v =>
+          (inverse_isometry centerL (ivec_add v shift), mem))
+        (@IndCpaDSim.toIntVec dim)
+        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev) out).
+      apply: dmargin_ext.
+      exact: IndCpaDSim.dmargin_toIntVec_discrete_gaussians_zero.
+    transitivity
+      ((dmargin
+        (fun y => (y, mem))
+        (dmargin (fun v => inverse_isometry centerL v)
+          (n_dg_shifted shift stdev))) out).
+    - rewrite (dmargin_comp
+        (fun y => (y, mem))
+        (fun v => inverse_isometry centerL v)
+        (n_dg_shifted shift stdev) out).
+      rewrite -(dmargin_ext
+        (fun v => (inverse_isometry centerL v, mem))
+        (dmargin (fun noise => ivec_add noise shift)
+          (n_dg dim stdev))
+        (n_dg_shifted shift stdev)
+        (n_dg_shiftedE shift stdev) out).
+      rewrite (dmargin_comp
+        (fun v => (inverse_isometry centerL v, mem))
+        (fun noise => ivec_add noise shift)
+        (n_dg dim stdev) out).
+      by [].
+    rewrite sampleRawE.
+    apply: dmargin_ext=> y.
+    symmetry.
+    rewrite /shift.
+    exact: simulator_decrypt_noise_one_chart.
+  Qed.
+
   Lemma complete_output_heap_ext
       {out_t : choice_type} (D E : {distr (out_t * heap) / R}) :
     D =1 E ->
@@ -1686,11 +2062,354 @@ Module NoiseFloodingSecure
     exact: (dmargin_ext (@pack_output_heap out_t) D E HDE packed).
   Qed.
 
-  Lemma noise_flooding_successful_decrypt_code_pyth
+  Lemma pythJudgment_ext_true
+      {ell : nat} {inL_t inR_t out_t : choice_type}
+      (progL progL' : inL_t -> raw_code out_t)
+      (progR progR' : inR_t -> raw_code out_t)
+      (pre : pred ((inL_t * heap) * (inR_t * heap)))
+      (s : (ell.+1).-tuple R) :
+    (forall x mem, Pr_code (progL x) mem =1 Pr_code (progL' x) mem) ->
+    (forall x mem, Pr_code (progR x) mem =1 Pr_code (progR' x) mem) ->
+    ⊨Pyth ⦃ pre ⦄ progL ≈( s ) progR
+      ⦃ fun _ : out_t * heap => true ⦄ ->
+    ⊨Pyth ⦃ pre ⦄ progL' ≈( s ) progR'
+      ⦃ fun _ : out_t * heap => true ⦄.
+  Proof.
+    move=> HextL HextR [Hs Hpyth].
+    split; first exact: Hs.
+    move=> memL memR xL xR Hpre.
+    have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
+      Hpyth memL memR xL xR Hpre.
+    exists P, Q.
+    split; first exact: Hdist.
+    split.
+    - move=> z.
+      rewrite (HmarginL z).
+      exact: (complete_output_heap_ext
+        (Pr_code (progL xL) memL)
+        (Pr_code (progL' xL) memL)
+        (HextL xL memL) z).
+    split.
+    - move=> z.
+      rewrite (HmarginR z).
+      exact: (complete_output_heap_ext
+        (Pr_code (progR xR) memR)
+        (Pr_code (progR' xR) memR)
+        (HextR xR memR) z).
+    split; by move=> y Hy.
+  Qed.
+
+  Fixpoint toChIntVec {n : nat} : n.-tuple int -> chVec chInt n :=
+    match n with
+    | 0 => fun _ => tt
+    | S n' => fun v =>
+      (Z_of_int (thead v), toChIntVec (behead_tuple v))
+    end.
+
+  Lemma toIntVec_toChIntVec {n : nat} (v : n.-tuple int) :
+    IndCpaDSim.toIntVec (toChIntVec v) = v.
+  Proof.
+    elim: n v=> [|n IH] v.
+    - by rewrite [v](tuple0 v).
+    rewrite /= IH Z_of_intK.
+    by rewrite [RHS](tuple_eta v).
+  Qed.
+
+  Lemma toChIntVec_injective {n : nat} :
+    injective (@toChIntVec n).
+  Proof.
+    move=> x y Hxy.
+    by rewrite -(toIntVec_toChIntVec x) Hxy toIntVec_toChIntVec.
+  Qed.
+
+  Lemma noise_flooding_ch_vector_kl_bound_one_chart
+      error_bound (centerL centerR : message) :
+    (metric centerL centerR <= error_bound)%N ->
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    finite_kl
+      (dmargin (@toChIntVec dim) (n_dg dim stdev))
+      (dmargin (@toChIntVec dim)
+        (n_dg_shifted (isometry centerL centerR) stdev)) /\
+    δ_KL
+      (dmargin (@toChIntVec dim) (n_dg dim stdev))
+      (dmargin (@toChIntVec dim)
+        (n_dg_shifted (isometry centerL centerR) stdev)) <=
+      noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+  Proof.
+    move=> Hmetric stdev.
+    have [Hfin Hkl] :=
+      noise_flooding_vector_kl_bound_one_chart
+        error_bound centerL centerR Hmetric.
+    split.
+    - exact: (finite_kl_dmargin_injective
+        (@toChIntVec dim) _ _ toChIntVec_injective Hfin).
+    rewrite (kl_dmargin_injective
+      (@toChIntVec dim) _ _ toChIntVec_injective Hfin).
+    exact: Hkl.
+  Qed.
+
+  Lemma noise_flooding_ch_vector_sample_pyth_one_chart
+      error_bound (centerL centerR : message) :
+    (metric centerL centerR <= error_bound)%N ->
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    ⊨Pyth1 ⦃ fun inps =>
+      let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
+      (fun _ : chUnit =>
+        sampleRaw (dmargin (@toChIntVec dim) (n_dg dim stdev)))
+      ≈( noise_flooding_per_query_epsilon
+        dim gaussian_width_multiplier )
+      (fun _ : chUnit =>
+        sampleRaw (dmargin (@toChIntVec dim)
+          (n_dg_shifted (isometry centerL centerR) stdev)))
+    ⦃ fun _ : chVec chInt dim * heap => true ⦄.
+  Proof.
+    move=> Hmetric stdev.
+    have [Hfin Hkl] :=
+      noise_flooding_ch_vector_kl_bound_one_chart
+        error_bound centerL centerR Hmetric.
+    apply: (klSampRule
+      (fun _ : chUnit =>
+        dmargin (@toChIntVec dim) (n_dg dim stdev))
+      (fun _ : chUnit =>
+        dmargin (@toChIntVec dim)
+          (n_dg_shifted (isometry centerL centerR) stdev))
+      (fun inps =>
+        let '((_, memL), (_, memR)) := inps in eq_op memL memR)
+      (fun _ : chVec chInt dim * heap => true)
+      (noise_flooding_per_query_epsilon
+        dim gaussian_width_multiplier)).
+    - exact: noise_flooding_per_query_epsilon_nonnegative.
+    - by move=> memL memR [] [] /eqP.
+    - by move=> [] [].
+    - move=> [].
+      rewrite dmargin_dweight.
+      apply: n_dg_mass1.
+      exact: noise_flooding_dg_stdev_pos.
+    - move=> [].
+      rewrite dmargin_dweight.
+      apply: n_dg_shifted_mass1.
+      exact: noise_flooding_dg_stdev_pos.
+    - by move=> memL memR [] [] Hpre.
+    - by move=> memL memR [] [] y Hpre Hy.
+    - by move=> memL memR [] [] y Hpre Hy.
+  Qed.
+
+  Lemma noise_flooding_successful_decrypt_some_target_pyth_one_chart
       sk data error_bound (m : message) :
     let c : ciphertext := Some (data, error_bound) in
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    (metric (dec' sk c) m <= error_bound)%N ->
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    ⊨Pyth ⦃ fun inps =>
+      let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
+      (fun _ : chUnit =>
+        noise ← sampleRaw
+          (dmargin (@toChIntVec dim) (n_dg dim stdev)) ;;
+        ret (Some
+          (inverse_isometry (dec' sk c) (IndCpaDSim.toIntVec noise))))
+      ≈( cat_tuple
+        [tuple noise_flooding_per_query_epsilon
+          dim gaussian_width_multiplier] [tuple 0] )
+      (fun _ : chUnit =>
+        noise ← sampleRaw
+          (dmargin (@toChIntVec dim)
+            (n_dg_shifted (isometry (dec' sk c) m) stdev)) ;;
+        ret (Some
+          (inverse_isometry (dec' sk c) (IndCpaDSim.toIntVec noise))))
+    ⦃ fun _ : chOption message * heap => true ⦄.
+  Proof.
+    move=> c Hmetric stdev.
+    set centerL := dec' sk c.
+    apply: (pythAeSeqRule
+      (fun _ : chUnit =>
+        sampleRaw (dmargin (@toChIntVec dim) (n_dg dim stdev)))
+      (fun _ : chUnit =>
+        sampleRaw (dmargin (@toChIntVec dim)
+          (n_dg_shifted (isometry centerL m) stdev)))
+      (fun noise : chVec chInt dim =>
+        ret (Some (inverse_isometry centerL
+          (IndCpaDSim.toIntVec noise))))
+      (fun inps =>
+        let '((_, memL), (_, memR)) := inps in eq_op memL memR)
+      (fun _ : chVec chInt dim * heap => true)
+      (fun _ : chOption message * heap => true)
+      [tuple noise_flooding_per_query_epsilon
+        dim gaussian_width_multiplier]).
+    - rewrite /centerL /stdev.
+      exact: (noise_flooding_ch_vector_sample_pyth_one_chart
+        error_bound (dec' sk c) m Hmetric).
+    - apply: hoareRetRule.
+      by [].
+  Qed.
+
+  Lemma noise_flooding_decrypt_pushed_centered_some_codeE
+      sk data error_bound mem :
+    let c : ciphertext := Some (data, error_bound) in
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    Pr_code
+      (noise ← sampleRaw
+        (dmargin (@toChIntVec dim) (n_dg dim stdev)) ;;
+       ret (Some
+        (inverse_isometry (dec' sk c) (IndCpaDSim.toIntVec noise))))
+      mem =1
+    Pr_code
+      (m' ← sampleRaw (NF.decrypt sk c) ;;
+       ret (Some m'))
+      mem.
+  Proof.
+    move=> c stdev out.
+    set center := dec' sk c.
+    rewrite (sampleRaw_bind_retE
+      (dmargin (@toChIntVec dim) (n_dg dim stdev))
+      (fun noise => Some
+        (inverse_isometry center (IndCpaDSim.toIntVec noise)))
+      mem out).
+    rewrite sampleRawE.
+    rewrite (dmargin_comp
+      (fun y => (y, mem))
+      (fun noise => Some
+        (inverse_isometry center (IndCpaDSim.toIntVec noise)))
+      (dmargin (@toChIntVec dim) (n_dg dim stdev)) out).
+    rewrite (dmargin_comp
+      (fun noise => (Some
+        (inverse_isometry center (IndCpaDSim.toIntVec noise)), mem))
+      (@toChIntVec dim) (n_dg dim stdev) out).
+    transitivity
+      ((dmargin
+        (fun v => (Some (inverse_isometry center v), mem))
+        (n_dg dim stdev)) out).
+    - apply: dmargin_fun_ext=> v.
+      by rewrite toIntVec_toChIntVec.
+    rewrite (sampleRaw_ret_someE (NF.decrypt sk c) mem out).
+    rewrite -(dmargin_comp
+      (fun y => (Some y, mem))
+      (fun v => inverse_isometry center v)
+      (n_dg dim stdev) out).
+    apply: dmargin_ext=> y.
+    symmetry.
+    rewrite /center /stdev.
+    exact: noise_flooding_decrypt_some_centered.
+  Qed.
+
+  Lemma simulator_pushed_one_chart_some_codeE
+      (centerL centerR : message) error_bound mem :
+    let stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
+    Pr_code
+      (noise ← sampleRaw
+        (dmargin (@toChIntVec dim)
+          (n_dg_shifted (isometry centerL centerR) stdev)) ;;
+       ret (Some
+        (inverse_isometry centerL (IndCpaDSim.toIntVec noise))))
+      mem =1
+    Pr_code
+      (m' ← sampleRaw
+        (simulator_successful_decrypt_distribution
+          centerR error_bound) ;;
+       ret (Some m'))
+      mem.
+  Proof.
+    move=> stdev out.
+    set shift := isometry centerL centerR.
+    rewrite (sampleRaw_bind_retE
+      (dmargin (@toChIntVec dim)
+        (n_dg_shifted shift stdev))
+      (fun noise => Some
+        (inverse_isometry centerL (IndCpaDSim.toIntVec noise)))
+      mem out).
+    rewrite sampleRawE.
+    rewrite (dmargin_comp
+      (fun y => (y, mem))
+      (fun noise => Some
+        (inverse_isometry centerL (IndCpaDSim.toIntVec noise)))
+      (dmargin (@toChIntVec dim)
+        (n_dg_shifted shift stdev)) out).
+    rewrite (dmargin_comp
+      (fun noise => (Some
+        (inverse_isometry centerL (IndCpaDSim.toIntVec noise)), mem))
+      (@toChIntVec dim) (n_dg_shifted shift stdev) out).
+    transitivity
+      ((dmargin
+        (fun v => (Some (inverse_isometry centerL v), mem))
+        (n_dg_shifted shift stdev)) out).
+    - apply: dmargin_fun_ext=> v.
+      by rewrite toIntVec_toChIntVec.
+    rewrite (sampleRaw_ret_someE
+      (simulator_successful_decrypt_distribution
+        centerR error_bound) mem out).
+    rewrite -(dmargin_comp
+      (fun y => (Some y, mem))
+      (fun v => inverse_isometry centerL v)
+      (n_dg_shifted shift stdev) out).
+    apply: dmargin_ext=> y.
+    symmetry.
+    rewrite /shift.
+    exact: simulator_decrypt_noise_one_chart.
+  Qed.
+
+  Lemma noise_flooding_successful_decrypt_some_pyth_one_chart
+      sk data error_bound (m : message) :
+    let c : ciphertext := Some (data, error_bound) in
+    (metric (dec' sk c) m <= error_bound)%N ->
+    ⊨Pyth ⦃ fun inps =>
+      let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
+      (fun _ : chUnit =>
+        m' ← sampleRaw (NF.decrypt sk c) ;;
+        ret (Some m'))
+      ≈( cat_tuple
+        [tuple noise_flooding_per_query_epsilon
+          dim gaussian_width_multiplier] [tuple 0] )
+      (fun _ : chUnit =>
+        m' ← sampleRaw
+          (simulator_successful_decrypt_distribution m error_bound) ;;
+        ret (Some m'))
+    ⦃ fun _ : chOption message * heap => true ⦄.
+  Proof.
+    move=> c Hmetric.
+    set stdev :=
+      noise_flooding_dg_stdev gaussian_width_multiplier error_bound.
+    apply: (pythJudgment_ext_true
+      (fun _ : chUnit =>
+        noise ← sampleRaw
+          (dmargin (@toChIntVec dim) (n_dg dim stdev)) ;;
+        ret (Some
+          (inverse_isometry (dec' sk c) (IndCpaDSim.toIntVec noise))))
+      (fun _ : chUnit =>
+        m' ← sampleRaw (NF.decrypt sk c) ;;
+        ret (Some m'))
+      (fun _ : chUnit =>
+        noise ← sampleRaw
+          (dmargin (@toChIntVec dim)
+            (n_dg_shifted (isometry (dec' sk c) m) stdev)) ;;
+        ret (Some
+          (inverse_isometry (dec' sk c) (IndCpaDSim.toIntVec noise))))
+      (fun _ : chUnit =>
+        m' ← sampleRaw
+          (simulator_successful_decrypt_distribution m error_bound) ;;
+        ret (Some m'))
+      (fun inps =>
+        let '((_, memL), (_, memR)) := inps in eq_op memL memR)
+      (cat_tuple
+        [tuple noise_flooding_per_query_epsilon
+          dim gaussian_width_multiplier] [tuple 0])).
+    - move=> [] mem.
+      rewrite /stdev.
+      exact: noise_flooding_decrypt_pushed_centered_some_codeE.
+    - move=> [] mem.
+      rewrite /stdev.
+      exact: (simulator_pushed_one_chart_some_codeE
+        (dec' sk c) m error_bound mem).
+    rewrite /stdev.
+    exact: (noise_flooding_successful_decrypt_some_target_pyth_one_chart
+      sk data error_bound m Hmetric).
+  Qed.
+
+  Lemma noise_flooding_successful_decrypt_code_pyth_one_chart
+      sk data error_bound (m : message) :
+    let c : ciphertext := Some (data, error_bound) in
     (metric (dec' sk c) m <= error_bound)%N ->
     ⊨Pyth ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
@@ -1711,10 +2430,10 @@ Module NoiseFloodingSecure
         ret (Some res))
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> c Henc Hchart Hmetric.
+    move=> c Hmetric.
     have Hpyth :=
-      noise_flooding_successful_decrypt_some_pyth
-        sk data error_bound m Henc Hchart Hmetric.
+      noise_flooding_successful_decrypt_some_pyth_one_chart
+        sk data error_bound m Hmetric.
     move: Hpyth=> [Hs Hpyth].
     split; first exact: Hs.
     move=> memL memR [] [] Hpre.
@@ -1741,6 +2460,34 @@ Module NoiseFloodingSecure
       by [].
     - move=> y Hy.
       by [].
+  Qed.
+
+  Lemma noise_flooding_successful_decrypt_code_pyth
+      sk data error_bound (m : message) :
+    let c : ciphertext := Some (data, error_bound) in
+    (metric (dec' sk c) m <= error_bound)%N ->
+    ⊨Pyth ⦃ fun inps =>
+      let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
+      (fun _ : chUnit =>
+        m' <$ (message; NF.decrypt sk c) ;;
+        ret (Some m'))
+      ≈( cat_tuple
+        [tuple noise_flooding_per_query_epsilon
+          dim gaussian_width_multiplier] [tuple 0] )
+      (fun _ : chUnit =>
+        noise <$ (chVec chInt dim;
+          discrete_gaussians (IndCpaDSim.zeroChVec dim)
+            (noise_flooding_dg_stdev
+              gaussian_width_multiplier error_bound)) ;;
+        let res :=
+          inverse_isometry m
+            (ivec_add (IndCpaDSim.toIntVec noise) (isometry m m)) in
+        ret (Some res))
+    ⦃ fun _ : chOption message * heap => true ⦄.
+  Proof.
+    move=> c Hmetric.
+    exact: (noise_flooding_successful_decrypt_code_pyth_one_chart
+      sk data error_bound m Hmetric).
   Qed.
 
   Lemma noise_flooding_successful_decrypt_code_pyth_from_finite_encoding_vector_bound
@@ -2190,11 +2937,10 @@ Module NoiseFloodingSecure
     by rewrite Hcenter ivec_dist_refl.
   Qed.
 
-  Lemma noise_flooding_successful_decrypt_code_pyth1
+  Lemma noise_flooding_successful_decrypt_code_pyth1_one_chart
       sk data error_bound (m : message) :
     let c : ciphertext := Some (data, error_bound) in
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     (metric (dec' sk c) m <= error_bound)%N ->
     ⊨Pyth1 ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
@@ -2214,19 +2960,18 @@ Module NoiseFloodingSecure
         ret (Some res))
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> c Henc Hchart Hmetric.
+    move=> c Henc Hmetric.
     set eps :=
       noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
     set centerL := dec' sk c.
-    set centerR := m.
     set stdev :=
       noise_flooding_dg_stdev gaussian_width_multiplier error_bound.
     set DL :=
       dmargin (fun v => inverse_isometry centerL v)
-        (n_dg_shifted (isometry centerL centerL) stdev).
+        (n_dg dim stdev).
     set DR :=
-      dmargin (fun v => inverse_isometry centerR v)
-        (n_dg_shifted (isometry centerR centerR) stdev).
+      dmargin (fun v => inverse_isometry centerL v)
+        (n_dg_shifted (isometry centerL m) stdev).
     set Dreal := NF.decrypt sk c.
     set Dsim := simulator_successful_decrypt_distribution m error_bound.
     set Dreal_opt := dmargin (@Some message) Dreal.
@@ -2235,19 +2980,19 @@ Module NoiseFloodingSecure
       by move=> x y [= ->].
     have [Hfin Hkl] :
         finite_kl DL DR /\ δ_KL DL DR <= eps.
-      rewrite /DL /DR /centerL /centerR /stdev /eps.
-      exact: (noise_flooding_message_gaussian_kl
-        Henc Hchart error_bound (dec' sk c) m Hmetric).
+      rewrite /DL /DR /centerL /stdev /eps.
+      exact: (noise_flooding_message_gaussian_kl_one_chart_from_finite_encoding
+        Henc error_bound (dec' sk c) m Hmetric).
     have HDreal : DL =1 Dreal.
       move=> y.
       rewrite /DL /Dreal /centerL /stdev.
       symmetry.
-      exact: noise_flooding_decrypt_some_shifted.
+      exact: noise_flooding_decrypt_some_centered.
     have HDsim : DR =1 Dsim.
       move=> y.
-      rewrite /DR /Dsim /centerR /stdev.
+      rewrite /DR /Dsim /centerL /stdev.
       symmetry.
-      exact: simulator_decrypt_noise_shifted.
+      exact: simulator_decrypt_noise_one_chart.
     have Hfin_opt : finite_kl Dreal_opt Dsim_opt.
       apply: (finite_kl_ext
         (dmargin (@Some message) DL) Dreal_opt
@@ -2289,7 +3034,7 @@ Module NoiseFloodingSecure
         rewrite (pr_ext Dreal DL predT); last
           by move=> y; symmetry; exact: HDreal.
         rewrite /DL dmargin_dweight.
-        apply: n_dg_shifted_mass1.
+        apply: n_dg_mass1.
         exact: noise_flooding_dg_stdev_pos.
       - move=> [].
         rewrite /Dsim_opt dmargin_dweight.
@@ -2323,7 +3068,7 @@ Module NoiseFloodingSecure
       symmetry.
       apply: complete_output_heap_ext=> out'.
       rewrite /Dsim_opt (sampleRaw_dmargin_someE Dsim memR out') /Dsim.
-      rewrite /centerR /stdev.
+      rewrite /stdev.
       exact: (simulator_successful_decrypt_some_codeE
         m error_bound memR out').
     split.
@@ -2331,6 +3076,36 @@ Module NoiseFloodingSecure
       by [].
     - move=> y Hy.
       by [].
+  Qed.
+
+  Lemma noise_flooding_successful_decrypt_code_pyth1
+      sk data error_bound (m : message) :
+    let c : ciphertext := Some (data, error_bound) in
+    finite_encoding_cert ->
+    chart_center_dist_le_metric_cert ->
+    (metric (dec' sk c) m <= error_bound)%N ->
+    ⊨Pyth1 ⦃ fun inps =>
+      let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
+      (fun _ : chUnit =>
+        m' <$ (message; NF.decrypt sk c) ;;
+        ret (Some m'))
+      ≈( noise_flooding_per_query_epsilon
+        dim gaussian_width_multiplier )
+      (fun _ : chUnit =>
+        noise <$ (chVec chInt dim;
+          discrete_gaussians (IndCpaDSim.zeroChVec dim)
+            (noise_flooding_dg_stdev
+              gaussian_width_multiplier error_bound)) ;;
+        let res :=
+          inverse_isometry m
+            (ivec_add (IndCpaDSim.toIntVec noise) (isometry m m)) in
+        ret (Some res))
+    ⦃ fun _ : chOption message * heap => true ⦄.
+  Proof.
+    move=> c Henc _ Hmetric.
+    exact: (noise_flooding_successful_decrypt_code_pyth1_one_chart
+      sk data error_bound m (finite_message_encoding_of_legacy Henc)
+      Hmetric).
   Qed.
 
   Notation " 'adv_keys " := (pk_t × evk_t) (in custom pack_type at level 2).
@@ -2773,13 +3548,13 @@ Module NoiseFloodingSecure
     0 <= ε ->
     (forall HbL HbR,
       exists d,
-        coupling d
+        clean_coupling d
           (complete (Pr_code (kL HbL) memL))
           (complete (Pr_code (kR HbR) memR)) /\
         \P_[d] post >= 1 - ε) ->
     post (None, None) ->
     exists d,
-      coupling d
+      clean_coupling d
         (complete (Pr_code (@assertD outL_t b kL) memL))
         (complete (Pr_code (@assertD outR_t b kR) memR)) /\
       \P_[d] post >= 1 - ε.
@@ -2790,15 +3565,15 @@ Module NoiseFloodingSecure
       split; last exact: Hprob.
       move: Hd=> [HdL HdR].
       split.
-      + rewrite HdL.
-        apply: distr_ext=> z.
+      + move=> z.
+        rewrite HdL.
         symmetry.
         exact: (complete_distr_ext
           (Pr_code (@assertD outL_t true kL) memL)
           (Pr_code (kL erefl) memL)
           (Pr_code_assertD_true_ext true kL erefl memL) z).
-      + rewrite HdR.
-        apply: distr_ext=> z.
+      + move=> z.
+        rewrite HdR.
         symmetry.
         exact: (complete_distr_ext
           (Pr_code (@assertD outR_t true kR) memR)
@@ -2807,11 +3582,11 @@ Module NoiseFloodingSecure
     - exists (dunit (None, None)).
       split.
       + split.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite dmargin_dunit.
           rewrite /assertD Pr_code_fail.
           exact/esym/complete_dnull.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite dmargin_dunit.
           rewrite /assertD Pr_code_fail.
           exact/esym/complete_dnull.
@@ -2834,7 +3609,7 @@ Module NoiseFloodingSecure
     (forall x, x \in dinsupp D -> post (Some (outL x), Some (outR x))) ->
     post (None, None) ->
     exists d,
-      coupling d (complete (Pr_code progL memL))
+      clean_coupling d (complete (Pr_code progL memL))
         (complete (Pr_code progR memR)) /\
       \P_[d] post >= 1.
   Proof.
@@ -2844,10 +3619,10 @@ Module NoiseFloodingSecure
     - have [HmarginL HmarginR] :=
         shared_complete_sample_coupling_margins D outL outR.
       split.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HmarginL.
         exact: (complete_distr_ext _ _ Hleft z).
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HmarginR.
         exact: (complete_distr_ext _ _ Hright z).
     - exact: (shared_complete_sample_coupling_pr_ge1 D outL outR post
@@ -2905,10 +3680,8 @@ Module NoiseFloodingSecure
     exists d.
     split.
     - split.
-      + apply: distr_ext=> z.
-        exact: HdL.
-      + apply: distr_ext=> z.
-        exact: HdR.
+      + exact: HdL.
+      + exact: HdR.
     - apply: (le_trans Hprob).
       apply: subset_pr=> xy Hxy.
       case: xy Hxy=> outL' outR'.
@@ -3066,12 +3839,12 @@ Module NoiseFloodingSecure
           contL contR mid post 0 Hcont.2).
       move: Hbind=> [HL HR].
       split.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HL.
         rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
         rewrite /KL Pr_code_bind.
         by [].
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HR.
         rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
         rewrite /KR Pr_code_bind.
@@ -4504,7 +5277,7 @@ Module NoiseFloodingSecure
       + have [HmarginL HmarginR] :=
           shared_complete_sample_coupling_margins (encrypt pk m) outL outR.
         split.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite HmarginL.
           apply: complete_ext=> y.
           rewrite /m /outL.
@@ -4514,7 +5287,7 @@ Module NoiseFloodingSecure
           rewrite Pr_code_sample.
           apply: eq_in_dlet=> // c _ y'.
           by rewrite Pr_code_get Pr_code_put Pr_code_ret.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite HmarginR.
           apply: complete_ext=> y.
           rewrite /m /outR.
@@ -4547,13 +5320,13 @@ Module NoiseFloodingSecure
             (dnull : {distr ciphertext / R})
             (fun c => (c, memL)) (fun c => (c, memR)).
         split.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite HmarginL.
           rewrite complete_dmargin_dnull.
           rewrite /ind_cpad_real_encrypt_code.
           rewrite !Pr_code_get Hpk_outer HpkR /assertD /= Pr_code_fail.
           exact/esym/complete_dnull.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite HmarginR.
           rewrite complete_dmargin_dnull.
           rewrite /ind_cpa_reduction_sim_encrypt_linked_code.
@@ -4592,8 +5365,8 @@ Module NoiseFloodingSecure
     split; last exact: Hpost.
     move: Hd=> [HdL HdR].
     split; first exact: HdL.
+    move=> z.
     rewrite HdR.
-    apply: distr_ext=> z.
     apply: complete_ext=> out.
     symmetry.
     exact: (ind_cpa_reduction_sim_encrypt_linked_resolve_Pr_codeE
@@ -5241,13 +6014,13 @@ Module NoiseFloodingSecure
             shared_complete_sample_coupling_margins
               (eval1 evk gate c) outL outR.
           split.
-          -- apply: distr_ext=> z.
+          -- move=> z.
              rewrite HmarginL.
              apply: complete_distr_ext=> y.
              rewrite /outL dmarginE Pr_code_sample.
              apply: eq_in_dlet=> // c' _ y'.
              by rewrite Pr_code_put Pr_code_ret.
-          -- apply: distr_ext=> z.
+          -- move=> z.
              rewrite HmarginR.
              apply: complete_distr_ext=> y.
              rewrite /outR dmarginE.
@@ -5281,10 +6054,10 @@ Module NoiseFloodingSecure
         exists (dunit (None, None)).
         split.
         * split.
-          -- apply: distr_ext=> z.
+          -- move=> z.
              rewrite dmargin_dunit.
              exact/esym/complete_dnull.
-          -- apply: distr_ext=> z.
+          -- move=> z.
              rewrite dmargin_dunit.
              rewrite (nth_valid_irrel
                (get_heap memL IndCpadGame.table_addr) r _ HrL).
@@ -5898,13 +6671,13 @@ Module NoiseFloodingSecure
               shared_complete_sample_coupling_margins
                 (eval2 evk gate ci cj) outL outR.
              split.
-             ++ apply: distr_ext=> z.
+             ++ move=> z.
                 rewrite HmarginL.
                 apply: complete_distr_ext=> y.
                 rewrite /outL dmarginE Pr_code_sample.
                 apply: eq_in_dlet=> // c' _ y'.
                 by rewrite Pr_code_put Pr_code_ret.
-             ++ apply: distr_ext=> z.
+             ++ move=> z.
                 rewrite HmarginR.
                 apply: complete_distr_ext=> y.
                 rewrite /outR dmarginE.
@@ -5945,10 +6718,10 @@ Module NoiseFloodingSecure
           exists (dunit (None, None)).
           split.
           -- split.
-             ++ apply: distr_ext=> z.
+             ++ move=> z.
                 rewrite dmargin_dunit.
                 exact/esym/complete_dnull.
-             ++ apply: distr_ext=> z.
+             ++ move=> z.
                 rewrite dmargin_dunit.
                 rewrite (nth_valid_irrel
                   (get_heap memL IndCpadGame.table_addr) ri _ HriL).
@@ -6697,13 +7470,13 @@ Module NoiseFloodingSecure
              ++ have [HmarginL HmarginR] :=
                   shared_complete_sample_coupling_margins D outL outR.
                 split.
-                ** apply: distr_ext=> z.
+                ** move=> z.
                    rewrite HmarginL.
                    apply: complete_distr_ext=> y.
                    rewrite /outL /D dmarginE Pr_code_sample.
                    apply: eq_in_dlet=> // noise _ y'.
                    by rewrite /decode Pr_code_ret.
-                ** apply: distr_ext=> z.
+                ** move=> z.
                    rewrite HmarginR.
                    apply: complete_distr_ext=> y.
                    rewrite /outR /D dmarginE.
@@ -6723,10 +7496,10 @@ Module NoiseFloodingSecure
              exists (dunit (None, None)).
              split.
              ++ split.
-                ** apply: distr_ext=> z.
+                ** move=> z.
                    rewrite dmargin_dunit.
                    exact/esym/complete_dnull.
-                ** apply: distr_ext=> z.
+                ** move=> z.
                    rewrite dmargin_dunit.
                    rewrite (nth_valid_irrel
                      (get_heap memL1 IndCpadGame.table_addr) i _ HiL).
@@ -6742,12 +7515,12 @@ Module NoiseFloodingSecure
           -- have [HmarginL HmarginR] :=
                shared_complete_sample_coupling_margins Dnone outL outR.
              split.
-             ++ apply: distr_ext=> z.
+             ++ move=> z.
                 rewrite HmarginL.
                 apply: complete_distr_ext=> y.
                 rewrite /outL dmargin_dunit Pr_code_ret.
                 by [].
-             ++ apply: distr_ext=> z.
+             ++ move=> z.
                 rewrite HmarginR.
                 apply: complete_distr_ext=> y.
                 rewrite /outR dmargin_dunit.
@@ -8558,8 +9331,8 @@ Module NoiseFloodingSecure
     if m0 == m1 then
       match get_heap mem IndCpadGame.sk_addr, c with
       | Some sk, Some (data, error_bound) =>
-          (ivec_dist (isometry (dec' sk c) (dec' sk c))
-            (isometry m0 m0) <= error_bound)%N
+          (ivec_dist ivec_zero (isometry (dec' sk c) m0)
+            <= error_bound)%N
       | _, _ => false
       end
     else true.
@@ -8611,7 +9384,7 @@ Module NoiseFloodingSecure
     exists sk data error_bound,
       get_heap mem IndCpadGame.sk_addr = Some sk /\
       c = Some (data, error_bound) /\
-      (ivec_dist (isometry (dec' sk c) (dec' sk c)) (isometry m m)
+      (ivec_dist ivec_zero (isometry (dec' sk c) m)
         <= error_bound)%N.
   Proof.
     rewrite /challenge_decrypt_prefix_row_ready_vector_bound=>
@@ -8627,11 +9400,10 @@ Module NoiseFloodingSecure
 
   Lemma challenge_decrypt_prefix_row_ready_vector_bound_from_ready
       row mem :
-    chart_center_dist_le_metric_cert ->
     challenge_decrypt_prefix_row_ready row mem ->
     challenge_decrypt_prefix_row_ready_vector_bound row mem.
   Proof.
-    move=> Hchart Hready.
+    move=> Hready.
     rewrite /challenge_decrypt_prefix_row_ready_vector_bound Hready /=.
     case: row Hready=> [[m0 m1] c] Hready.
     rewrite /challenge_decrypt_prefix_row_vector_bound.
@@ -8643,9 +9415,7 @@ Module NoiseFloodingSecure
         mem m0 c Hready.
     rewrite Hsk Hc /=.
     rewrite Hc in Hmetric.
-    exact: (leq_trans
-      (Hchart (dec' sk (Some (data, error_bound))) m0)
-      Hmetric).
+    by rewrite -metric_chartE.
   Qed.
 
   Lemma ind_cpad_decrypt_prefix_code_certifies_row max_queries :
@@ -8722,16 +9492,14 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_prefix_code_readies_row_vector_bound
       max_queries :
-    chart_center_dist_le_metric_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries.
   Proof.
-    move=> Hchart.
     rewrite /decrypt_prefix_ready_vector_bound_cert /hoareJudgment=>
       [i mem Hinv] out Hout.
     have Hready := ind_cpad_decrypt_prefix_code_readies_row max_queries.
     move: Hready; rewrite /hoareJudgment=> Hready.
     exact: (challenge_decrypt_prefix_row_ready_vector_bound_from_ready
-      out.1 out.2 Hchart (Hready i mem Hinv out Hout)).
+      out.1 out.2 (Hready i mem Hinv out Hout)).
   Qed.
 
   Lemma ind_cpad_decrypt_cont_neq_pyth m0 m1 c :
@@ -8786,8 +9554,6 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_cont_eq_pyth m c :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨Pyth ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in
       (eq_op memL memR) &&
@@ -8799,7 +9565,6 @@ Module NoiseFloodingSecure
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont (m, m, c))
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
@@ -8817,7 +9582,7 @@ Module NoiseFloodingSecure
     subst c.
     have Hpyth :=
       noise_flooding_successful_decrypt_code_pyth
-        sk data error_bound m Henc Hchart Hmetric.
+        sk data error_bound m Hmetric.
     move: Hpyth=> [_ Hpyth].
     have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
       Hpyth memL memL tt tt (eqxx memL).
@@ -9291,7 +10056,6 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_cont_eq_pyth_from_metric_encoding_ready_vector_bound
       m c :
-    finite_encoding_cert ->
     ⊨Pyth ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in
       (eq_op memL memR) &&
@@ -9303,7 +10067,6 @@ Module NoiseFloodingSecure
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont (m, m, c))
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
@@ -9315,13 +10078,14 @@ Module NoiseFloodingSecure
     move=> memL memR [] [] Hpre.
     move/andP: Hpre=> [/eqP Hmem Hready].
     subst memR.
-    have [sk [data [error_bound [Hsk [Hc Hvecdist]]]]] :=
-      challenge_decrypt_prefix_row_ready_vector_bound_equal_messages_some
+    move/andP: Hready=> [Hready _].
+    have [sk [data [error_bound [Hsk [Hc Hmetric]]]]] :=
+      challenge_decrypt_prefix_row_ready_equal_messages_some
         memL m c Hready.
     subst c.
     have Hpyth :=
-      noise_flooding_successful_decrypt_code_pyth_from_metric_encoding_vector_bound
-        sk data error_bound m Henc Hvecdist.
+      noise_flooding_successful_decrypt_code_pyth_one_chart
+        sk data error_bound m Hmetric.
     move: Hpyth=> [_ Hpyth].
     have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
       Hpyth memL memL tt tt (eqxx memL).
@@ -9348,7 +10112,7 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_cont_eq_pyth1_from_metric_encoding_ready_vector_bound
       m c :
-    finite_encoding_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth1 ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in
       (eq_op memL memR) &&
@@ -9366,13 +10130,14 @@ Module NoiseFloodingSecure
     move=> memL memR [] [] Hpre.
     move/andP: Hpre=> [/eqP Hmem Hready].
     subst memR.
-    have [sk [data [error_bound [Hsk [Hc Hvecdist]]]]] :=
-      challenge_decrypt_prefix_row_ready_vector_bound_equal_messages_some
+    move/andP: Hready=> [Hready _].
+    have [sk [data [error_bound [Hsk [Hc Hmetric]]]]] :=
+      challenge_decrypt_prefix_row_ready_equal_messages_some
         memL m c Hready.
     subst c.
     have Hpyth :=
-      noise_flooding_successful_decrypt_code_pyth1_from_metric_encoding_vector_bound
-        sk data error_bound m Henc Hvecdist.
+      noise_flooding_successful_decrypt_code_pyth1_one_chart
+        sk data error_bound m Henc Hmetric.
     move: Hpyth=> [_ Hpyth].
     have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
       Hpyth memL memL tt tt (eqxx memL).
@@ -9399,7 +10164,6 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_cont_pyth_from_metric_encoding_ready_vector_bound
       (row : IndCpadGame.challenger_table_row) :
-    finite_encoding_cert ->
     ⊨Pyth ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in
       (eq_op memL memR) &&
@@ -9411,13 +10175,12 @@ Module NoiseFloodingSecure
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc.
     case: row=> [[m0 m1] c].
     destruct (eq_op m0 m1) eqn:Heq.
     - have Hm : m0 = m1 := eqP Heq.
       subst m1.
       exact: (ind_cpad_decrypt_cont_eq_pyth_from_metric_encoding_ready_vector_bound
-        m0 c Henc).
+        m0 c).
     rewrite /ind_cpad_real_decrypt_cont /ind_cpad_sim_decrypt_cont Heq.
     apply: pythReflRule.
     - move=> i.
@@ -9435,7 +10198,7 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_cont_pyth1_from_metric_encoding_ready_vector_bound
       (row : IndCpadGame.challenger_table_row) :
-    finite_encoding_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth1 ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in
       (eq_op memL memR) &&
@@ -9465,8 +10228,6 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_cont_pyth
       (row : IndCpadGame.challenger_table_row) :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨Pyth ⦃ fun inps =>
       let '((_, memL), (_, memR)) := inps in
       (eq_op memL memR) &&
@@ -9478,12 +10239,11 @@ Module NoiseFloodingSecure
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
     case: row=> [[m0 m1] c].
     destruct (eq_op m0 m1) eqn:Heq.
     - have Hm : m0 = m1 := eqP Heq.
       subst m1.
-      exact: (ind_cpad_decrypt_cont_eq_pyth m0 c Henc Hchart).
+      exact: (ind_cpad_decrypt_cont_eq_pyth m0 c).
     rewrite /ind_cpad_real_decrypt_cont /ind_cpad_sim_decrypt_cont Heq.
     apply: pythReflRule.
     - move=> i.
@@ -9530,8 +10290,6 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_cont_kernel_pyth :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨Pyth ⦃ fun inps =>
       let '((rowL, memL), (rowR, memR)) := inps in
       (rowL == rowR) && (memL == memR) &&
@@ -9543,7 +10301,6 @@ Module NoiseFloodingSecure
       ind_cpad_sim_decrypt_cont
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
@@ -9556,7 +10313,7 @@ Module NoiseFloodingSecure
     move/andP: Hpre=> [/andP [/eqP Hrow /eqP Hmem] Hready].
     subst rowR.
     subst memR.
-    have [_ Hpyth] := ind_cpad_decrypt_cont_pyth rowL Henc Hchart.
+    have [_ Hpyth] := ind_cpad_decrypt_cont_pyth rowL.
     have Hpre_unit :
         (let '((_, memL0), (_, memR0)) :=
             ((tt, memL), (tt, memL)) in eq_op memL0 memR0) &&
@@ -9596,7 +10353,6 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_cont_kernel_pyth_from_metric_encoding_ready_vector_bound :
-    finite_encoding_cert ->
     ⊨Pyth ⦃ fun inps =>
       let '((rowL, memL), (rowR, memR)) := inps in
       (rowL == rowR) && (memL == memR) &&
@@ -9608,7 +10364,6 @@ Module NoiseFloodingSecure
       ind_cpad_sim_decrypt_cont
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
@@ -9623,7 +10378,7 @@ Module NoiseFloodingSecure
     subst memR.
     have [_ Hpyth] :=
       ind_cpad_decrypt_cont_pyth_from_metric_encoding_ready_vector_bound
-        rowL Henc.
+        rowL.
     have Hpre_unit :
         (let '((_, memL0), (_, memR0)) :=
             ((tt, memL), (tt, memL)) in eq_op memL0 memR0) &&
@@ -9633,7 +10388,7 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_cont_kernel_pyth1_from_metric_encoding_ready_vector_bound :
-    finite_encoding_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth1 ⦃ fun inps =>
       let '((rowL, memL), (rowR, memR)) := inps in
       (rowL == rowR) && (memL == memR) &&
@@ -9664,8 +10419,6 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_factored_pyth max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun i : nat =>
         row ← ind_cpad_decrypt_prefix_code max_queries i ;;
@@ -9679,7 +10432,6 @@ Module NoiseFloodingSecure
         ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
     apply: (pythHoareSeqRule
       (ind_cpad_decrypt_prefix_code max_queries)
       ind_cpad_real_decrypt_cont
@@ -9696,7 +10448,7 @@ Module NoiseFloodingSecure
       move/andP: Hpre=> [/andP [/eqP Hi /eqP Hmem] Hinv].
       by split; [exact: Hi | split].
     - exact: ind_cpad_decrypt_prefix_code_readies_row.
-    - exact: (ind_cpad_decrypt_cont_kernel_pyth Henc Hchart).
+    - exact: ind_cpad_decrypt_cont_kernel_pyth.
   Qed.
 
   Lemma ind_cpad_decrypt_factored_pyth_short max_queries :
@@ -9735,7 +10487,6 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_factored_pyth_from_metric_encoding_ready_vector_bound
       max_queries :
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun i : nat =>
@@ -9750,7 +10501,7 @@ Module NoiseFloodingSecure
         ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hprefix_vector.
+    move=> Hprefix_vector.
     apply: (pythHoareSeqRule
       (ind_cpad_decrypt_prefix_code max_queries)
       ind_cpad_real_decrypt_cont
@@ -9767,13 +10518,12 @@ Module NoiseFloodingSecure
       move/andP: Hpre=> [/andP [/eqP Hi /eqP Hmem] Hinv].
       by split; [exact: Hi | split].
     - exact: Hprefix_vector.
-    - exact: (ind_cpad_decrypt_cont_kernel_pyth_from_metric_encoding_ready_vector_bound
-        Henc).
+    - exact: ind_cpad_decrypt_cont_kernel_pyth_from_metric_encoding_ready_vector_bound.
   Qed.
 
   Lemma ind_cpad_decrypt_factored_pyth_short_from_metric_encoding_ready_vector_bound
       max_queries :
-    finite_encoding_cert ->
+    finite_message_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun i : nat =>
@@ -9809,8 +10559,6 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_factored_pyth_from_metric_encoding
       max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun i : nat =>
         row ← ind_cpad_decrypt_prefix_code max_queries i ;;
@@ -9824,17 +10572,15 @@ Module NoiseFloodingSecure
         ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
     exact: (ind_cpad_decrypt_factored_pyth_from_metric_encoding_ready_vector_bound
-      max_queries Henc
+      max_queries
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_decrypt_factored_pyth_short_from_metric_encoding
       max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun i : nat =>
         row ← ind_cpad_decrypt_prefix_code max_queries i ;;
@@ -9847,16 +10593,14 @@ Module NoiseFloodingSecure
         ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
+    move=> Henc.
     exact: (ind_cpad_decrypt_factored_pyth_short_from_metric_encoding_ready_vector_bound
       max_queries Henc
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_decrypt_code_pyth max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
       ≈( cat_tuple [tuple 0]
@@ -9866,9 +10610,8 @@ Module NoiseFloodingSecure
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
     have Hfactored := ind_cpad_decrypt_factored_pyth
-      max_queries Henc Hchart.
+      max_queries.
     move: Hfactored=> [Hs Hpyth].
     split; first exact: Hs.
     move=> memL memR iL iR Hpre.
@@ -9937,7 +10680,6 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_code_pyth_from_metric_encoding_ready_vector_bound
       max_queries :
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
@@ -9948,10 +10690,10 @@ Module NoiseFloodingSecure
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hprefix_vector.
+    move=> Hprefix_vector.
     have Hfactored :=
       ind_cpad_decrypt_factored_pyth_from_metric_encoding_ready_vector_bound
-        max_queries Henc Hprefix_vector.
+        max_queries Hprefix_vector.
     move: Hfactored=> [Hs Hpyth].
     split; first exact: Hs.
     move=> memL memR iL iR Hpre.
@@ -9980,7 +10722,7 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_code_pyth_short_from_metric_encoding_ready_vector_bound
       max_queries :
-    finite_encoding_cert ->
+    finite_message_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
@@ -10022,8 +10764,6 @@ Module NoiseFloodingSecure
 
   Lemma ind_cpad_decrypt_code_pyth_from_metric_encoding
       max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
       ≈( cat_tuple [tuple 0]
@@ -10033,17 +10773,15 @@ Module NoiseFloodingSecure
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
     exact: (ind_cpad_decrypt_code_pyth_from_metric_encoding_ready_vector_bound
-      max_queries Henc
+      max_queries
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_decrypt_code_pyth_short_from_metric_encoding
       max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
       ≈( cat_tuple [tuple 0]
@@ -10052,16 +10790,16 @@ Module NoiseFloodingSecure
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
+    move=> Henc.
     exact: (ind_cpad_decrypt_code_pyth_short_from_metric_encoding_ready_vector_bound
       max_queries Henc
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_decrypt_code_pyth1_from_metric_encoding_ready_vector_bound
       max_queries :
-    finite_encoding_cert ->
+    finite_message_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨Pyth1 ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
@@ -10175,8 +10913,7 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_code_pyth1 max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth1 ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
       ≈( noise_flooding_per_query_epsilon
@@ -10184,17 +10921,16 @@ Module NoiseFloodingSecure
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
-    move=> Henc Hchart.
+    move=> Henc.
     exact: (ind_cpad_decrypt_code_pyth1_from_metric_encoding_ready_vector_bound
       max_queries Henc
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_decrypt_code_pyth1_from_metric_encoding
       max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth1 ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_real_decrypt_code max_queries)
       ≈( noise_flooding_per_query_epsilon
@@ -10317,8 +11053,7 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_resolve_pyth_short max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun x : nat =>
         resolve (IndCpadGame.IndCpadOracle max_queries)
@@ -10332,10 +11067,10 @@ Module NoiseFloodingSecure
     ⦃ fun out =>
       let '(_, mem) := out in challenge_heap_valid mem ⦄.
   Proof.
-    move=> Henc Hchart.
+    move=> Henc.
     have Hcode :=
       ind_cpad_decrypt_code_pyth_short_from_metric_encoding
-        max_queries Henc Hchart.
+        max_queries Henc.
     move: Hcode=> [Hs Hpyth].
     split; first exact: Hs.
     move=> memL memR iL iR Hpre.
@@ -10380,9 +11115,96 @@ Module NoiseFloodingSecure
         max_queries iR memL Hinv (y, mem) Hy_code).
   Qed.
 
+  Lemma ind_cpad_decrypt_resolve_pyth_from_metric_encoding_ready_vector_bound
+      max_queries :
+    decrypt_prefix_ready_vector_bound_cert max_queries ->
+    ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
+      (fun x : nat =>
+        resolve (IndCpadGame.IndCpadOracle max_queries)
+          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
+      ≈( cat_tuple [tuple 0]
+        (cat_tuple
+          [tuple noise_flooding_per_query_epsilon
+            dim gaussian_width_multiplier] [tuple 0]) )
+      (fun x : nat =>
+        resolve (IndCpadSimDecryptOracle max_queries)
+          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
+    ⦃ fun out =>
+      let '(_, mem) := out in challenge_heap_valid mem ⦄.
+  Proof.
+    move=> Hprefix_vector.
+    have Hcode :=
+      ind_cpad_decrypt_code_pyth_from_metric_encoding_ready_vector_bound
+        max_queries Hprefix_vector.
+    move: Hcode=> [Hs Hpyth].
+    split; first exact: Hs.
+    move=> memL memR iL iR Hpre.
+    have [P [Q [Hdist [HmarginL [HmarginR [_ _]]]]]] :=
+      Hpyth memL memR iL iR Hpre.
+    exists P, Q.
+    split; first exact: Hdist.
+    split.
+    - move=> out.
+      rewrite (HmarginL out).
+      symmetry.
+      apply: complete_output_heap_ext=> out'.
+      rewrite ind_cpad_real_decrypt_resolveE.
+      by [].
+    split.
+    - move=> out.
+      rewrite (HmarginR out).
+      symmetry.
+      apply: complete_output_heap_ext=> out'.
+      rewrite ind_cpad_sim_decrypt_resolveE.
+      by [].
+    split.
+    - move=> y Hy.
+      move/andP: Hpre=> [/andP [/eqP _ /eqP Hmem] Hinv].
+      subst memR.
+      case: y Hy=> y mem Hy /=.
+      have Hy_code :
+          (y, mem) \in dinsupp
+            (Pr_code (ind_cpad_real_decrypt_code max_queries iL) memL).
+        by rewrite -ind_cpad_real_decrypt_resolveE.
+      exact: (ind_cpad_real_decrypt_code_preserves_challenge_heap_valid
+        max_queries iL memL Hinv (y, mem) Hy_code).
+    - move=> y Hy.
+      move/andP: Hpre=> [/andP [/eqP _ /eqP Hmem] Hinv].
+      subst memR.
+      case: y Hy=> y mem Hy /=.
+      have Hy_code :
+          (y, mem) \in dinsupp
+            (Pr_code (ind_cpad_sim_decrypt_code max_queries iR) memL).
+        by rewrite -ind_cpad_sim_decrypt_resolveE.
+      exact: (ind_cpad_sim_decrypt_code_preserves_challenge_heap_valid
+        max_queries iR memL Hinv (y, mem) Hy_code).
+  Qed.
+
+  Lemma ind_cpad_decrypt_resolve_pyth_from_metric_encoding
+      max_queries :
+    ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
+      (fun x : nat =>
+        resolve (IndCpadGame.IndCpadOracle max_queries)
+          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
+      ≈( cat_tuple [tuple 0]
+        (cat_tuple
+          [tuple noise_flooding_per_query_epsilon
+            dim gaussian_width_multiplier] [tuple 0]) )
+      (fun x : nat =>
+        resolve (IndCpadSimDecryptOracle max_queries)
+          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
+    ⦃ fun out =>
+      let '(_, mem) := out in challenge_heap_valid mem ⦄.
+  Proof.
+    exact: (ind_cpad_decrypt_resolve_pyth_from_metric_encoding_ready_vector_bound
+      max_queries
+      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
+        max_queries)).
+  Qed.
+
   Lemma ind_cpad_decrypt_resolve_pyth1_from_metric_encoding_ready_vector_bound
       max_queries :
-    finite_encoding_cert ->
+    finite_message_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨Pyth1 ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun x : nat =>
@@ -10445,8 +11267,7 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_decrypt_resolve_pyth1 max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth1 ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun x : nat =>
         resolve (IndCpadGame.IndCpadOracle max_queries)
@@ -10459,17 +11280,16 @@ Module NoiseFloodingSecure
     ⦃ fun out =>
       let '(_, mem) := out in challenge_heap_valid mem ⦄.
   Proof.
-    move=> Henc Hchart.
+    move=> Henc.
     exact: (ind_cpad_decrypt_resolve_pyth1_from_metric_encoding_ready_vector_bound
       max_queries Henc
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_decrypt_resolve_pyth1_from_metric_encoding
       max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨Pyth1 ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun x : nat =>
         resolve (IndCpadGame.IndCpadOracle max_queries)
@@ -10494,9 +11314,19 @@ Module NoiseFloodingSecure
     by rewrite !(tnth_nth 0) /= add0r addr0.
   Qed.
 
+  Lemma tuple_sum_noise_flooding_vector_call_error :
+    tuple_sum
+      (cat_tuple [tuple 0]
+        (cat_tuple
+          [tuple noise_flooding_per_query_epsilon
+            dim gaussian_width_multiplier] [tuple 0])) =
+    noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+  Proof.
+    by rewrite !tuple_sum_cat !tuple_sum_singleton add0r addr0.
+  Qed.
+
   Lemma ind_cpad_decrypt_resolve_additive_error_short max_queries :
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
+    finite_message_encoding_cert ->
     ⊨AE_opt ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (fun x : nat =>
         resolve (IndCpadGame.IndCpadOracle max_queries)
@@ -10510,10 +11340,10 @@ Module NoiseFloodingSecure
     ⦃ fun outs =>
       let '(outL, outR) := outs in eq_op outL outR ⦄.
   Proof.
-    move=> Henc Hchart.
+    move=> Henc.
     rewrite -pythagorean_tv_bound_cat0_singleton.
     exact: (MicciancioWalterRule _ _ _ _ _
-      (ind_cpad_decrypt_resolve_pyth_short max_queries Henc Hchart)).
+      (ind_cpad_decrypt_resolve_pyth_short max_queries Henc)).
   Qed.
 
   Lemma ind_cpad_real_oracle_preserves_challenge_heap_valid_except_decrypt
@@ -10817,17 +11647,17 @@ Module NoiseFloodingSecure
       (d : {distr
         (option (out_t * heap) * option (out_t * heap)) / R})
       (outL outR : {distr (out_t * heap) / R}) :
-    coupling d (complete outL) (complete outR) ->
+    clean_coupling d (complete outL) (complete outR) ->
     supports_same_result_sim_decrypt_reduction_adv_opt A d ->
     \P_[d] same_result_opt >= 1.
   Proof.
-    move=> Hd Hsupport.
+    move=> [HdL _] Hsupport.
     have Hdweight : dweight d = 1.
-      rewrite pr_predT.
-      rewrite (@psum_coupling_left
-        (option (out_t * heap)) (option (out_t * heap))
-        d (complete outL) (complete outR) Hd).
-      by rewrite -pr_predT complete_dweight.
+      rewrite -(dmargin_dweight fst d).
+      transitivity (dweight (complete outL)).
+      - apply: eq_psum=> z.
+        by rewrite !mul1r HdL.
+      - exact: complete_dweight.
     rewrite (pr_eq1_of_support d same_result_opt Hdweight).
     - exact: lexx.
     - move=> outs Houts.
@@ -10840,17 +11670,17 @@ Module NoiseFloodingSecure
       (d : {distr
         (option (out_t * heap) * option (out_t * heap)) / R})
       (outL outR : {distr (out_t * heap) / R}) :
-    coupling d (complete outL) (complete outR) ->
+    clean_coupling d (complete outL) (complete outR) ->
     supports_same_result_sim_decrypt_reduction_adv_opt A d ->
     \P_[d] same_result_sim_decrypt_reduction_opt >= 1.
   Proof.
-    move=> Hd Hsupport.
+    move=> [HdL _] Hsupport.
     have Hdweight : dweight d = 1.
-      rewrite pr_predT.
-      rewrite (@psum_coupling_left
-        (option (out_t * heap)) (option (out_t * heap))
-        d (complete outL) (complete outR) Hd).
-      by rewrite -pr_predT complete_dweight.
+      rewrite -(dmargin_dweight fst d).
+      transitivity (dweight (complete outL)).
+      - apply: eq_psum=> z.
+        by rewrite !mul1r HdL.
+      - exact: complete_dweight.
     rewrite (pr_eq1_of_support d
       same_result_sim_decrypt_reduction_opt Hdweight).
     - exact: lexx.
@@ -11864,7 +12694,7 @@ Module NoiseFloodingSecure
   Qed.
 
   Lemma ind_cpad_reduction_challenge_init_coupling_margins :
-    coupling ind_cpad_reduction_challenge_init_coupling
+    clean_coupling ind_cpad_reduction_challenge_init_coupling
       (complete (Pr_code (ind_cpad_challenge_init_code tt) empty_heap))
       (complete
         (Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap)).
@@ -11876,7 +12706,7 @@ Module NoiseFloodingSecure
         ind_cpad_reduction_challenge_init_outL
         ind_cpad_reduction_challenge_init_outR.
     split.
-    - apply: distr_ext=> z.
+    - move=> z.
       rewrite HmarginL.
       apply: complete_distr_ext=> y.
       rewrite /ind_cpad_reduction_challenge_init_sample
@@ -11890,7 +12720,7 @@ Module NoiseFloodingSecure
       apply: eq_in_dlet=> // keys _ y''.
       case: keys=> [[pk evk] sk].
       by rewrite dlet_unit /challenge_initialized_heap !Pr_code_put Pr_code_ret.
-    - apply: distr_ext=> z.
+    - move=> z.
       rewrite HmarginR.
       apply: complete_distr_ext=> y.
       rewrite /ind_cpad_reduction_challenge_init_sample
@@ -11910,7 +12740,7 @@ Module NoiseFloodingSecure
       (A : nom_package) :
     fseparate (loc (ind_cpa_reduction_moved_adversary A))
       IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    coupling ind_cpad_reduction_challenge_init_coupling
+    clean_coupling ind_cpad_reduction_challenge_init_coupling
       (complete (Pr_code (ind_cpad_challenge_init_code tt) empty_heap))
       (complete
         (Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap)) /\
@@ -11928,7 +12758,7 @@ Module NoiseFloodingSecure
       (contL contR : in_t -> raw_code out_t) : Prop :=
     forall memL memR xL xR,
       exists d,
-        coupling d
+        clean_coupling d
           (complete (Pr_code (contL xL) memL))
           (complete (Pr_code (contR xR) memR)) /\
         (same_input_sim_decrypt_reduction_adv_pre A
@@ -11972,7 +12802,7 @@ Module NoiseFloodingSecure
         A contL contR) xy :
     let KL ymem := Pr_code (contL ymem.1) ymem.2 in
     let KR ymem := Pr_code (contR ymem.1) ymem.2 in
-    coupling
+    clean_coupling
       (sim_decrypt_reduction_adv_continuation_kernel
         A contL contR Hcont xy)
       (complete_bind_kernel KL xy.1)
@@ -11992,10 +12822,8 @@ Module NoiseFloodingSecure
           (fun ymem : mid_t * heap => Pr_code (contR ymem.1) ymem.2)
           (Some (yL, memL), None).
       split.
-      + apply: distr_ext=> z.
-        by rewrite /lmg.
-      + apply: distr_ext=> z.
-        by rewrite /rmg.
+      + exact: HdL.
+      + exact: HdR.
     - case: ymemR=> yR memR.
       rewrite /sim_decrypt_reduction_adv_continuation_kernel /=.
       have [HdL HdR] :=
@@ -12004,10 +12832,8 @@ Module NoiseFloodingSecure
           (fun ymem : mid_t * heap => Pr_code (contR ymem.1) ymem.2)
           (None, Some (yR, memR)).
       split.
-      + apply: distr_ext=> z.
-        by rewrite /lmg.
-      + apply: distr_ext=> z.
-        by rewrite /rmg.
+      + exact: HdL.
+      + exact: HdR.
     - rewrite /sim_decrypt_reduction_adv_continuation_kernel /=.
       have [HdL HdR] :=
         complete_bind_fallback_coupling_margins
@@ -12015,10 +12841,8 @@ Module NoiseFloodingSecure
           (fun ymem : mid_t * heap => Pr_code (contR ymem.1) ymem.2)
           (None, None).
       split.
-      + apply: distr_ext=> z.
-        by rewrite /lmg.
-      + apply: distr_ext=> z.
-        by rewrite /rmg.
+      + exact: HdL.
+      + exact: HdR.
   Qed.
 
   Lemma sim_decrypt_reduction_adv_continuation_kernel_support
@@ -12059,13 +12883,13 @@ Module NoiseFloodingSecure
     exists d.
     split.
     - split.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite /d dmargin_dunit Pr_code_ret.
         case: z=> [[y mem]|] /=.
         * rewrite /complete_mass.
           by rewrite !dunit1E.
         * by rewrite /complete_mass dunit_dweight subrr dunit1E.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite /d dmargin_dunit Pr_code_ret.
         case: z=> [[y mem]|] /=.
         * rewrite /complete_mass.
@@ -12109,12 +12933,12 @@ Module NoiseFloodingSecure
           A contL contR Hcont).
       move: Hbind=> [HL HR].
       split.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HL.
         rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
         rewrite /KL Pr_code_bind.
         by [].
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HR.
         rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
         rewrite /KR Pr_code_bind.
@@ -12186,7 +13010,7 @@ Module NoiseFloodingSecure
       | _ => complete_bind_fallback_coupling KL KR xy
       end.
     have HK xy :
-        coupling (K xy)
+        clean_coupling (K xy)
           (complete_bind_kernel KL xy.1)
           (complete_bind_kernel KR xy.2).
       case: xy=> [[ymemL|] [ymemR|]] /=.
@@ -12203,35 +13027,27 @@ Module NoiseFloodingSecure
               (Pr_code (contL yL xL) memL')
               (Pr_code (contR yR xR) memR').
           split.
-          * apply: distr_ext=> z.
-            by rewrite /lmg.
-          * apply: distr_ext=> z.
-            by rewrite /rmg.
+          * exact: HdL.
+          * exact: HdR.
       - case: ymemL=> yL memL'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (Some (yL, memL'), None).
         split.
-        + apply: distr_ext=> z.
-          by rewrite /lmg.
-        + apply: distr_ext=> z.
-          by rewrite /rmg.
+        + exact: HdL.
+        + exact: HdR.
       - case: ymemR=> yR memR'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (None, Some (yR, memR')).
         split.
-        + apply: distr_ext=> z.
-          by rewrite /lmg.
-        + apply: distr_ext=> z.
-          by rewrite /rmg.
+        + exact: HdL.
+        + exact: HdR.
       - have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR (None, None).
         split.
-        + apply: distr_ext=> z.
-          by rewrite /lmg.
-        + apply: distr_ext=> z.
-          by rewrite /rmg.
+        + exact: HdL.
+        + exact: HdR.
     exists (\dlet_(xy <- d0) K xy).
     split.
     - have Hbind := coupling_bind_kernel d0
@@ -12241,12 +13057,12 @@ Module NoiseFloodingSecure
         Hd0 HK.
       move: Hbind=> [HL HR].
       split.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HL.
         rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
         rewrite /KL Pr_code_bind.
         by [].
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HR.
         rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
         rewrite /KR Pr_code_bind.
@@ -12323,12 +13139,8 @@ Module NoiseFloodingSecure
             (Pr_code (progL xL) memL)
             (Pr_code (progR xR) memR).
         split.
-        * apply: distr_ext=> z.
-          rewrite /d /lmg.
-          exact: (HdL z).
-        * apply: distr_ext=> z.
-          rewrite /d /rmg.
-          exact: (HdR z).
+        * exact: HdL.
+        * exact: HdR.
       + move=> Hpre.
         case: Hpre=> Hx_eq _.
         move: Hx.
@@ -12358,19 +13170,15 @@ Module NoiseFloodingSecure
     have [d [Hd Hsupport_if]] :=
       Hcont (set_heap memL l v) (set_heap memR lR v) xL xR.
     exists d.
-    split.
-    - move: Hd=> [HL HR].
       split.
-      + apply: distr_ext=> z.
-        rewrite Pr_code_put.
-        rewrite /lmg.
-        rewrite /lmg in HL.
-        by rewrite HL.
-      + apply: distr_ext=> z.
-        rewrite /lR Pr_code_put.
-        rewrite /rmg.
-        rewrite /rmg in HR.
-        by rewrite HR.
+      - move: Hd=> [HL HR].
+        split.
+        + move=> z.
+          rewrite Pr_code_put.
+          by rewrite HL.
+        + move=> z.
+          rewrite /lR Pr_code_put.
+          by rewrite HR.
     - move=> Hpre.
       apply: Hsupport_if.
       case: Hpre=> Hx Hrel.
@@ -12409,15 +13217,11 @@ Module NoiseFloodingSecure
       split.
       + move: Hd=> [HL HR].
         split.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite Pr_code_get /vL.
-          rewrite /lmg.
-          rewrite /lmg in HL.
           by rewrite HL.
-        * apply: distr_ext=> z.
+        * move=> z.
           rewrite Pr_code_get /lR -/vR -Hv /vL.
-          rewrite /rmg.
-          rewrite /rmg in HR.
           by rewrite HR.
       + exact: Hsupport_if.
     - pose d :=
@@ -12431,12 +13235,12 @@ Module NoiseFloodingSecure
             (Pr_code (contL vL xL) memL)
             (Pr_code (contR vR xR) memR).
         split.
-        * apply: distr_ext=> z.
-          rewrite /d /lmg.
+        * move=> z.
+          rewrite /d.
           rewrite Pr_code_get /vL.
           exact: (HL z).
-        * apply: distr_ext=> z.
-          rewrite /d /rmg.
+        * move=> z.
+          rewrite /d.
           rewrite Pr_code_get /lR /vR.
           exact: (HR z).
       + move=> Hpre.
@@ -12485,20 +13289,16 @@ Module NoiseFloodingSecure
           end
       | _ => complete_bind_fallback_coupling KL KR xy
       end.
-    have Hd0 : coupling d0
+    have Hd0 : clean_coupling d0
         (complete (dmargin outL D))
         (complete (dmargin outR D)).
       have [HmarginL HmarginR] :=
         shared_complete_sample_coupling_margins D outL outR.
       split.
-      + apply: distr_ext=> z.
-        rewrite /d0 /lmg.
-        exact: (HmarginL z).
-      + apply: distr_ext=> z.
-        rewrite /d0 /rmg.
-        exact: (HmarginR z).
+      + exact: HmarginL.
+      + exact: HmarginR.
     have HK xy :
-        coupling (K xy)
+        clean_coupling (K xy)
           (complete_bind_kernel KL xy.1)
           (complete_bind_kernel KR xy.2).
       case: xy=> [[ymemL|] [ymemR|]] /=.
@@ -12515,35 +13315,27 @@ Module NoiseFloodingSecure
               (Pr_code (contL aL xL) memL')
               (Pr_code (contR aR xR) memR').
           split.
-          * apply: distr_ext=> z.
-            by rewrite /lmg.
-          * apply: distr_ext=> z.
-            by rewrite /rmg.
+          * exact: HdL.
+          * exact: HdR.
       - case: ymemL=> aL memL'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (Some (aL, memL'), None).
         split.
-        + apply: distr_ext=> z.
-          by rewrite /lmg.
-        + apply: distr_ext=> z.
-          by rewrite /rmg.
+        + exact: HdL.
+        + exact: HdR.
       - case: ymemR=> aR memR'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (None, Some (aR, memR')).
         split.
-        + apply: distr_ext=> z.
-          by rewrite /lmg.
-        + apply: distr_ext=> z.
-          by rewrite /rmg.
+        + exact: HdL.
+        + exact: HdR.
       - have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR (None, None).
         split.
-        + apply: distr_ext=> z.
-          by rewrite /lmg.
-        + apply: distr_ext=> z.
-          by rewrite /rmg.
+        + exact: HdL.
+        + exact: HdR.
     exists (\dlet_(xy <- d0) K xy).
     split.
     - have Hbind := coupling_bind_kernel d0
@@ -12551,7 +13343,7 @@ Module NoiseFloodingSecure
         K (complete_bind_kernel KL) (complete_bind_kernel KR) Hd0 HK.
       move: Hbind=> [HL HR].
       split.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HL.
         rewrite (complete_bind (dmargin outL D) KL z).
         apply: complete_distr_ext=> y.
@@ -12559,7 +13351,7 @@ Module NoiseFloodingSecure
         rewrite __deprecated__dlet_dlet.
         apply: eq_in_dlet=> // a _ y'.
         by rewrite dlet_unit.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HR.
         rewrite (complete_bind (dmargin outR D) KR z).
         apply: complete_distr_ext=> y.
@@ -12602,7 +13394,7 @@ Module NoiseFloodingSecure
     fseparate (loc (ind_cpa_reduction_moved_adversary A))
       IndCpaSecurity.IndCpaGame.IndCpa_locs ->
     sim_decrypt_reduction_adv_heap_rel A memL memR ->
-    coupling d
+    clean_coupling d
       (complete
         (Pr_code (resolve (IndCpadSimDecryptOracle max_queries) o x) memL))
       (complete
@@ -12615,12 +13407,13 @@ Module NoiseFloodingSecure
     supports_same_result_sim_decrypt_reduction_adv_opt A d.
   Proof.
     move=> Ho Houter [Hheap Hadv] [HdL HdR] Hprob outs Houts.
-    rewrite /lmg in HdL.
-    rewrite /rmg in HdR.
     have Hdweight : dweight d = 1.
       rewrite -(dmargin_dweight fst d).
-      rewrite HdL.
-      exact: complete_dweight.
+      transitivity (dweight (complete
+        (Pr_code (resolve (IndCpadSimDecryptOracle max_queries) o x) memL))).
+      - apply: eq_psum=> z.
+        by rewrite !mul1r HdL.
+      - exact: complete_dweight.
     have Hbool :
         same_result_sim_decrypt_reduction_opt outs.
       exact: (support_of_pr_ge1 d
@@ -12717,12 +13510,8 @@ Module NoiseFloodingSecure
                 IndCpaSecurity.IndCpaGame.IndCpaOracle)
               memR).
         split.
-        * apply: distr_ext=> z.
-          rewrite /d /lmg.
-          exact: (HdL z).
-        * apply: distr_ext=> z.
-          rewrite /d /rmg.
-          exact: (HdR z).
+        * exact: HdL.
+        * exact: HdR.
       + move=> Hpre.
         case: Hpre=> _ [Hrel _].
         move: Hrel_bool.
@@ -13189,7 +13978,7 @@ Module NoiseFloodingSecure
       Pr_code
         (init ← ind_cpa_reduction_challenge_init_code tt ;; guessR init)
         empty_heap.
-    have Hfinal_coupling : coupling finalD (complete leftD)
+    have Hfinal_coupling : clean_coupling finalD (complete leftD)
         (complete rightD).
       have Hbind := coupling_bind_kernel d0
         (complete (Pr_code (ind_cpad_challenge_init_code tt) empty_heap))
@@ -13201,13 +13990,13 @@ Module NoiseFloodingSecure
           A guessL guessR Hcont).
       move: Hbind=> [HL HR].
       split.
-      - apply: distr_ext=> z.
+      - move=> z.
         rewrite /finalD /leftD HL.
         rewrite (complete_bind
           (Pr_code (ind_cpad_challenge_init_code tt) empty_heap) KL z).
         rewrite /KL Pr_code_bind.
         by [].
-      - apply: distr_ext=> z.
+      - move=> z.
         rewrite /finalD /rightD HR.
         rewrite (complete_bind
           (Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap)
@@ -13218,11 +14007,12 @@ Module NoiseFloodingSecure
     split; first exact: Hfinal_coupling.
     rewrite subr0.
     have Hfinal_weight : dweight finalD = 1.
-      rewrite pr_predT.
-      rewrite (@psum_coupling_left (option (bool * heap))
-        (option (bool * heap)) finalD (complete leftD) (complete rightD)
-        Hfinal_coupling).
-      by rewrite -pr_predT complete_dweight.
+      move: Hfinal_coupling=> [HfinalL _].
+      rewrite -(dmargin_dweight fst finalD).
+      transitivity (dweight (complete leftD)).
+      - apply: eq_psum=> z.
+        by rewrite !mul1r HfinalL.
+      - exact: complete_dweight.
     rewrite (pr_eq1_of_support finalD same_game_result_opt Hfinal_weight).
     - exact: lexx.
     move=> outs Houts.
@@ -13773,7 +14563,6 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨AE_opt ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_compiled_real_guess_code A max_queries)
@@ -13781,12 +14570,13 @@ Module NoiseFloodingSecure
       (ind_cpad_compiled_sim_decrypt_guess_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     rewrite /ind_cpad_compiled_real_guess_code
       /ind_cpad_compiled_sim_decrypt_guess_code
       /compile_security_error.
     rewrite /same_game_output_opt /same_input_invariant_pre.
-    exact: (compileRule max_queries nat (chOption message)
+    rewrite -tuple_sum_noise_flooding_vector_call_error.
+    exact: (compileTupleRule max_queries nat (chOption message)
       (chProd chBool (chProd pk_t evk_t)) bool
       IndCpadGame.oracle_mem_spec
       (loc (ind_cpad_moved_adversary A))
@@ -13796,7 +14586,10 @@ Module NoiseFloodingSecure
       (IndCpadSimDecryptOracle max_queries)
       IndCpadGame.oracle_decrypt
       (ind_cpad_open_guess_code A)
-      (noise_flooding_per_query_epsilon dim gaussian_width_multiplier)
+      (cat_tuple [tuple 0]
+        (cat_tuple
+          [tuple noise_flooding_per_query_epsilon
+            dim gaussian_width_multiplier] [tuple 0]))
       challenge_heap_valid
       (ind_cpad_open_guess_code_valid A A_valid)
       (IndCpadRealOracle_valid max_queries)
@@ -13806,27 +14599,25 @@ Module NoiseFloodingSecure
       (ind_cpad_real_oracle_preserves_challenge_heap_valid_except_decrypt
         max_queries)
       ind_cpad_decrypt_in_adv_import
-      (ind_cpad_decrypt_resolve_pyth1_from_metric_encoding_ready_vector_bound
-        max_queries Henc Hprefix_vector)).
+      (ind_cpad_decrypt_resolve_pyth_from_metric_encoding_ready_vector_bound
+        max_queries Hprefix_vector)).
   Qed.
 
   Lemma ind_cpad_compiled_guess_decrypt_replacement_from_compile
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨AE_opt ⦃ same_input_invariant_pre challenge_heap_valid ⦄
       (ind_cpad_compiled_real_guess_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_guess_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (ind_cpad_compiled_guess_decrypt_replacement_from_compile_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Definition ind_cpa_reduction (A : nom_package)
@@ -14667,7 +15458,7 @@ Module NoiseFloodingSecure
     - have [HmarginL HmarginR] :=
         shared_complete_sample_coupling_margins initD outL outR.
       split.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HmarginL.
         apply: complete_distr_ext=> y.
         rewrite /initD /outL /ind_cpad_challenge_init_code.
@@ -14679,7 +15470,7 @@ Module NoiseFloodingSecure
         apply: eq_in_dlet=> // keys _ y''.
         case: keys=> [[pk evk] sk].
         by rewrite dlet_unit /challenge_initialized_heap !Pr_code_put Pr_code_ret.
-      + apply: distr_ext=> z.
+      + move=> z.
         rewrite HmarginR.
         apply: complete_distr_ext=> y.
         rewrite /initD /outR /ind_cpa_reduction_challenge_init_code.
@@ -14982,7 +15773,6 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_factored_compiled_real_guess_game_code A max_queries)
@@ -14990,7 +15780,7 @@ Module NoiseFloodingSecure
       (ind_cpad_factored_compiled_sim_decrypt_guess_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     have -> : compile_security_error max_queries =
         0 + compile_security_error max_queries by lra.
     exact: (additiveErrorOptSeqRule
@@ -15004,33 +15794,30 @@ Module NoiseFloodingSecure
       0 (compile_security_error max_queries)
       ind_cpad_challenge_init_code_ae
       (ind_cpad_compiled_guess_decrypt_replacement_from_compile_ready_vector_bound
-        A max_queries A_valid Henc Hprefix_vector)).
+        A max_queries A_valid Hprefix_vector)).
   Qed.
 
   Lemma ind_cpad_factored_compiled_guess_decrypt_replacement
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_factored_compiled_real_guess_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_factored_compiled_sim_decrypt_guess_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (ind_cpad_factored_compiled_guess_decrypt_replacement_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_compiled_real_game_code A max_queries)
@@ -15038,10 +15825,10 @@ Module NoiseFloodingSecure
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     have Hfactored :=
       ind_cpad_factored_compiled_guess_decrypt_replacement_ready_vector_bound
-        A max_queries A_valid Henc Hprefix_vector.
+        A max_queries A_valid Hprefix_vector.
     split; first exact: Hfactored.1.
     move=> memL memR xL xR Hpre.
     have [d [Hd Hpost]] := Hfactored.2 memL memR xL xR Hpre.
@@ -15063,26 +15850,23 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_compiled_real_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_game_to_compiled_sim_decrypt_additive_error_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
@@ -15090,10 +15874,10 @@ Module NoiseFloodingSecure
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     have Hcompiled :=
       ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring_ready_vector_bound
-        A max_queries A_valid Henc Hprefix_vector.
+        A max_queries A_valid Hprefix_vector.
     split; first exact: Hcompiled.1.
     move=> memL memR xL xR Hpre.
     have [d [Hd Hpost]] := Hcompiled.2 memL memR xL xR Hpre.
@@ -15109,19 +15893,17 @@ Module NoiseFloodingSecure
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
       IndCpadGame.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
     ⦃ same_game_output_opt ⦄.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (ind_cpad_game_to_compiled_sim_decrypt_additive_error_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpad_compiled_sim_decrypt_self_link_to_sim_decrypt_ae
@@ -15260,10 +16042,8 @@ Module NoiseFloodingSecure
     exists d.
     split.
     - split.
-      + apply: distr_ext=> z.
-        exact: HdL.
-      + apply: distr_ext=> z.
-        exact: HdR.
+      + exact: HdL.
+      + exact: HdR.
     - apply: (le_trans Hprob).
       apply: subset_pr=> xy Hxy.
       case: xy Hxy=> outL' outR'.
@@ -15772,7 +16552,6 @@ Module NoiseFloodingSecure
   Lemma ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
     (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
@@ -15780,10 +16559,10 @@ Module NoiseFloodingSecure
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     have Hleft :=
       ind_cpad_game_to_compiled_sim_decrypt_additive_error_ready_vector_bound
-        A max_queries A_valid Henc Hprefix_vector.
+        A max_queries A_valid Hprefix_vector.
     have Hmixed :=
       ind_cpad_compiled_sim_decrypt_mixed_to_self_link_ae
         A max_queries A_valid.
@@ -15828,25 +16607,22 @@ Module NoiseFloodingSecure
   Lemma ind_cpa_reduction_additive_error_from_compile
     (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( compile_security_error max_queries )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Lemma ind_cpa_reduction_additive_error_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
@@ -15854,44 +16630,41 @@ Module NoiseFloodingSecure
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     rewrite security_loss_halfE.
     exact: (ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
-      A max_queries A_valid Henc Hprefix_vector).
+      A max_queries A_valid Hprefix_vector).
   Qed.
 
   (* Packages the compile-rule loss as the AE obligation expected downstream. *)
   Lemma ind_cpa_reduction_additive_error
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     ⊨AE_opt ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
       ≈( security_loss max_queries / 2 )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (ind_cpa_reduction_additive_error_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Theorem ind_cpa_reduction_bound_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     IndCpadGame.winning_probability max_queries A <=
     IndCpaSecurity.IndCpaGame.winning_probability
       (ind_cpa_reduction A max_queries) +
     security_loss max_queries.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     have Hae := ind_cpa_reduction_additive_error_ready_vector_bound
-      A max_queries A_valid Henc Hprefix_vector.
+      A max_queries A_valid Hprefix_vector.
     apply: (ind_cpa_reduction_bound_from_additive_error
       A max_queries _ Hae).
     lra.
@@ -15900,31 +16673,28 @@ Module NoiseFloodingSecure
   (* The main reduction theorem composes AE-to-bound with the core AE judgment. *)
   Theorem ind_cpa_reduction_bound (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     IndCpadGame.winning_probability max_queries A <=
     IndCpaSecurity.IndCpaGame.winning_probability
       (ind_cpa_reduction A max_queries) +
     security_loss max_queries.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (ind_cpa_reduction_bound_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 
   Theorem is_secure_ready_vector_bound (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     IndCpadGame.winning_probability max_queries A <= security_bound max_queries.
   Proof.
-    move=> A_valid Henc Hprefix_vector.
+    move=> A_valid Hprefix_vector.
     rewrite /security_bound /security_loss.
     apply: (le_trans
       (ind_cpa_reduction_bound_ready_vector_bound
-        A max_queries A_valid Henc Hprefix_vector)).
+        A max_queries A_valid Hprefix_vector)).
     rewrite lerD2r.
     exact: (IndCpaSecurity.is_secure
       (ind_cpa_reduction A max_queries)
@@ -15934,14 +16704,12 @@ Module NoiseFloodingSecure
   (* IND-CPAD security follows by applying IND-CPA security to the reduction. *)
   Theorem is_secure (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    finite_encoding_cert ->
-    chart_center_dist_le_metric_cert ->
     IndCpadGame.winning_probability max_queries A <= security_bound max_queries.
   Proof.
-    move=> A_valid Henc Hchart.
+    move=> A_valid.
     exact: (is_secure_ready_vector_bound
-      A max_queries A_valid Henc
+      A max_queries A_valid
       (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries Hchart)).
+        max_queries)).
   Qed.
 End NoiseFloodingSecure.

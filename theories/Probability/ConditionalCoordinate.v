@@ -49,7 +49,7 @@ Lemma conditional_coordinate_zero_prefix
 Proof.
 move=> Hzero x.
 rewrite pr_pred1 dnullE.
-rewrite /conditional_coordinate pr_dmargin pr_dcond /prc Hzero.
+rewrite /conditional_coordinate pr_dmargin_pred1_clean pr_dcond /prc Hzero.
 by rewrite invr0 mulr0.
 Qed.
 

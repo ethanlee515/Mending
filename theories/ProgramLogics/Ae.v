@@ -24,6 +24,11 @@ Import pkg_heap.
 Import PackageNotation.
 Local Open Scope package_scope.
 
+Definition clean_coupling {A1 A2 : choiceType}
+    (d : {distr (A1 * A2) / R})
+    (c1 : {distr A1 / R}) (c2 : {distr A2 / R}) : Prop :=
+  dmargin fst d =1 c1 /\ dmargin snd d =1 c2.
+
 Definition additiveErrorJudgmentOpt
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
@@ -35,7 +40,7 @@ Definition additiveErrorJudgmentOpt
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
     let out1 := Pr_code (progL xL) memL in
     let out2 := Pr_code (progR xR) memR in
-    ∃ d, coupling d (complete out1) (complete out2) ∧
+    ∃ d, clean_coupling d (complete out1) (complete out2) ∧
       \P_[ d ] post >= 1 - ε.
 
 Declare Scope AeNotations.
@@ -90,7 +95,7 @@ Lemma additiveErrorCoupleOptRule
   (forall memL memR xL xR Hpre,
     let out1 := Pr_code (progL xL) memL in
     let out2 := Pr_code (progR xR) memR in
-    coupling (wit memL memR xL xR Hpre)
+    clean_coupling (wit memL memR xL xR Hpre)
       (complete out1) (complete out2)) ->
   (forall memL memR xL xR Hpre,
     \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->
@@ -153,11 +158,9 @@ Lemma dmargin_comp
   dmargin f (dmargin g D) =1 dmargin (fun x => f (g x)) D.
 Proof.
 move=> z.
-rewrite dmarginE __deprecated__dlet_dlet.
-transitivity ((\dlet_(x <- D) dunit (f (g x))) z).
-- apply: eq_in_dlet=> // x _ z'.
-  by rewrite dlet_unit.
-- by rewrite dmarginE.
+rewrite dmarginE dmargin_dlet_partition.
+apply: eq_in_dlet=> // x _ z'.
+by rewrite dmargin_dunit.
 Qed.
 
 Lemma dmargin_some {T : choiceType} (D : {distr T / R}) :
@@ -216,14 +219,14 @@ pose lift (xy : (out_t * heap) * (out_t * heap)) :=
 exists (dmargin lift d).
 split.
 - split.
-  + apply: distr_ext=> z.
+  + move=> z.
     rewrite (dmargin_comp fst lift d z).
     change (dmargin (fun xy : (out_t * heap) * (out_t * heap) =>
       Some xy.1) d z = complete outL z).
     rewrite -(dmargin_comp (@Some (out_t * heap)) fst d z).
     rewrite (dmargin_ext (@Some (out_t * heap)) _ _ HdL z).
     exact: dmargin_some.
-  + apply: distr_ext=> z.
+  + move=> z.
     rewrite (dmargin_comp snd lift d z).
     change (dmargin (fun xy : (out_t * heap) * (out_t * heap) =>
       Some xy.2) d z = complete outR z).
@@ -266,10 +269,8 @@ have [d [HdL [HdR Hprob]]] :=
 exists d.
 split.
 - split.
-  + apply: distr_ext=> x.
-    by rewrite /lmg dmarginE.
-  + apply: distr_ext=> x.
-    by rewrite /rmg dmarginE.
+  + exact: HdL.
+  + exact: HdR.
 - rewrite (eq_pr (B := fun xy => xy.1 == xy.2)).
     exact: Hprob.
   by case=> outL outR.
@@ -305,10 +306,8 @@ have [d [HdL [HdR Hprob]]] :=
 exists d.
 split.
 - split.
-  + apply: distr_ext=> x.
-    by rewrite /lmg dmarginE.
-  + apply: distr_ext=> x.
-    by rewrite /rmg dmarginE.
+  + exact: HdL.
+  + exact: HdR.
 - rewrite (eq_pr (B := fun xy => xy.1 == xy.2)).
     exact: Hprob.
   by case=> outL outR.
@@ -444,14 +443,14 @@ pose post_lift := lift_loss_post
 exists (dmargin lift d).
 split.
 - split.
-  + apply: distr_ext=> z.
+  + move=> z.
     rewrite (dmargin_comp fst lift d z).
     change (dmargin (fun xy : (out_t * heap) * (out_t * heap) =>
       Some xy.1) d z = complete outL z).
     rewrite -(dmargin_comp (@Some (out_t * heap)) fst d z).
     rewrite (dmargin_ext (@Some (out_t * heap)) _ _ HdL z).
     exact: dmargin_some.
-  + apply: distr_ext=> z.
+  + move=> z.
     rewrite (dmargin_comp snd lift d z).
     change (dmargin (fun xy : (out_t * heap) * (out_t * heap) =>
       Some xy.2) d z = complete outR z).
@@ -604,7 +603,7 @@ Definition additiveErrorOptSeqKernel
   (Hcont : forall memL memR yL yR,
       mid ((yL, memL), (yR, memR)) ->
       exists d,
-        coupling d
+        clean_coupling d
           (complete (Pr_code (contL yL) memL))
           (complete (Pr_code (contR yR) memR)) /\
         \P_[ d ] post >= 1 - ε')
@@ -634,14 +633,14 @@ Lemma additiveErrorOptSeqKernel_margins
   (Hcont : forall memL memR yL yR,
       mid ((yL, memL), (yR, memR)) ->
       exists d,
-        coupling d
+        clean_coupling d
           (complete (Pr_code (contL yL) memL))
           (complete (Pr_code (contR yR) memR)) /\
         \P_[ d ] post >= 1 - ε')
   (xy : option (midL_t * heap) * option (midR_t * heap)) :
   let KL ymem := Pr_code (contL ymem.1) ymem.2 in
   let KR ymem := Pr_code (contR ymem.1) ymem.2 in
-  coupling (additiveErrorOptSeqKernel contL contR mid post ε' Hcont xy)
+  clean_coupling (additiveErrorOptSeqKernel contL contR mid post ε' Hcont xy)
     (complete_bind_kernel KL xy.1)
     (complete_bind_kernel KR xy.2).
 Proof.
@@ -658,10 +657,8 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
         (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
         (Some (yL, memL), Some (yR, memR)).
     split.
-    * apply: distr_ext=> z.
-      by rewrite /lmg.
-    * apply: distr_ext=> z.
-      by rewrite /rmg.
+    * exact: HdL.
+    * exact: HdR.
 - case: ymemL=> yL memL.
   have [HdL HdR] :=
     complete_bind_fallback_coupling_margins
@@ -669,10 +666,8 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
       (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
       (Some (yL, memL), None).
   split.
-  - apply: distr_ext=> z.
-    by rewrite /lmg.
-  - apply: distr_ext=> z.
-    by rewrite /rmg.
+  - exact: HdL.
+  - exact: HdR.
 - case: ymemR=> yR memR.
   have [HdL HdR] :=
     complete_bind_fallback_coupling_margins
@@ -680,20 +675,16 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
       (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
       (None, Some (yR, memR)).
   split.
-  - apply: distr_ext=> z.
-    by rewrite /lmg.
-  - apply: distr_ext=> z.
-    by rewrite /rmg.
+  - exact: HdL.
+  - exact: HdR.
 - have [HdL HdR] :=
     complete_bind_fallback_coupling_margins
       (fun ymem : midL_t * heap => Pr_code (contL ymem.1) ymem.2)
       (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
       (None, None).
   split.
-  - apply: distr_ext=> z.
-    by rewrite /lmg.
-  - apply: distr_ext=> z.
-    by rewrite /rmg.
+  - exact: HdL.
+  - exact: HdR.
 Qed.
 
 Definition additiveErrorOptSeqGood
@@ -716,7 +707,7 @@ Lemma additiveErrorOptSeqKernel_event
   (Hcont : forall memL memR yL yR,
       mid ((yL, memL), (yR, memR)) ->
       exists d,
-        coupling d
+        clean_coupling d
           (complete (Pr_code (contL yL) memL))
           (complete (Pr_code (contR yR) memR)) /\
         \P_[ d ] post >= 1 - ε')
@@ -747,32 +738,30 @@ Lemma coupling_bind_kernel
     {distr (option (outL_t * heap) * option (outR_t * heap)) / R})
   (KL : option (midL_t * heap) -> {distr (option (outL_t * heap)) / R})
   (KR : option (midR_t * heap) -> {distr (option (outR_t * heap)) / R}) :
-  coupling d PL PR ->
-  (forall xy, coupling (K xy) (KL xy.1) (KR xy.2)) ->
-  coupling (\dlet_(xy <- d) K xy)
+  clean_coupling d PL PR ->
+  (forall xy, clean_coupling (K xy) (KL xy.1) (KR xy.2)) ->
+  clean_coupling (\dlet_(xy <- d) K xy)
     (\dlet_(x <- PL) KL x)
     (\dlet_(y <- PR) KR y).
 Proof.
 move=> [HdL HdR] HK.
 split.
-- apply: distr_ext=> z.
-  rewrite /lmg __deprecated__dmargin_dlet.
+- move=> z.
+  rewrite dmargin_dlet_partition.
   transitivity ((\dlet_(xy <- d) KL xy.1) z).
   + apply: eq_in_dlet=> // xy _ z'.
     have [HKL _] := HK xy.
-    by rewrite -HKL /lmg.
-  + rewrite -(__deprecated__dlet_dmargin d fst KL z).
-    rewrite /lmg in HdL.
-    by rewrite HdL.
-- apply: distr_ext=> z.
-  rewrite /rmg __deprecated__dmargin_dlet.
+    by rewrite -HKL.
+  + rewrite -(dlet_dmargin_partition d fst KL z).
+    by apply: eq_in_dlet=> // x _ z'; rewrite HdL.
+- move=> z.
+  rewrite dmargin_dlet_partition.
   transitivity ((\dlet_(xy <- d) KR xy.2) z).
   + apply: eq_in_dlet=> // xy _ z'.
     have [_ HKR] := HK xy.
-    by rewrite -HKR /rmg.
-  + rewrite -(__deprecated__dlet_dmargin d snd KR z).
-    rewrite /rmg in HdR.
-    by rewrite HdR.
+    by rewrite -HKR.
+  + rewrite -(dlet_dmargin_partition d snd KR z).
+    by apply: eq_in_dlet=> // y _ z'; rewrite HdR.
 Qed.
 
 Lemma additiveErrorOptSeqRule_coupling
@@ -789,7 +778,7 @@ Lemma additiveErrorOptSeqRule_coupling
   ⊨AE_opt ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
   pre ((xL, memL), (xR, memR)) ->
   exists d,
-    coupling d
+    clean_coupling d
       (complete (Pr_code (yL ← progL xL ;; contL yL) memL))
       (complete (Pr_code (yR ← progR xR ;; contR yR) memR)).
 Proof.
@@ -806,13 +795,13 @@ have Hbind := coupling_bind_kernel d0
   Hd0 (additiveErrorOptSeqKernel_margins contL contR mid post ε' Hcont).
 move: Hbind=> [HL HR].
 split.
-- apply: distr_ext=> z.
+- move=> z.
   rewrite HL.
   rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
   rewrite /KL.
   rewrite Pr_code_bind.
   by [].
-- apply: distr_ext=> z.
+- move=> z.
   rewrite HR.
   rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
   rewrite /KR.
@@ -856,13 +845,13 @@ split.
     Hd0 (additiveErrorOptSeqKernel_margins contL contR mid post ε' Hcont).
   move: Hbind=> [HL HR].
   split.
-  + apply: distr_ext=> z.
+  + move=> z.
     rewrite HL.
     rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
     rewrite /KL.
     rewrite Pr_code_bind.
     by [].
-  + apply: distr_ext=> z.
+  + move=> z.
     rewrite HR.
     rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
     rewrite /KR.

@@ -109,6 +109,61 @@ case Hdecode: (canonical_decode_output_heap x)=> [y|].
   by rewrite -Hpack canonical_decode_output_heap_pack.
 Qed.
 
+Lemma dlet_dmargin_pack_output_heap
+    {out_t : choice_type} {U : choiceType}
+    (P : {distr (out_t * heap) / R})
+    (K : (nat * heap)%type -> {distr U / R}) z :
+  (\dlet_(packed <- dmargin (@pack_output_heap out_t) P) K packed) z =
+  (\dlet_(x <- P) K (pack_output_heap x)) z.
+Proof.
+rewrite !dletE.
+pose Img : pred (nat * heap)%type :=
+  fun packed => @canonical_decode_output_heap out_t packed != None.
+rewrite (@reindex_psum_onto R (nat * heap)%type (out_t * heap)%type
+  (fun packed => dmargin (@pack_output_heap out_t) P packed * K packed z)
+  Img (@pack_output_heap out_t) (@canonical_decode_output_heap out_t)).
+- apply/eq_psum=> x.
+  by rewrite dmargin_pack_output_heapE canonical_decode_output_heap_pack.
+- move=> packed Hnz.
+  case Hdecode: (@canonical_decode_output_heap out_t packed)=> [x|].
+    change ((@canonical_decode_output_heap out_t packed != None) = true).
+    by rewrite Hdecode.
+  have Hmargin0 : dmargin (@pack_output_heap out_t) P packed = 0.
+    by rewrite dmargin_pack_output_heapE Hdecode.
+  have Hzero :
+      dmargin (@pack_output_heap out_t) P packed * K packed z = 0.
+    by rewrite Hmargin0 mul0r.
+  by rewrite Hzero eqxx in Hnz.
+- move=> packed Himg.
+  case Hdecode: (@canonical_decode_output_heap out_t packed)=> [x|].
+  + by rewrite /= (canonical_decode_output_heapK packed x Hdecode).
+  + move: Himg.
+    change ((@canonical_decode_output_heap out_t packed != None) = true ->
+      None = Some packed).
+    by rewrite Hdecode.
+- move=> x Himg.
+  exact: canonical_decode_output_heap_pack.
+Qed.
+
+Lemma dmargin_dlet_pack_output_heap
+    {T : choiceType} {out_t : choice_type}
+    (P : {distr T / R})
+    (K : T -> {distr (out_t * heap) / R}) packed :
+  dmargin (@pack_output_heap out_t) (\dlet_(x <- P) K x) packed =
+  (\dlet_(x <- P) dmargin (@pack_output_heap out_t) (K x)) packed.
+Proof.
+rewrite dmargin_pack_output_heapE.
+case Hdecode: (@canonical_decode_output_heap out_t packed)=> [y|].
+- rewrite !dletE.
+  apply/eq_psum=> x.
+  by rewrite dmargin_pack_output_heapE Hdecode.
+- rewrite dletE.
+  rewrite (eq_psum (F2 := fun _ : T => 0)).
+    by rewrite psum0.
+  move=> x.
+  by rewrite dmargin_pack_output_heapE Hdecode mulr0.
+Qed.
+
 Lemma total_variation_pack_output_heap
     {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
   total_variation P Q =
