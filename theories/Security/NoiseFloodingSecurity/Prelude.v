@@ -37,7 +37,8 @@ Local Open Scope HoareNotations.
 Local Open Scope PythNotations.
 
 (* Conservative per-query KL budget for a [dim]-dimensional Gaussian vector.
-   The outer factor matches the loss shape produced by [compileRule]. *)
+   The outer factor matches the singleton-coordinate loss shape produced by
+   [compileRule]. *)
 Definition noise_flooding_per_query_epsilon
     (dim : nat) (gaussian_width_multiplier : R) : R :=
   dim%:R / (2 * gaussian_width_multiplier ^+ 2).

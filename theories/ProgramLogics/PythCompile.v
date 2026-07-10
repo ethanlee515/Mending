@@ -3461,68 +3461,6 @@ by rewrite eqxx.
 Qed.
 
 Lemma compileRule
-  (q : nat) (X Y A B : choice_type)
-  (K L L' L'' : Locations) (M : Interface)
-  (P' P'' : raw_package) (fn : ident)
-  (prog : A -> raw_code B)
-  (eps : R)
-  (call_invariant : pred heap) :
-  (forall x, ValidCode L M (prog x)) ->
-  ValidPackage L' [interface] M P' ->
-  ValidPackage L'' [interface] M P'' ->
-  fseparate K L ->
-  heap_pred_depends_only_on K call_invariant ->
-  package_preserves_heap_pred_except M P' fn call_invariant ->
-  fhas M (mkopsig fn X Y) ->
-  ⊨Pyth1 ⦃ fun inps =>
-          let '((xL, memL), (xR, memR)) := inps in
-          (xL == xR) && (memL == memR) &&
-          call_invariant memL ⦄
-    (fun x => resolve P' (mkopsig fn X Y) x)
-    ≈( eps )
-    (fun x => resolve P'' (mkopsig fn X Y) x)
-  ⦃ fun out =>
-    let '(y, mem) := out in
-    call_invariant mem ⦄ ->
-  ⊨AE_opt ⦃ fun inps =>
-          let '((xL, memL), (xR, memR)) := inps in
-          (xL == xR) && (memL == memR) &&
-          call_invariant memL ⦄
-    (fun x => code_link
-      (compile_calls q (X := X) (Y := Y) P' fn (prog x))
-      P')
-    ≈( Num.sqrt ((q%:R * eps) / 2) )
-    (fun x => code_link
-      (compile_calls q (X := X) (Y := Y) P'' fn (prog x))
-      P')
-  ⦃ fun outs =>
-    let '(outL, outR) := outs in
-    outL == outR ⦄.
-Proof.
-move=> Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall.
-case: q=> [|q].
-- rewrite /compile_calls /compile_calls_from_trace /=.
-  split; first exact: Num.Theory.sqrtr_ge0.
-  move=> memL memR xL xR Hpre.
-  move/andP: Hpre=> [/andP [/eqP -> /eqP ->] _].
-  rewrite continue_from_trace_nil.
-  set D := complete (Pr_code (code_link (prog xR) P') memR).
-  exists (\dlet_(z <- D) dunit (z, z)).
-  split; first exact: diagonalCoupling.
-  rewrite (_ : \P_[\dlet_(z <- D) dunit (z, z)]
-      (fun outs =>
-        let '(outL, outR) := outs in outL == outR) = 1).
-    have -> : Num.sqrt ((0%:R * eps) / 2) = 0.
-      by rewrite mul0r mul0r sqrtr0.
-    by rewrite subr0 lexx.
-  by rewrite diagonalDletPrEq1 // /D complete_dweight.
-rewrite -pythagorean_tv_bound_pythCallErrors.
-exact: (MicciancioWalterRule _ _ _ _ _
-  (pythCompileCallsRule q X Y A B K L L' L'' M P' P'' fn prog eps
-    call_invariant Hvalid HP' HP'' HKL Hdep HP'_pres Hfn Hcall)).
-Qed.
-
-Lemma compileTupleRule
   {ℓ : nat}
   (q : nat) (X Y A B : choice_type)
   (K L L' L'' : Locations) (M : Interface)
