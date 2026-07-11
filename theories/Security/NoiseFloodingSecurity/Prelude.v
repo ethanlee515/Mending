@@ -36,18 +36,11 @@ Local Open Scope AeNotations.
 Local Open Scope HoareNotations.
 Local Open Scope PythNotations.
 
-(* Conservative per-query KL budget for a [dim]-dimensional Gaussian vector.
-   The outer factor matches the singleton-coordinate loss shape produced by
-   [compileRule]. *)
-Definition noise_flooding_per_query_epsilon
-    (dim : nat) (gaussian_width_multiplier : R) : R :=
-  dim%:R / (2 * gaussian_width_multiplier ^+ 2).
-
-Definition global_epsilon
+Definition security_loss
     (dim max_queries : nat) (gaussian_width_multiplier : R) : R :=
   2 * Num.sqrt
     ((max_queries%:R *
-      noise_flooding_per_query_epsilon dim gaussian_width_multiplier) / 2).
+      (dim%:R / (2 * gaussian_width_multiplier ^+ 2))) / 2).
 
 (* Glue code *)
 Module Type NoiseFloodingIsIndCpad

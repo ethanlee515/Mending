@@ -287,11 +287,10 @@ Proof. exact: Scheme.keygen_lossless. Qed.
 Definition encrypt := Scheme.encrypt.
 Definition eval1 := Scheme.eval1.
 Definition eval2 := Scheme.eval2.
-(* TODO find out if this is the "right" amount of noise. *)
 Definition dg_stdev (error_bound : nat) : R :=
   noise_flooding_dg_stdev gaussian_width_multiplier error_bound.
-(* Maybe it's not ideal that decrypting an invalid ciphertext crashes the entire experiment.
- * This makes any sense only if invalid ciphertexts result only from misuse. *)
+(* Invalid ciphertexts are modeled by the null subdistribution; the scheme
+   interface treats them as unsupported evaluation results. *)
 Definition decrypt (sk: sk_t) (c: ciphertext) : distr R message :=
   match c with
   | None => dnull

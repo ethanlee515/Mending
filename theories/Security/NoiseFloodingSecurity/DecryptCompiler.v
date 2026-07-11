@@ -2039,18 +2039,16 @@ Module NoiseFloodingSecureDecryptCompiler
       challenge_decrypt_prefix_row_ready (m, m, c) memL ⦄
       (fun _ : chUnit => ind_cpad_real_decrypt_cont (m, m, c))
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont (m, m, c))
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] i).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
       + move=> j.
-        by rewrite [j]ord1 noise_flooding_per_query_epsilon_nonnegative.
+        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
       + by move=> j; rewrite [j]ord1.
     move=> memL memR [] [] Hpre.
     move/andP: Hpre=> [/eqP Hmem Hready].
@@ -2094,18 +2092,16 @@ Module NoiseFloodingSecureDecryptCompiler
       challenge_decrypt_prefix_row_ready_vector_bound (m, m, c) memL ⦄
       (fun _ : chUnit => ind_cpad_real_decrypt_cont (m, m, c))
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont (m, m, c))
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] i).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
       + move=> j.
-        by rewrite [j]ord1 noise_flooding_per_query_epsilon_nonnegative.
+        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
       + by move=> j; rewrite [j]ord1.
     move=> memL memR [] [] Hpre.
     move/andP: Hpre=> [/eqP Hmem Hready].
@@ -2150,8 +2146,7 @@ Module NoiseFloodingSecureDecryptCompiler
       challenge_decrypt_prefix_row_ready_vector_bound row memL ⦄
       (fun _ : chUnit => ind_cpad_real_decrypt_cont row)
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
@@ -2165,10 +2160,9 @@ Module NoiseFloodingSecureDecryptCompiler
     apply: pythReflRule.
     - move=> i.
       apply: (cat_tuple_nonneg
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] i).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
       + move=> j.
-        by rewrite [j]ord1 noise_flooding_per_query_epsilon_nonnegative.
+        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
       + by move=> j; rewrite [j]ord1.
     - move=> memL memR [] [] Hpre.
       move/andP: Hpre=> [/eqP Hmem _].
@@ -2184,8 +2178,7 @@ Module NoiseFloodingSecureDecryptCompiler
       challenge_decrypt_prefix_row_ready row memL ⦄
       (fun _ : chUnit => ind_cpad_real_decrypt_cont row)
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit => ind_cpad_sim_decrypt_cont row)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
@@ -2198,10 +2191,9 @@ Module NoiseFloodingSecureDecryptCompiler
     apply: pythReflRule.
     - move=> i.
       apply: (cat_tuple_nonneg
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] i).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
       + move=> j.
-        by rewrite [j]ord1 noise_flooding_per_query_epsilon_nonnegative.
+        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
       + by move=> j; rewrite [j]ord1.
     - move=> memL memR [] [] Hpre.
       move/andP: Hpre=> [/eqP Hmem _].
@@ -2216,18 +2208,16 @@ Module NoiseFloodingSecureDecryptCompiler
       challenge_decrypt_prefix_row_ready rowL memL ⦄
       ind_cpad_real_decrypt_cont
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       ind_cpad_sim_decrypt_cont
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] i).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
       + move=> j.
-        by rewrite [j]ord1 noise_flooding_per_query_epsilon_nonnegative.
+        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
       + by move=> j; rewrite [j]ord1.
     move=> memL memR rowL rowR Hpre.
     move/andP: Hpre=> [/andP [/eqP Hrow /eqP Hmem] Hready].
@@ -2249,18 +2239,16 @@ Module NoiseFloodingSecureDecryptCompiler
       challenge_decrypt_prefix_row_ready_vector_bound rowL memL ⦄
       ind_cpad_real_decrypt_cont
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       ind_cpad_sim_decrypt_cont
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
     split.
     - move=> i.
       apply: (cat_tuple_nonneg
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] i).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
       + move=> j.
-        by rewrite [j]ord1 noise_flooding_per_query_epsilon_nonnegative.
+        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
       + by move=> j; rewrite [j]ord1.
     move=> memL memR rowL rowR Hpre.
     move/andP: Hpre=> [/andP [/eqP Hrow /eqP Hmem] Hready].
@@ -2284,8 +2272,7 @@ Module NoiseFloodingSecureDecryptCompiler
         ind_cpad_real_decrypt_cont row)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (fun i : nat =>
         row ← ind_cpad_decrypt_prefix_code max_queries i ;;
         ind_cpad_sim_decrypt_cont row)
@@ -2301,8 +2288,7 @@ Module NoiseFloodingSecureDecryptCompiler
         challenge_decrypt_prefix_row_ready out_mem.1 out_mem.2)
       (fun _ : chOption message * heap => true)
       (cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0])).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0])).
     - move=> memL memR iL iR Hpre.
       move/andP: Hpre=> [/andP [/eqP Hi /eqP Hmem] Hinv].
       by split; [exact: Hi | split].
@@ -2319,8 +2305,7 @@ Module NoiseFloodingSecureDecryptCompiler
         ind_cpad_real_decrypt_cont row)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (fun i : nat =>
         row ← ind_cpad_decrypt_prefix_code max_queries i ;;
         ind_cpad_sim_decrypt_cont row)
@@ -2337,8 +2322,7 @@ Module NoiseFloodingSecureDecryptCompiler
         challenge_decrypt_prefix_row_ready_vector_bound out_mem.1 out_mem.2)
       (fun _ : chOption message * heap => true)
       (cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0])).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0])).
     - move=> memL memR iL iR Hpre.
       move/andP: Hpre=> [/andP [/eqP Hi /eqP Hmem] Hinv].
       by split; [exact: Hi | split].
@@ -2354,8 +2338,7 @@ Module NoiseFloodingSecureDecryptCompiler
         ind_cpad_real_decrypt_cont row)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (fun i : nat =>
         row ← ind_cpad_decrypt_prefix_code max_queries i ;;
         ind_cpad_sim_decrypt_cont row)
@@ -2372,8 +2355,7 @@ Module NoiseFloodingSecureDecryptCompiler
       (ind_cpad_real_decrypt_code max_queries)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
@@ -2412,8 +2394,7 @@ Module NoiseFloodingSecureDecryptCompiler
       (ind_cpad_real_decrypt_code max_queries)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
@@ -2453,8 +2434,7 @@ Module NoiseFloodingSecureDecryptCompiler
       (ind_cpad_real_decrypt_code max_queries)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (ind_cpad_sim_decrypt_code max_queries)
     ⦃ fun _ : chOption message * heap => true ⦄.
   Proof.
@@ -2584,8 +2564,7 @@ Module NoiseFloodingSecureDecryptCompiler
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (fun x : nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
@@ -2648,8 +2627,7 @@ Module NoiseFloodingSecureDecryptCompiler
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
       ≈( cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0]) )
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
       (fun x : nat =>
         resolve (IndCpadSimDecryptOracle max_queries)
           (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
@@ -2666,9 +2644,8 @@ Module NoiseFloodingSecureDecryptCompiler
     tuple_sum
       (cat_tuple [tuple 0]
         (cat_tuple
-          [tuple noise_flooding_per_query_epsilon
-            dim gaussian_width_multiplier] [tuple 0])) =
-    noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0])) =
+    (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
   Proof.
     by rewrite !tuple_sum_cat !tuple_sum_singleton add0r addr0.
   Qed.

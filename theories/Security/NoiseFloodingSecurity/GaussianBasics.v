@@ -45,27 +45,24 @@ Module NoiseFloodingSecureGaussianBasics
   (Import IndCpaSecurity : IsIndCpa(Scheme))
   (Import Params : NoiseFloodingParams).
   Module NF := NoiseFlooding(Scheme)(Metric)(Params).
-  Definition security_loss (max_queries : nat) :=
-    global_epsilon dim max_queries gaussian_width_multiplier.
-  Definition security_bound (max_queries : nat) :=
-    IndCpaSecurity.security_bound + security_loss max_queries.
   Definition compile_security_error (max_queries : nat) :=
     Num.sqrt
       ((max_queries%:R *
-        noise_flooding_per_query_epsilon dim gaussian_width_multiplier) / 2).
+        (dim%:R / (2 * gaussian_width_multiplier ^+ 2))) / 2).
 
   Lemma security_loss_nonnegative max_queries :
-    0 <= security_loss max_queries.
+    0 <= security_loss dim max_queries gaussian_width_multiplier.
   Proof.
-    rewrite /security_loss /global_epsilon.
+    rewrite /security_loss.
     apply: mulr_ge0; first lra.
     exact: Num.Theory.sqrtr_ge0.
   Qed.
 
   Lemma security_loss_halfE max_queries :
-    security_loss max_queries / 2 = compile_security_error max_queries.
+    security_loss dim max_queries gaussian_width_multiplier / 2 =
+    compile_security_error max_queries.
   Proof.
-    rewrite /security_loss /global_epsilon /compile_security_error.
+    rewrite /security_loss /compile_security_error.
     lra.
   Qed.
 
@@ -78,10 +75,9 @@ Module NoiseFloodingSecureGaussianBasics
     lia.
   Qed.
 
-  Lemma noise_flooding_per_query_epsilon_nonnegative :
-    0 <= noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+  Lemma noise_flooding_call_error_nonnegative :
+    0 <= (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
   Proof.
-    rewrite /noise_flooding_per_query_epsilon.
     apply: divr_ge0; first exact: ler0n.
     apply: mulr_ge0; first lra.
     apply: exprn_ge0.
@@ -204,9 +200,8 @@ Module NoiseFloodingSecureGaussianBasics
 
   Lemma noise_flooding_coordinate_epsilon_sum :
     \sum_(i < dim) (1 / (2 * gaussian_width_multiplier ^+ 2)) =
-    noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+    (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
   Proof.
-    rewrite /noise_flooding_per_query_epsilon.
     rewrite big_const_ord iter_addr_0 mulr_natl.
     field.
     have Hg : 0 < gaussian_width_multiplier :=
@@ -387,7 +382,7 @@ Module NoiseFloodingSecureGaussianBasics
     δ_KL
       (n_dg_shifted centerL stdev)
       (n_dg_shifted centerR stdev) <=
-      noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+      (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
   Proof.
     move=> Hdist stdev.
     have Hpyth :
@@ -505,7 +500,7 @@ Module NoiseFloodingSecureGaussianBasics
     δ_KL
       (n_dg dim stdev)
       (n_dg_shifted (isometry centerL centerR) stdev) <=
-      noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+      (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
   Proof.
     move=> Hmetric stdev.
     have Hpyth :
@@ -1015,7 +1010,7 @@ Module NoiseFloodingSecureGaussianBasics
       (dmargin (@toChIntVec dim) (n_dg dim stdev))
       (dmargin (@toChIntVec dim)
         (n_dg_shifted (isometry centerL centerR) stdev)) <=
-      noise_flooding_per_query_epsilon dim gaussian_width_multiplier.
+      (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
   Proof.
     move=> Hmetric stdev.
     have [Hfin Hkl] :=
@@ -1038,8 +1033,7 @@ Module NoiseFloodingSecureGaussianBasics
       let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
       (fun _ : chUnit =>
         sampleRaw (dmargin (@toChIntVec dim) (n_dg dim stdev)))
-      ≈( noise_flooding_per_query_epsilon
-        dim gaussian_width_multiplier )
+      ≈( (dim%:R / (2 * gaussian_width_multiplier ^+ 2)) )
       (fun _ : chUnit =>
         sampleRaw (dmargin (@toChIntVec dim)
           (n_dg_shifted (isometry centerL centerR) stdev)))
@@ -1058,9 +1052,8 @@ Module NoiseFloodingSecureGaussianBasics
       (fun inps =>
         let '((_, memL), (_, memR)) := inps in eq_op memL memR)
       (fun _ : chVec chInt dim * heap => true)
-      (noise_flooding_per_query_epsilon
-        dim gaussian_width_multiplier)).
-    - exact: noise_flooding_per_query_epsilon_nonnegative.
+      ((dim%:R / (2 * gaussian_width_multiplier ^+ 2)))).
+    - exact: noise_flooding_call_error_nonnegative.
     - by move=> memL memR [] [] /eqP.
     - by move=> [] [].
     - move=> [].
@@ -1090,8 +1083,7 @@ Module NoiseFloodingSecureGaussianBasics
         ret (Some
           (inverse_isometry (deterministic_dec sk c) (IndCpaDSim.toIntVec noise))))
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit =>
         noise ← sampleRaw
           (dmargin (@toChIntVec dim)
@@ -1115,8 +1107,7 @@ Module NoiseFloodingSecureGaussianBasics
         let '((_, memL), (_, memR)) := inps in eq_op memL memR)
       (fun _ : chVec chInt dim * heap => true)
       (fun _ : chOption message * heap => true)
-      [tuple noise_flooding_per_query_epsilon
-        dim gaussian_width_multiplier]).
+      [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))]).
     - rewrite /centerL /stdev.
       exact: (noise_flooding_ch_vector_sample_pyth_one_chart
         error_bound (deterministic_dec sk c) m Hmetric).
@@ -1240,8 +1231,7 @@ Module NoiseFloodingSecureGaussianBasics
         m' ← sampleRaw (NF.decrypt sk c) ;;
         ret (Some m'))
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit =>
         m' ← sampleRaw
           (simulator_successful_decrypt_distribution m error_bound) ;;
@@ -1273,8 +1263,7 @@ Module NoiseFloodingSecureGaussianBasics
       (fun inps =>
         let '((_, memL), (_, memR)) := inps in eq_op memL memR)
       (cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0])).
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0])).
     - move=> [] mem.
       rewrite /stdev.
       exact: noise_flooding_decrypt_pushed_centered_some_codeE.
@@ -1297,8 +1286,7 @@ Module NoiseFloodingSecureGaussianBasics
         m' <$ (message; NF.decrypt sk c) ;;
         ret (Some m'))
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit =>
         noise <$ (chVec chInt dim;
           discrete_gaussians (IndCpaDSim.zeroChVec dim)
@@ -1352,8 +1340,7 @@ Module NoiseFloodingSecureGaussianBasics
         m' <$ (message; NF.decrypt sk c) ;;
         ret (Some m'))
       ≈( cat_tuple
-        [tuple noise_flooding_per_query_epsilon
-          dim gaussian_width_multiplier] [tuple 0] )
+        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
       (fun _ : chUnit =>
         noise <$ (chVec chInt dim;
           discrete_gaussians (IndCpaDSim.zeroChVec dim)

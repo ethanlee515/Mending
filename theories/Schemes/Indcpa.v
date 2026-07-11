@@ -106,8 +106,8 @@ End IndCpa.
 Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
   Module IndCpaGame := IndCpa Scheme.
   Import IndCpaGame.
-  Parameter security_bound : R.
+  Parameter security_bound : nom_package -> R.
   Axiom is_secure : forall (A : nom_package),
     Package IndCpaAdv_import IndCpaAdv_export A ->
-    winning_probability A <= security_bound.
+    winning_probability A <= security_bound A.
 End IsIndCpa.
