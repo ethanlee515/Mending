@@ -195,56 +195,6 @@ Module NoiseFloodingSecureDecryptCompiler
       max_queries i mem Hcount).
   Qed.
 
-  Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_result_tv_le0
-      max_queries i mem :
-    ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N ->
-    total_variation
-      (complete (dmargin fst (Pr_code
-        (resolve (IndCpadGame.IndCpadOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-        mem)))
-      (complete (dmargin fst (Pr_code
-        (resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-        mem))) <= 0.
-  Proof.
-    move=> Hcount.
-    apply: total_variation_eq_le0=> z.
-    rewrite (complete_distr_ext _ _
-      (dmargin_ext fst _ _
-        (ind_cpad_real_decrypt_resolve_over_bound_null
-          max_queries i mem Hcount)) z).
-    rewrite (complete_distr_ext _ _
-      (dmargin_ext fst _ _
-        (ind_cpad_sim_decrypt_resolve_over_bound_null
-          max_queries i mem Hcount)) z).
-    by [].
-  Qed.
-
-  Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_output_tv_le0
-      max_queries i mem :
-    ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N ->
-    total_variation
-      (complete (Pr_code
-        (resolve (IndCpadGame.IndCpadOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-        mem))
-      (complete (Pr_code
-        (resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-        mem)) <= 0.
-  Proof.
-    move=> Hcount.
-    apply: total_variation_eq_le0=> z.
-    rewrite (complete_distr_ext _ _
-      (ind_cpad_real_decrypt_resolve_over_bound_null
-        max_queries i mem Hcount) z).
-    rewrite (complete_distr_ext _ _
-      (ind_cpad_sim_decrypt_resolve_over_bound_null
-        max_queries i mem Hcount) z).
-    by [].
-  Qed.
-
   Definition decrypt_count_over_bound (max_queries : nat) : pred heap :=
     fun mem =>
       ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N.
@@ -257,56 +207,6 @@ Module NoiseFloodingSecureDecryptCompiler
   Proof.
     rewrite /decrypt_count_over_bound.
     by rewrite get_set_heap_neq; [| neq_loc_auto].
-  Qed.
-
-  Definition same_input_decrypt_over_bound_pre (max_queries : nat) :
-      pred ((nat * heap) * (nat * heap)) :=
-    fun inps =>
-      let '((iL, memL), (iR, memR)) := inps in
-      (iL == iR) && (memL == memR) &&
-      decrypt_count_over_bound max_queries memL.
-
-  Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_ae max_queries :
-    ⊨AE ⦃ same_input_decrypt_over_bound_pre max_queries ⦄
-      (fun i : nat =>
-        resolve (IndCpadGame.IndCpadOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-    ≈( 0 )
-      (fun i : nat =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-    ⦃ same_result_opt ⦄.
-  Proof.
-    apply: additiveErrorSameResultTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR iL iR Hpre.
-      rewrite /same_input_decrypt_over_bound_pre in Hpre.
-      move/andP: Hpre=> [/andP [/eqP Hi /eqP Hmem] Hcount].
-      subst iR memR.
-      exact: (ind_cpad_real_sim_decrypt_resolve_over_bound_result_tv_le0
-        max_queries iL memL Hcount).
-  Qed.
-
-  Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_output_ae
-      max_queries :
-    ⊨AE ⦃ same_input_decrypt_over_bound_pre max_queries ⦄
-      (fun i : nat =>
-        resolve (IndCpadGame.IndCpadOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-    ≈( 0 )
-      (fun i : nat =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) i)
-    ⦃ same_output_heap_opt ⦄.
-  Proof.
-    apply: additiveErrorSameOutputTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR iL iR Hpre.
-      rewrite /same_input_decrypt_over_bound_pre in Hpre.
-      move/andP: Hpre=> [/andP [/eqP Hi /eqP Hmem] Hcount].
-      subst iR memR.
-      exact: (ind_cpad_real_sim_decrypt_resolve_over_bound_output_tv_le0
-        max_queries iL memL Hcount).
   Qed.
 
   Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_eq
@@ -628,23 +528,6 @@ Module NoiseFloodingSecureDecryptCompiler
     - by move: Ho_decrypt; rewrite eqxx.
   Qed.
 
-  Lemma ind_cpad_real_sim_decrypt_resolve_over_bound_opsig_output_tv_le0
-      max_queries (o : opsig) (x : src o) mem :
-    fhas IndCpadGame.IndCpadAdv_import o ->
-    ~~ (get_heap mem IndCpadGame.decrypt_count_addr < max_queries)%N ->
-    total_variation
-      (complete (Pr_code
-        (resolve (IndCpadGame.IndCpadOracle max_queries) o x) mem))
-      (complete (Pr_code
-        (resolve (IndCpadSimDecryptOracle max_queries) o x) mem)) <= 0.
-  Proof.
-    move=> Hhas Hcount.
-    apply: total_variation_eq_le0=> z.
-    exact: (complete_distr_ext _ _
-      (ind_cpad_real_sim_decrypt_resolve_over_bound_eq
-        max_queries o x mem Hhas Hcount) z).
-  Qed.
-
   Lemma ind_cpad_real_encrypt_code_preserves_decrypt_count_over_bound
       max_queries :
     ⊨Hoare ⦃ fun in_mem =>
@@ -760,21 +643,6 @@ Module NoiseFloodingSecureDecryptCompiler
     by move/dinsuppP: Hout; rewrite dnullE.
   Qed.
 
-  Lemma ind_cpad_sim_decrypt_code_preserves_decrypt_count_over_bound
-      max_queries :
-    ⊨Hoare ⦃ fun in_mem =>
-        decrypt_count_over_bound max_queries in_mem.2 ⦄
-      (ind_cpad_sim_decrypt_code max_queries)
-    ⦃ fun out_mem =>
-        decrypt_count_over_bound max_queries out_mem.2 ⦄.
-  Proof.
-    rewrite /hoareJudgment=> [i mem Hbound] out Hout.
-    rewrite /decrypt_count_over_bound in Hbound.
-    rewrite /ind_cpad_sim_decrypt_code in Hout.
-    rewrite Pr_code_get /assertD (negbTE Hbound) /= Pr_code_fail in Hout.
-    by move/dinsuppP: Hout; rewrite dnullE.
-  Qed.
-
   Lemma ind_cpad_real_resolve_preserves_decrypt_count_over_bound
       max_queries (o : opsig) (x : src o) :
     fhas IndCpadGame.IndCpadAdv_import o ->
@@ -861,92 +729,6 @@ Module NoiseFloodingSecureDecryptCompiler
     - by move: Ho_decrypt; rewrite eqxx.
   Qed.
 
-  Lemma ind_cpad_sim_decrypt_resolve_preserves_decrypt_count_over_bound
-      max_queries (o : opsig) (x : src o) :
-    fhas IndCpadGame.IndCpadAdv_import o ->
-    ⊨Hoare ⦃ fun in_mem =>
-        decrypt_count_over_bound max_queries in_mem.2 ⦄
-      (fun x => resolve (IndCpadSimDecryptOracle max_queries) o x)
-    ⦃ fun out_mem =>
-        decrypt_count_over_bound max_queries out_mem.2 ⦄.
-  Proof.
-    move: o x=> [f [S T]] x Hhas.
-    destruct ((f == IndCpadGame.oracle_encrypt)%bool) eqn:Ho_encrypt.
-    - have Hfid : f = IndCpadGame.oracle_encrypt :=
-        ident_eqb_eq f IndCpadGame.oracle_encrypt Ho_encrypt.
-      have Hop : (f, (S, T)) =
-          mkopsig IndCpadGame.oracle_encrypt
-            (chProd message message) ciphertext.
-        apply: (fhas_same_ident_opsig IndCpadGame.IndCpadAdv_import).
-        + rewrite /IndCpadGame.IndCpadAdv_import.
-          fmap_solve.
-        + exact: Hhas.
-        + exact: Hfid.
-      subst f.
-      inversion Hop; subst S T.
-      rewrite /hoareJudgment=> x0 mem Hbound out Hout.
-      rewrite ind_cpad_sim_decrypt_encrypt_resolveE in Hout.
-      exact: (ind_cpad_real_encrypt_code_preserves_decrypt_count_over_bound
-        max_queries x0 mem Hbound out Hout).
-    destruct ((f == IndCpadGame.oracle_eval1)%bool) eqn:Ho_eval1.
-    - have Hfid : f = IndCpadGame.oracle_eval1 :=
-        ident_eqb_eq f IndCpadGame.oracle_eval1 Ho_eval1.
-      have Hop : (f, (S, T)) =
-          mkopsig IndCpadGame.oracle_eval1
-            (chProd unary_gate nat) ciphertext.
-        apply: (fhas_same_ident_opsig IndCpadGame.IndCpadAdv_import).
-        + rewrite /IndCpadGame.IndCpadAdv_import.
-          fmap_solve.
-        + exact: Hhas.
-        + exact: Hfid.
-      subst f.
-      inversion Hop; subst S T.
-      rewrite /hoareJudgment=> x0 mem Hbound out Hout.
-      rewrite ind_cpad_sim_decrypt_eval1_resolveE in Hout.
-      exact: (ind_cpad_real_eval1_code_preserves_decrypt_count_over_bound
-        max_queries x0 mem Hbound out Hout).
-    destruct ((f == IndCpadGame.oracle_eval2)%bool) eqn:Ho_eval2.
-    - have Hfid : f = IndCpadGame.oracle_eval2 :=
-        ident_eqb_eq f IndCpadGame.oracle_eval2 Ho_eval2.
-      have Hop : (f, (S, T)) =
-          mkopsig IndCpadGame.oracle_eval2
-            (chProd (chProd binary_gate nat) nat) ciphertext.
-        apply: (fhas_same_ident_opsig IndCpadGame.IndCpadAdv_import).
-        + rewrite /IndCpadGame.IndCpadAdv_import.
-          fmap_solve.
-        + exact: Hhas.
-        + exact: Hfid.
-      subst f.
-      inversion Hop; subst S T.
-      rewrite /hoareJudgment=> x0 mem Hbound out Hout.
-      rewrite ind_cpad_sim_decrypt_eval2_resolveE in Hout.
-      exact: (ind_cpad_real_eval2_code_preserves_decrypt_count_over_bound
-        max_queries x0 mem Hbound out Hout).
-    destruct ((f == IndCpadGame.oracle_decrypt)%bool) eqn:Ho_decrypt.
-    - have Hfid : f = IndCpadGame.oracle_decrypt :=
-        ident_eqb_eq f IndCpadGame.oracle_decrypt Ho_decrypt.
-      have Hop : (f, (S, T)) =
-          mkopsig IndCpadGame.oracle_decrypt nat (chOption message).
-        apply: (fhas_same_ident_opsig IndCpadGame.IndCpadAdv_import).
-        + rewrite /IndCpadGame.IndCpadAdv_import.
-          fmap_solve.
-        + exact: Hhas.
-        + exact: Hfid.
-      subst f.
-      inversion Hop; subst S T.
-      rewrite /hoareJudgment=> x0 mem Hbound out Hout.
-      rewrite ind_cpad_sim_decrypt_resolveE in Hout.
-      exact: (ind_cpad_sim_decrypt_code_preserves_decrypt_count_over_bound
-        max_queries x0 mem Hbound out Hout).
-    exfalso.
-    rewrite /IndCpadGame.IndCpadAdv_import in Hhas.
-    fmap_invert Hhas.
-    - by move: Ho_encrypt; rewrite eqxx.
-    - by move: Ho_eval1; rewrite eqxx.
-    - by move: Ho_eval2; rewrite eqxx.
-    - by move: Ho_decrypt; rewrite eqxx.
-  Qed.
-
   Lemma decrypt_count_over_bound_depends_only_on_oracle_mem_spec
       max_queries :
     heap_pred_depends_only_on IndCpadGame.oracle_mem_spec
@@ -1003,25 +785,6 @@ Module NoiseFloodingSecureDecryptCompiler
     - rewrite !Pr_code_sample.
       apply: eq_in_dlet=> // a _ out'.
       exact: (IH a mem Hbound out').
-  Qed.
-
-  Lemma code_link_real_sim_decrypt_over_bound_output_tv_le0
-      (A : choice_type) (L : Locations)
-      (prog : raw_code A) max_queries mem :
-    ValidCode L IndCpadGame.IndCpadAdv_import prog ->
-    fseparate IndCpadGame.oracle_mem_spec L ->
-    decrypt_count_over_bound max_queries mem ->
-    total_variation
-      (complete (Pr_code
-        (code_link prog (IndCpadGame.IndCpadOracle max_queries)) mem))
-      (complete (Pr_code
-        (code_link prog (IndCpadSimDecryptOracle max_queries)) mem)) <= 0.
-  Proof.
-    move=> Hvalid Hsep Hbound.
-    apply: total_variation_eq_le0=> out.
-    exact: (complete_distr_ext _ _
-      (code_link_real_sim_decrypt_over_bound_eq
-        A L prog max_queries mem Hvalid Hsep Hbound) out).
   Qed.
 
   Lemma code_link_run_until_next_call_aux_real_sim_decrypt_eq
@@ -1152,67 +915,6 @@ Module NoiseFloodingSecureDecryptCompiler
   Proof.
     rewrite /run_until_next_call.
     exact: code_link_run_until_next_call_aux_real_preserves_decrypt_count.
-  Qed.
-
-  Lemma code_link_compile_calls_real_sim_decrypt_step_reduction
-      (q : nat) (A : choice_type) (L : Locations)
-      (prog : raw_code A) max_queries mem :
-    ValidCode L IndCpadGame.IndCpadAdv_import prog ->
-    (forall s mem',
-      (s, mem') \in dinsupp (Pr_code
-        (code_link
-          (run_until_next_call prog IndCpadGame.oracle_decrypt)
-          (IndCpadGame.IndCpadOracle max_queries)) mem) ->
-      Pr_code
-        (code_link
-          (compile_calls_from_trace_step_cont q
-            (X := nat) (Y := chOption message)
-            (IndCpadSimDecryptOracle max_queries)
-            IndCpadGame.oracle_decrypt prog nil s)
-          (IndCpadGame.IndCpadOracle max_queries)) mem' =1
-      Pr_code
-        (code_link
-          (compile_calls_from_trace_step_cont q
-            (X := nat) (Y := chOption message)
-            (IndCpadSimDecryptOracle max_queries)
-            IndCpadGame.oracle_decrypt prog nil s)
-          (IndCpadSimDecryptOracle max_queries)) mem') ->
-    Pr_code
-      (code_link
-        (compile_calls q.+1
-          (X := nat) (Y := chOption message)
-          (IndCpadSimDecryptOracle max_queries)
-          IndCpadGame.oracle_decrypt prog)
-        (IndCpadGame.IndCpadOracle max_queries)) mem =1
-    Pr_code
-      (code_link
-        (compile_calls q.+1
-          (X := nat) (Y := chOption message)
-          (IndCpadSimDecryptOracle max_queries)
-          IndCpadGame.oracle_decrypt prog)
-        (IndCpadSimDecryptOracle max_queries)) mem.
-  Proof.
-    move=> Hvalid Hstep out.
-    rewrite -!compile_calls_from_trace_nil.
-    rewrite (@codeLinkCompileCallsFromTraceS_decompose q
-      nat (chOption message) A
-      (IndCpadSimDecryptOracle max_queries)
-      (IndCpadGame.IndCpadOracle max_queries)
-      IndCpadGame.oracle_decrypt prog prog nil
-      (continue_from_trace_nil prog)).
-    rewrite (@codeLinkCompileCallsFromTraceS_decompose q
-      nat (chOption message) A
-      (IndCpadSimDecryptOracle max_queries)
-      (IndCpadSimDecryptOracle max_queries)
-      IndCpadGame.oracle_decrypt prog prog nil
-      (continue_from_trace_nil prog)).
-    rewrite !Pr_code_bind.
-    apply: eq_in_dlet.
-    - move=> smem Hsmem out'.
-      case: smem Hsmem=> s mem' Hsmem.
-      exact: (Hstep s mem' Hsmem out').
-    - exact: (code_link_run_until_next_call_real_sim_decrypt_eq
-        A L prog max_queries mem Hvalid).
   Qed.
 
   Lemma compile_calls_step_cont_invalid_call_real_sim_decrypt_eq
@@ -1761,40 +1463,6 @@ Module NoiseFloodingSecureDecryptCompiler
           A L prog max_queries mem Hprog_valid).
   Qed.
 
-  Lemma ind_cpad_decrypt_prefix_code_preserves_challenge_heap_valid
-      max_queries :
-    ⊨Hoare ⦃ fun in_mem => challenge_heap_valid in_mem.2 ⦄
-      (ind_cpad_decrypt_prefix_code max_queries)
-    ⦃ fun out_mem => challenge_heap_valid out_mem.2 ⦄.
-  Proof.
-    rewrite /hoareJudgment=> [i mem Hinv] out Hout.
-    rewrite /ind_cpad_decrypt_prefix_code in Hout.
-    rewrite Pr_code_get in Hout.
-    have [Hcount Hafter_count] := dinsupp_assertD _ _ _ _ Hout.
-    rewrite Pr_code_put in Hafter_count.
-    set mem1 := set_heap mem IndCpadGame.decrypt_count_addr
-      (get_heap mem IndCpadGame.decrypt_count_addr).+1.
-    have Hinv1 : challenge_heap_valid mem1.
-      rewrite /mem1.
-      exact: challenge_heap_valid_set_decrypt_count.
-    rewrite Pr_code_get in Hafter_count.
-    have [Hi Hafter_i] := dinsupp_assertD _ _ _ _ Hafter_count.
-    rewrite Pr_code_ret in Hafter_i.
-    have -> : out =
-        (nth_valid (get_heap mem1 IndCpadGame.table_addr) i Hi, mem1).
-      exact: in_dunit Hafter_i.
-    exact: Hinv1.
-  Qed.
-
-  Definition challenge_decrypt_prefix_row_valid
-      (row : IndCpadGame.challenger_table_row) (mem : heap) : bool :=
-    challenge_heap_valid mem &&
-    match get_heap mem IndCpadGame.sk_addr with
-    | Some sk =>
-        row_valid_for_branch sk (get_heap mem IndCpadGame.bit_addr) row
-    | None => true
-    end.
-
   Definition challenge_decrypt_prefix_row_ready
       (row : IndCpadGame.challenger_table_row) (mem : heap) : bool :=
     challenge_heap_valid mem &&
@@ -1827,20 +1495,6 @@ Module NoiseFloodingSecureDecryptCompiler
     ⦃ fun out_mem =>
       challenge_decrypt_prefix_row_ready_vector_bound out_mem.1 out_mem.2 ⦄.
 
-  Lemma challenge_decrypt_prefix_row_valid_equal_messages_some
-      mem sk m c :
-    challenge_decrypt_prefix_row_valid (m, m, c) mem ->
-    get_heap mem IndCpadGame.sk_addr = Some sk ->
-    exists data error_bound,
-      c = Some (data, error_bound) /\
-      (metric (deterministic_dec sk c) m <= error_bound)%N.
-  Proof.
-    rewrite /challenge_decrypt_prefix_row_valid=> /andP [_ Hrow] Hsk.
-    rewrite Hsk in Hrow.
-    exact: (row_valid_for_branch_equal_messages_some sk
-      (get_heap mem IndCpadGame.bit_addr) m c Hrow).
-  Qed.
-
   Lemma challenge_decrypt_prefix_row_ready_equal_messages_some
       mem m c :
     challenge_decrypt_prefix_row_ready (m, m, c) mem ->
@@ -1855,26 +1509,6 @@ Module NoiseFloodingSecureDecryptCompiler
       row_valid_for_branch_equal_messages_some sk
         (get_heap mem IndCpadGame.bit_addr) m c Hrow.
     by exists sk, data, error_bound.
-  Qed.
-
-  Lemma challenge_decrypt_prefix_row_ready_vector_bound_equal_messages_some
-      mem m c :
-    challenge_decrypt_prefix_row_ready_vector_bound (m, m, c) mem ->
-    exists sk data error_bound,
-      get_heap mem IndCpadGame.sk_addr = Some sk /\
-      c = Some (data, error_bound) /\
-      (ivec_dist ivec_zero (isometry (deterministic_dec sk c) m)
-        <= error_bound)%N.
-  Proof.
-    rewrite /challenge_decrypt_prefix_row_ready_vector_bound=>
-      /andP [Hready Hvec].
-    rewrite /challenge_decrypt_prefix_row_vector_bound eqxx in Hvec.
-    case Hsk: (get_heap mem IndCpadGame.sk_addr)=> [sk|] //= in Hvec.
-    case Hc: c=> [[data error_bound]|] //= in Hvec.
-    exists sk, data, error_bound.
-    split; first exact: Hsk.
-    split; first exact: Hc.
-    by rewrite Hc.
   Qed.
 
   Lemma challenge_decrypt_prefix_row_ready_vector_bound_from_ready
@@ -1895,37 +1529,6 @@ Module NoiseFloodingSecureDecryptCompiler
     rewrite Hsk Hc /=.
     rewrite Hc in Hmetric.
     by rewrite -metric_chartE.
-  Qed.
-
-  Lemma ind_cpad_decrypt_prefix_code_certifies_row max_queries :
-    ⊨Hoare ⦃ fun in_mem => challenge_heap_valid in_mem.2 ⦄
-      (ind_cpad_decrypt_prefix_code max_queries)
-    ⦃ fun out_mem =>
-      challenge_decrypt_prefix_row_valid out_mem.1 out_mem.2 ⦄.
-  Proof.
-    rewrite /hoareJudgment=> [i mem Hinv] out Hout.
-    rewrite /ind_cpad_decrypt_prefix_code in Hout.
-    rewrite Pr_code_get in Hout.
-    have [Hcount Hafter_count] := dinsupp_assertD _ _ _ _ Hout.
-    rewrite Pr_code_put in Hafter_count.
-    set mem1 := set_heap mem IndCpadGame.decrypt_count_addr
-      (get_heap mem IndCpadGame.decrypt_count_addr).+1.
-    have Hinv1 : challenge_heap_valid mem1.
-      rewrite /mem1.
-      exact: challenge_heap_valid_set_decrypt_count.
-    rewrite Pr_code_get in Hafter_count.
-    have [Hi Hafter_i] := dinsupp_assertD _ _ _ _ Hafter_count.
-    rewrite Pr_code_ret in Hafter_i.
-    have -> : out =
-        (nth_valid (get_heap mem1 IndCpadGame.table_addr) i Hi, mem1).
-      exact: in_dunit Hafter_i.
-    rewrite /challenge_decrypt_prefix_row_valid Hinv1 /=.
-    case Hsk: (get_heap mem1 IndCpadGame.sk_addr)=> [sk|] //=.
-    have [pk [evk [_ _ _ Htable]]] :=
-      challenge_heap_valid_sk_initialized mem1 sk Hinv1 Hsk.
-    exact: (table_valid_for_branch_nth sk
-      (get_heap mem1 IndCpadGame.bit_addr)
-      (get_heap mem1 IndCpadGame.table_addr) i Hi Htable).
   Qed.
 
   Lemma ind_cpad_decrypt_prefix_code_readies_row max_queries :
@@ -1981,25 +1584,6 @@ Module NoiseFloodingSecureDecryptCompiler
       out.1 out.2 (Hready i mem Hinv out Hout)).
   Qed.
 
-  Lemma ind_cpad_decrypt_cont_neq_pyth m0 m1 c :
-    m0 != m1 ->
-    ⊨Pyth1 ⦃ fun inps =>
-      let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
-      (fun _ : chUnit => ind_cpad_real_decrypt_cont (m0, m1, c))
-      ≈( 0 )
-      (fun _ : chUnit => ind_cpad_sim_decrypt_cont (m0, m1, c))
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    move=> Hneq.
-    rewrite /ind_cpad_real_decrypt_cont /ind_cpad_sim_decrypt_cont.
-    rewrite (negbTE Hneq).
-    apply: pythReflRule.
-    - by move=> i; rewrite [i]ord1.
-    - move=> memL memR [] [] /eqP Hmem.
-      by split.
-    - by move=> mem [] y Hpre Hy.
-  Qed.
-
   Lemma ind_cpad_real_decrypt_cont_eq_codeE mem sk m c :
     get_heap mem IndCpadGame.sk_addr = Some sk ->
     Pr_code (ind_cpad_real_decrypt_cont (m, m, c)) mem =1
@@ -2030,58 +1614,6 @@ Module NoiseFloodingSecureDecryptCompiler
     move=> -> out.
     rewrite /ind_cpad_sim_decrypt_cont eqxx.
     by rewrite /assertD.
-  Qed.
-
-  Lemma ind_cpad_decrypt_cont_eq_pyth m c :
-    ⊨Pyth ⦃ fun inps =>
-      let '((_, memL), (_, memR)) := inps in
-      (eq_op memL memR) &&
-      challenge_decrypt_prefix_row_ready (m, m, c) memL ⦄
-      (fun _ : chUnit => ind_cpad_real_decrypt_cont (m, m, c))
-      ≈( cat_tuple
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
-      (fun _ : chUnit => ind_cpad_sim_decrypt_cont (m, m, c))
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    split.
-    - move=> i.
-      apply: (cat_tuple_nonneg
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
-      + move=> j.
-        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
-      + by move=> j; rewrite [j]ord1.
-    move=> memL memR [] [] Hpre.
-    move/andP: Hpre=> [/eqP Hmem Hready].
-    subst memR.
-    have [sk [data [error_bound [Hsk [Hc Hmetric]]]]] :=
-      challenge_decrypt_prefix_row_ready_equal_messages_some
-        memL m c Hready.
-    subst c.
-    have Hpyth :=
-      noise_flooding_successful_decrypt_code_pyth
-        sk data error_bound m Hmetric.
-    move: Hpyth=> [_ Hpyth].
-    have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
-      Hpyth memL memL tt tt (eqxx memL).
-    exists P, Q.
-    split; first exact: Hdist.
-    split.
-    - move=> out.
-      rewrite (HmarginL out).
-      symmetry.
-      apply: complete_output_heap_ext=> out'.
-      exact: (ind_cpad_real_decrypt_cont_eq_codeE
-        memL sk m (Some (data, error_bound)) Hsk out').
-    split.
-    - move=> out.
-      rewrite (HmarginR out).
-      symmetry.
-      apply: complete_output_heap_ext=> out'.
-      exact: (ind_cpad_sim_decrypt_cont_eq_codeE
-        memL m (Some (data, error_bound)) data error_bound erefl out').
-    split.
-    - by move=> y Hy.
-    - by move=> y Hy.
   Qed.
 
   Lemma ind_cpad_decrypt_cont_eq_pyth_from_metric_encoding_ready_vector_bound
@@ -2170,68 +1702,6 @@ Module NoiseFloodingSecureDecryptCompiler
     - by move=> mem [] y Hpre Hy.
   Qed.
 
-  Lemma ind_cpad_decrypt_cont_pyth
-      (row : IndCpadGame.challenger_table_row) :
-    ⊨Pyth ⦃ fun inps =>
-      let '((_, memL), (_, memR)) := inps in
-      (eq_op memL memR) &&
-      challenge_decrypt_prefix_row_ready row memL ⦄
-      (fun _ : chUnit => ind_cpad_real_decrypt_cont row)
-      ≈( cat_tuple
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
-      (fun _ : chUnit => ind_cpad_sim_decrypt_cont row)
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    case: row=> [[m0 m1] c].
-    destruct (eq_op m0 m1) eqn:Heq.
-    - have Hm : m0 = m1 := eqP Heq.
-      subst m1.
-      exact: (ind_cpad_decrypt_cont_eq_pyth m0 c).
-    rewrite /ind_cpad_real_decrypt_cont /ind_cpad_sim_decrypt_cont Heq.
-    apply: pythReflRule.
-    - move=> i.
-      apply: (cat_tuple_nonneg
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
-      + move=> j.
-        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
-      + by move=> j; rewrite [j]ord1.
-    - move=> memL memR [] [] Hpre.
-      move/andP: Hpre=> [/eqP Hmem _].
-      by split.
-    - by move=> mem [] y Hpre Hy.
-  Qed.
-
-  Lemma ind_cpad_decrypt_cont_kernel_pyth :
-    ⊨Pyth ⦃ fun inps =>
-      let '((rowL, memL), (rowR, memR)) := inps in
-      (rowL == rowR) && (memL == memR) &&
-      challenge_decrypt_prefix_row_ready rowL memL ⦄
-      ind_cpad_real_decrypt_cont
-      ≈( cat_tuple
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
-      ind_cpad_sim_decrypt_cont
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    split.
-    - move=> i.
-      apply: (cat_tuple_nonneg
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] i).
-      + move=> j.
-        by rewrite [j]ord1 noise_flooding_call_error_nonnegative.
-      + by move=> j; rewrite [j]ord1.
-    move=> memL memR rowL rowR Hpre.
-    move/andP: Hpre=> [/andP [/eqP Hrow /eqP Hmem] Hready].
-    subst rowR.
-    subst memR.
-    have [_ Hpyth] := ind_cpad_decrypt_cont_pyth rowL.
-    have Hpre_unit :
-        (let '((_, memL0), (_, memR0)) :=
-            ((tt, memL), (tt, memL)) in eq_op memL0 memR0) &&
-        challenge_decrypt_prefix_row_ready rowL memL.
-      by rewrite eqxx Hready.
-    exact: (Hpyth memL memL tt tt Hpre_unit).
-  Qed.
-
   Lemma ind_cpad_decrypt_cont_kernel_pyth_from_metric_encoding_ready_vector_bound :
     ⊨Pyth ⦃ fun inps =>
       let '((rowL, memL), (rowR, memR)) := inps in
@@ -2263,37 +1733,6 @@ Module NoiseFloodingSecureDecryptCompiler
         challenge_decrypt_prefix_row_ready_vector_bound rowL memL.
       by rewrite eqxx Hready.
     exact: (Hpyth memL memL tt tt Hpre_unit).
-  Qed.
-
-  Lemma ind_cpad_decrypt_factored_pyth max_queries :
-    ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
-      (fun i : nat =>
-        row ← ind_cpad_decrypt_prefix_code max_queries i ;;
-        ind_cpad_real_decrypt_cont row)
-      ≈( cat_tuple [tuple 0]
-        (cat_tuple
-          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
-      (fun i : nat =>
-        row ← ind_cpad_decrypt_prefix_code max_queries i ;;
-        ind_cpad_sim_decrypt_cont row)
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    apply: (pythHoareSeqRule
-      (ind_cpad_decrypt_prefix_code max_queries)
-      ind_cpad_real_decrypt_cont
-      ind_cpad_sim_decrypt_cont
-      (fun in_mem => challenge_heap_valid in_mem.2)
-      (same_input_invariant_pre challenge_heap_valid)
-      (fun out_mem =>
-        challenge_decrypt_prefix_row_ready out_mem.1 out_mem.2)
-      (fun _ : chOption message * heap => true)
-      (cat_tuple
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0])).
-    - move=> memL memR iL iR Hpre.
-      move/andP: Hpre=> [/andP [/eqP Hi /eqP Hmem] Hinv].
-      by split; [exact: Hi | split].
-    - exact: ind_cpad_decrypt_prefix_code_readies_row.
-    - exact: ind_cpad_decrypt_cont_kernel_pyth.
   Qed.
 
   Lemma ind_cpad_decrypt_factored_pyth_from_metric_encoding_ready_vector_bound
@@ -2328,63 +1767,6 @@ Module NoiseFloodingSecureDecryptCompiler
       by split; [exact: Hi | split].
     - exact: Hprefix_vector.
     - exact: ind_cpad_decrypt_cont_kernel_pyth_from_metric_encoding_ready_vector_bound.
-  Qed.
-
-  Lemma ind_cpad_decrypt_factored_pyth_from_metric_encoding
-      max_queries :
-    ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
-      (fun i : nat =>
-        row ← ind_cpad_decrypt_prefix_code max_queries i ;;
-        ind_cpad_real_decrypt_cont row)
-      ≈( cat_tuple [tuple 0]
-        (cat_tuple
-          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
-      (fun i : nat =>
-        row ← ind_cpad_decrypt_prefix_code max_queries i ;;
-        ind_cpad_sim_decrypt_cont row)
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    exact: (ind_cpad_decrypt_factored_pyth_from_metric_encoding_ready_vector_bound
-      max_queries
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
-  Qed.
-
-  Lemma ind_cpad_decrypt_code_pyth max_queries :
-    ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
-      (ind_cpad_real_decrypt_code max_queries)
-      ≈( cat_tuple [tuple 0]
-        (cat_tuple
-          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
-      (ind_cpad_sim_decrypt_code max_queries)
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    have Hfactored := ind_cpad_decrypt_factored_pyth
-      max_queries.
-    move: Hfactored=> [Hs Hpyth].
-    split; first exact: Hs.
-    move=> memL memR iL iR Hpre.
-    have [P [Q [Hdist [HmarginL [HmarginR [HpostL HpostR]]]]]] :=
-      Hpyth memL memR iL iR Hpre.
-    exists P, Q.
-    split; first exact: Hdist.
-    split.
-    - move=> out.
-      rewrite (HmarginL out).
-      symmetry.
-      apply: complete_output_heap_ext=> out'.
-      exact: (ind_cpad_real_decrypt_code_factorE
-        max_queries iL memL out').
-    split.
-    - move=> out.
-      rewrite (HmarginR out).
-      symmetry.
-      apply: complete_output_heap_ext=> out'.
-      exact: (ind_cpad_sim_decrypt_code_factorE
-        max_queries iR memR out').
-    split.
-    - by move=> y Hy.
-    - by move=> y Hy.
   Qed.
 
   Lemma ind_cpad_decrypt_code_pyth_from_metric_encoding_ready_vector_bound
@@ -2426,22 +1808,6 @@ Module NoiseFloodingSecureDecryptCompiler
     split.
     - by move=> y Hy.
     - by move=> y Hy.
-  Qed.
-
-  Lemma ind_cpad_decrypt_code_pyth_from_metric_encoding
-      max_queries :
-    ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
-      (ind_cpad_real_decrypt_code max_queries)
-      ≈( cat_tuple [tuple 0]
-        (cat_tuple
-          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
-      (ind_cpad_sim_decrypt_code max_queries)
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    exact: (ind_cpad_decrypt_code_pyth_from_metric_encoding_ready_vector_bound
-      max_queries
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
   Qed.
 
   Lemma ind_cpad_real_decrypt_code_preserves_challenge_heap_valid
@@ -2527,34 +1893,6 @@ Module NoiseFloodingSecureDecryptCompiler
       exact: Hinv1.
   Qed.
 
-  Lemma ind_cpad_real_decrypt_resolve_preserves_challenge_heap_valid
-      max_queries :
-    ⊨Hoare ⦃ fun in_mem => challenge_heap_valid in_mem.2 ⦄
-      (fun x : nat =>
-        resolve (IndCpadGame.IndCpadOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
-    ⦃ fun out_mem => challenge_heap_valid out_mem.2 ⦄.
-  Proof.
-    rewrite /hoareJudgment=> x mem Hinv out Hout.
-    rewrite ind_cpad_real_decrypt_resolveE in Hout.
-    exact: (ind_cpad_real_decrypt_code_preserves_challenge_heap_valid
-      max_queries x mem Hinv out Hout).
-  Qed.
-
-  Lemma ind_cpad_sim_decrypt_resolve_preserves_challenge_heap_valid
-      max_queries :
-    ⊨Hoare ⦃ fun in_mem => challenge_heap_valid in_mem.2 ⦄
-      (fun x : nat =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
-    ⦃ fun out_mem => challenge_heap_valid out_mem.2 ⦄.
-  Proof.
-    rewrite /hoareJudgment=> x mem Hinv out Hout.
-    rewrite ind_cpad_sim_decrypt_resolveE in Hout.
-    exact: (ind_cpad_sim_decrypt_code_preserves_challenge_heap_valid
-      max_queries x mem Hinv out Hout).
-  Qed.
-
   Lemma ind_cpad_decrypt_resolve_pyth_from_metric_encoding_ready_vector_bound
       max_queries :
     decrypt_prefix_ready_vector_bound_cert max_queries ->
@@ -2617,27 +1955,6 @@ Module NoiseFloodingSecureDecryptCompiler
         by rewrite -ind_cpad_sim_decrypt_resolveE.
       exact: (ind_cpad_sim_decrypt_code_preserves_challenge_heap_valid
         max_queries iR memL Hinv (y, mem) Hy_code).
-  Qed.
-
-  Lemma ind_cpad_decrypt_resolve_pyth_from_metric_encoding
-      max_queries :
-    ⊨Pyth ⦃ same_input_invariant_pre challenge_heap_valid ⦄
-      (fun x : nat =>
-        resolve (IndCpadGame.IndCpadOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
-      ≈( cat_tuple [tuple 0]
-        (cat_tuple
-          [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0]) )
-      (fun x : nat =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
-    ⦃ fun out =>
-      let '(_, mem) := out in challenge_heap_valid mem ⦄.
-  Proof.
-    exact: (ind_cpad_decrypt_resolve_pyth_from_metric_encoding_ready_vector_bound
-      max_queries
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
   Qed.
 
   Lemma tuple_sum_noise_flooding_vector_call_error :
@@ -2703,72 +2020,6 @@ Module NoiseFloodingSecureDecryptCompiler
       subst f.
       inversion Hop; subst S T.
       exact: ind_cpad_real_eval2_resolve_preserves_challenge_heap_valid.
-    destruct ((f == IndCpadGame.oracle_decrypt)%bool) eqn:Ho_decrypt.
-    - have Hdecrypt_eq : f = IndCpadGame.oracle_decrypt :=
-        ident_eqb_eq f IndCpadGame.oracle_decrypt Ho_decrypt.
-      by move: Hnot_decrypt; rewrite Hdecrypt_eq eqxx.
-    exfalso.
-    rewrite /IndCpadGame.IndCpadAdv_import in Hhas.
-    fmap_invert Hhas.
-    - by move: Ho_encrypt; rewrite eqxx.
-    - by move: Ho_eval1; rewrite eqxx.
-    - by move: Ho_eval2; rewrite eqxx.
-    - by move: Ho_decrypt; rewrite eqxx.
-  Qed.
-
-  Lemma ind_cpad_sim_decrypt_oracle_preserves_challenge_heap_valid_except_decrypt
-      max_queries :
-    package_preserves_heap_pred_except
-      IndCpadGame.IndCpadAdv_import
-      (IndCpadSimDecryptOracle max_queries)
-      IndCpadGame.oracle_decrypt
-      challenge_heap_valid.
-  Proof.
-    rewrite /package_preserves_heap_pred_except.
-    move=> o.
-    case: o=> f [S T] x Hhas Hnot_decrypt.
-    destruct ((f == IndCpadGame.oracle_encrypt)%bool) eqn:Ho_encrypt.
-    - have Hfid : f = IndCpadGame.oracle_encrypt :=
-        ident_eqb_eq f IndCpadGame.oracle_encrypt Ho_encrypt.
-      have Hop : (f, (S, T)) =
-          mkopsig IndCpadGame.oracle_encrypt
-            (chProd message message) ciphertext.
-        apply: (fhas_same_ident_opsig IndCpadGame.IndCpadAdv_import).
-        + rewrite /IndCpadGame.IndCpadAdv_import.
-          fmap_solve.
-        + exact: Hhas.
-        + exact: Hfid.
-      subst f.
-      inversion Hop; subst S T.
-      exact: ind_cpad_sim_decrypt_encrypt_resolve_preserves_challenge_heap_valid.
-    destruct ((f == IndCpadGame.oracle_eval1)%bool) eqn:Ho_eval1.
-    - have Hfid : f = IndCpadGame.oracle_eval1 :=
-        ident_eqb_eq f IndCpadGame.oracle_eval1 Ho_eval1.
-      have Hop : (f, (S, T)) =
-          mkopsig IndCpadGame.oracle_eval1
-            (chProd unary_gate nat) ciphertext.
-        apply: (fhas_same_ident_opsig IndCpadGame.IndCpadAdv_import).
-        + rewrite /IndCpadGame.IndCpadAdv_import.
-          fmap_solve.
-        + exact: Hhas.
-        + exact: Hfid.
-      subst f.
-      inversion Hop; subst S T.
-      exact: ind_cpad_sim_decrypt_eval1_resolve_preserves_challenge_heap_valid.
-    destruct ((f == IndCpadGame.oracle_eval2)%bool) eqn:Ho_eval2.
-    - have Hfid : f = IndCpadGame.oracle_eval2 :=
-        ident_eqb_eq f IndCpadGame.oracle_eval2 Ho_eval2.
-      have Hop : (f, (S, T)) =
-          mkopsig IndCpadGame.oracle_eval2
-            (chProd (chProd binary_gate nat) nat) ciphertext.
-        apply: (fhas_same_ident_opsig IndCpadGame.IndCpadAdv_import).
-        + rewrite /IndCpadGame.IndCpadAdv_import.
-          fmap_solve.
-        + exact: Hhas.
-        + exact: Hfid.
-      subst f.
-      inversion Hop; subst S T.
-      exact: ind_cpad_sim_decrypt_eval2_resolve_preserves_challenge_heap_valid.
     destruct ((f == IndCpadGame.oracle_decrypt)%bool) eqn:Ho_decrypt.
     - have Hdecrypt_eq : f = IndCpadGame.oracle_decrypt :=
         ident_eqb_eq f IndCpadGame.oracle_decrypt Ho_decrypt.

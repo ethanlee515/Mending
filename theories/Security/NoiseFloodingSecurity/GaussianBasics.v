@@ -50,14 +50,6 @@ Module NoiseFloodingSecureGaussianBasics
       ((max_queries%:R *
         (dim%:R / (2 * gaussian_width_multiplier ^+ 2))) / 2).
 
-  Lemma security_loss_nonnegative max_queries :
-    0 <= security_loss dim max_queries gaussian_width_multiplier.
-  Proof.
-    rewrite /security_loss.
-    apply: mulr_ge0; first lra.
-    exact: Num.Theory.sqrtr_ge0.
-  Qed.
-
   Lemma security_loss_halfE max_queries :
     security_loss dim max_queries gaussian_width_multiplier / 2 =
     compile_security_error max_queries.
@@ -82,12 +74,6 @@ Module NoiseFloodingSecureGaussianBasics
     apply: mulr_ge0; first lra.
     apply: exprn_ge0.
     exact: ltW gt0_gaussian_width_multiplier.
-  Qed.
-
-  Lemma compile_security_error_nonnegative max_queries :
-    0 <= compile_security_error max_queries.
-  Proof.
-    exact: Num.Theory.sqrtr_ge0.
   Qed.
 
   Lemma noise_flooding_scalar_kl_budget
@@ -371,62 +357,6 @@ Module NoiseFloodingSecureGaussianBasics
     exact: (noise_flooding_coordinate_kl error_bound centerL centerR i Hdist).
   Qed.
 
-  Lemma noise_flooding_vector_kl_bound
-      error_bound (centerL centerR : dim.-tuple int) :
-    (ivec_dist centerL centerR <= error_bound)%N ->
-    let stdev :=
-      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
-    finite_kl
-      (n_dg_shifted centerL stdev)
-      (n_dg_shifted centerR stdev) /\
-    δ_KL
-      (n_dg_shifted centerL stdev)
-      (n_dg_shifted centerR stdev) <=
-      (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
-  Proof.
-    move=> Hdist stdev.
-    have Hpyth :
-        pythDist
-          (n_dg_shifted centerL stdev)
-          (n_dg_shifted centerR stdev)
-          [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim].
-      exact: (noise_flooding_vector_pythDist
-        error_bound centerL centerR Hdist).
-    split.
-    - exact: (pythDist_finite_kl _ _ _ Hpyth).
-    have Hbound := pythDist_kl_bound _ _ _ Hpyth.
-    rewrite (eq_bigr
-      (fun _ : 'I_dim =>
-        1 / (2 * gaussian_width_multiplier ^+ 2)) _ ) in Hbound.
-    - by rewrite noise_flooding_coordinate_epsilon_sum in Hbound.
-    - move=> i _.
-      by rewrite tnth_mktuple.
-  Qed.
-
-  Lemma shifted_tuple_gaussian_n_dg_shiftedE
-      (center : dim.-tuple int) (stdev : R) :
-    Metric.shifted_tuple_gaussian center stdev =1
-    n_dg_shifted center stdev.
-  Proof.
-    move=> y.
-    rewrite /Metric.shifted_tuple_gaussian
-      /Metric.centered_tuple_gaussian /n_dg.
-    exact: n_dg_shiftedE.
-  Qed.
-
-  Lemma inverse_isometry_shift_n_dg
-      (centerL centerR : message) stdev :
-    dmargin (fun v => inverse_isometry centerR v) (n_dg dim stdev) =1
-    dmargin
-      (fun v => inverse_isometry centerL
-        (ivec_add v (isometry centerL centerR)))
-      (n_dg dim stdev).
-  Proof.
-    move=> y.
-    apply: dmargin_fun_ext=> v.
-    exact: inverse_isometry_shift.
-  Qed.
-
   Lemma inverse_isometry_shifted_gaussian_one_chart
       (centerL centerR : message) stdev :
     dmargin (fun v => inverse_isometry centerR v) (n_dg dim stdev) =1
@@ -655,22 +585,6 @@ Module NoiseFloodingSecureGaussianBasics
       centerL centerR stdev y).
   Qed.
 
-  Lemma simulator_successful_decrypt_distribution_mass1 m error_bound :
-    dweight (simulator_successful_decrypt_distribution m error_bound) = 1.
-  Proof.
-    rewrite (pr_ext
-      (simulator_successful_decrypt_distribution m error_bound)
-      (dmargin (fun v => inverse_isometry m v)
-        (n_dg_shifted (isometry m m)
-          (noise_flooding_dg_stdev
-            gaussian_width_multiplier error_bound)))
-      predT); last
-      exact: simulator_decrypt_noise_shifted.
-    rewrite dmargin_dweight.
-    apply: n_dg_shifted_mass1.
-    exact: noise_flooding_dg_stdev_pos.
-  Qed.
-
   Lemma sampleRaw_ret_someE
       {T : choice_type} (D : {distr T / R}) mem :
     Pr_code
@@ -689,17 +603,6 @@ Module NoiseFloodingSecureGaussianBasics
     rewrite dmarginE __deprecated__dlet_dlet.
     apply: eq_in_dlet=> // x _ out'.
     by rewrite dlet_unit Pr_code_ret.
-  Qed.
-
-  Lemma sampleRaw_ext
-      {T : choice_type} (D E : {distr T / R}) mem :
-    D =1 E ->
-    Pr_code (sampleRaw D) mem =1 Pr_code (sampleRaw E) mem.
-  Proof.
-    move=> HDE out.
-    rewrite !sampleRawE.
-    apply: dmargin_ext=> y.
-    exact: HDE.
   Qed.
 
   Lemma sampleRaw_bind_retE
@@ -733,20 +636,6 @@ Module NoiseFloodingSecureGaussianBasics
     rewrite sampleRawE.
     symmetry.
     exact: (dmargin_comp (fun y : U => (y, mem)) f D out).
-  Qed.
-
-  Lemma sampleRaw_dmargin_someE
-      {T : choice_type} (D : {distr T / R}) mem :
-    Pr_code (sampleRaw (dmargin (@Some T) D)) mem =1
-    Pr_code
-      (x ← sampleRaw D ;;
-       ret (Some x))
-      mem.
-  Proof.
-    move=> out.
-    rewrite sampleRawE sampleRaw_ret_someE.
-    exact: (dmargin_comp
-      (fun y => (y, mem)) (@Some T) D out).
   Qed.
 
   Lemma noise_flooding_decrypt_some_codeE sk c mem :
@@ -808,122 +697,6 @@ Module NoiseFloodingSecureGaussianBasics
       (discrete_gaussians (IndCpaDSim.zeroChVec dim)
         (noise_flooding_dg_stdev
           gaussian_width_multiplier error_bound)) out).
-  Qed.
-
-  Lemma noise_flooding_decrypt_centered_codeE
-      sk data error_bound mem :
-    let c : ciphertext := Some (data, error_bound) in
-    Pr_code
-      (noise <$ (chVec chInt dim;
-        discrete_gaussians (IndCpaDSim.zeroChVec dim)
-          (noise_flooding_dg_stdev
-            gaussian_width_multiplier error_bound)) ;;
-       ret (inverse_isometry (deterministic_dec sk c)
-         (IndCpaDSim.toIntVec noise)))
-      mem =1
-    Pr_code (sampleRaw (NF.decrypt sk c)) mem.
-  Proof.
-    move=> c out.
-    set stdev := noise_flooding_dg_stdev
-      gaussian_width_multiplier error_bound.
-    set center := deterministic_dec sk c.
-    rewrite Pr_code_sample.
-    transitivity
-      ((dmargin
-        (fun noise =>
-          (inverse_isometry center
-            (IndCpaDSim.toIntVec noise), mem))
-        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev)) out).
-    - rewrite dmarginE.
-      apply: eq_in_dlet=> // noise _ out'.
-      by rewrite Pr_code_ret.
-    transitivity
-      ((dmargin
-        (fun v => (inverse_isometry center v, mem))
-        (n_dg dim stdev)) out).
-    - rewrite -(dmargin_comp
-        (fun v => (inverse_isometry center v, mem))
-        (@IndCpaDSim.toIntVec dim)
-        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev) out).
-      apply: dmargin_ext.
-      exact: IndCpaDSim.dmargin_toIntVec_discrete_gaussians_zero.
-    rewrite sampleRawE.
-    rewrite -(dmargin_comp
-      (fun y => (y, mem))
-      (fun v => inverse_isometry center v)
-      (n_dg dim stdev) out).
-    apply: dmargin_ext=> y.
-    symmetry.
-    rewrite /center /stdev.
-    exact: noise_flooding_decrypt_some_centered.
-  Qed.
-
-  Lemma simulator_one_chart_codeE
-      (centerL centerR : message) error_bound mem :
-    let stdev :=
-      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
-    Pr_code
-      (noise <$ (chVec chInt dim;
-        discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev) ;;
-       ret (inverse_isometry centerL
-         (ivec_add (IndCpaDSim.toIntVec noise)
-           (isometry centerL centerR))))
-      mem =1
-    Pr_code
-      (sampleRaw
-        (simulator_successful_decrypt_distribution
-          centerR error_bound))
-      mem.
-  Proof.
-    move=> stdev out.
-    set shift := isometry centerL centerR.
-    rewrite Pr_code_sample.
-    transitivity
-      ((dmargin
-        (fun noise =>
-          (inverse_isometry centerL
-            (ivec_add (IndCpaDSim.toIntVec noise) shift), mem))
-        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev)) out).
-    - rewrite dmarginE.
-      apply: eq_in_dlet=> // noise _ out'.
-      by rewrite Pr_code_ret.
-    transitivity
-      ((dmargin
-        (fun v =>
-          (inverse_isometry centerL (ivec_add v shift), mem))
-        (n_dg dim stdev)) out).
-    - rewrite -(dmargin_comp
-        (fun v =>
-          (inverse_isometry centerL (ivec_add v shift), mem))
-        (@IndCpaDSim.toIntVec dim)
-        (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev) out).
-      apply: dmargin_ext.
-      exact: IndCpaDSim.dmargin_toIntVec_discrete_gaussians_zero.
-    transitivity
-      ((dmargin
-        (fun y => (y, mem))
-        (dmargin (fun v => inverse_isometry centerL v)
-          (n_dg_shifted shift stdev))) out).
-    - rewrite (dmargin_comp
-        (fun y => (y, mem))
-        (fun v => inverse_isometry centerL v)
-        (n_dg_shifted shift stdev) out).
-      rewrite -(dmargin_ext
-        (fun v => (inverse_isometry centerL v, mem))
-        (dmargin (fun noise => ivec_add noise shift)
-          (n_dg dim stdev))
-        (n_dg_shifted shift stdev)
-        (n_dg_shiftedE shift stdev) out).
-      rewrite (dmargin_comp
-        (fun v => (inverse_isometry centerL v, mem))
-        (fun noise => ivec_add noise shift)
-        (n_dg dim stdev) out).
-      by [].
-    rewrite sampleRawE.
-    apply: dmargin_ext=> y.
-    symmetry.
-    rewrite /shift.
-    exact: simulator_decrypt_noise_one_chart.
   Qed.
 
   Lemma complete_output_heap_ext
@@ -1328,33 +1101,6 @@ Module NoiseFloodingSecureGaussianBasics
       by [].
     - move=> y Hy.
       by [].
-  Qed.
-
-  Lemma noise_flooding_successful_decrypt_code_pyth
-      sk data error_bound (m : message) :
-    let c : ciphertext := Some (data, error_bound) in
-    (metric (deterministic_dec sk c) m <= error_bound)%N ->
-    ⊨Pyth ⦃ fun inps =>
-      let '((_, memL), (_, memR)) := inps in eq_op memL memR ⦄
-      (fun _ : chUnit =>
-        m' <$ (message; NF.decrypt sk c) ;;
-        ret (Some m'))
-      ≈( cat_tuple
-        [tuple (dim%:R / (2 * gaussian_width_multiplier ^+ 2))] [tuple 0] )
-      (fun _ : chUnit =>
-        noise <$ (chVec chInt dim;
-          discrete_gaussians (IndCpaDSim.zeroChVec dim)
-            (noise_flooding_dg_stdev
-              gaussian_width_multiplier error_bound)) ;;
-        let res :=
-          inverse_isometry m
-            (ivec_add (IndCpaDSim.toIntVec noise) (isometry m m)) in
-        ret (Some res))
-    ⦃ fun _ : chOption message * heap => true ⦄.
-  Proof.
-    move=> c Hmetric.
-    exact: (noise_flooding_successful_decrypt_code_pyth_one_chart
-      sk data error_bound m Hmetric).
   Qed.
 
 End NoiseFloodingSecureGaussianBasics.

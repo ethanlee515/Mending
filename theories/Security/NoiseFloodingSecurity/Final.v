@@ -518,23 +518,6 @@ Module NoiseFloodingSecure
         max_queries Hprefix_vector)).
   Qed.
 
-  Lemma ind_cpad_compiled_guess_decrypt_replacement_from_compile
-      (A : nom_package) max_queries :
-    Package IndCpadGame.IndCpadAdv_import
-      IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE ⦃ same_input_invariant_pre challenge_heap_valid ⦄
-      (ind_cpad_compiled_real_guess_code A max_queries)
-      ≈( compile_security_error max_queries )
-      (ind_cpad_compiled_sim_decrypt_guess_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    move=> A_valid.
-    exact: (ind_cpad_compiled_guess_decrypt_replacement_from_compile_ready_vector_bound
-      A max_queries A_valid
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
-  Qed.
-
   Definition ind_cpa_reduction (A : nom_package)
     (max_queries : nat) :=
     IndCpaDSim.IndCpaReduction A max_queries.
@@ -590,17 +573,6 @@ Module NoiseFloodingSecure
       ((IndCpaSecurity.IndCpaGame.IndCpaChallenger ∘
         ind_cpa_reduction A max_queries)%share)
       (IndCpaSecurity.IndCpaGame.main, ('unit, 'bool)) tt.
-
-  Definition ind_cpa_reduction_open_guess_code
-      (A : nom_package) (max_queries : nat)
-      (input : (bool * (pk_t * evk_t))%type) : raw_code bool :=
-    let '(b, (pk, evk)) := input in
-    b' ← resolve
-      (move (IndCpaSecurity.IndCpaGame.IndCpaChallenger : nom_package)
-        (ind_cpa_reduction A max_queries))
-        (mkopsig IndCpaSecurity.IndCpaGame.adv_guess
-          (chProd pk_t evk_t) chBool) (pk, evk) ;;
-    ret (eq_op b' b).
 
   Definition ind_cpa_reduction_unfresh_open_guess_code
       (A : nom_package) (max_queries : nat)
@@ -894,36 +866,11 @@ Module NoiseFloodingSecure
     init ← ind_cpa_reduction_challenge_init_code tt ;;
     ind_cpa_reduction_direct_guess_code A max_queries init.
 
-  Definition ind_cpa_reduction_factored_outer_open_game_code
-      (A : nom_package) (max_queries : nat) (_ : chUnit) :
-      raw_code bool :=
-    init ← ind_cpa_reduction_outer_challenge_init_code tt ;;
-    ind_cpa_reduction_open_guess_code A max_queries init.
-
   Definition ind_cpa_reduction_unfresh_factored_outer_open_game_code
       (A : nom_package) (max_queries : nat) (_ : chUnit) :
       raw_code bool :=
     init ← ind_cpa_reduction_outer_challenge_init_code tt ;;
     ind_cpa_reduction_unfresh_open_guess_code A max_queries init.
-
-  Lemma ind_cpa_reduction_open_game_code_factored_outer
-      (A : nom_package) max_queries x :
-    ind_cpa_reduction_open_game_code A max_queries x =
-    ind_cpa_reduction_factored_outer_open_game_code A max_queries x.
-  Proof.
-    case: x=> [].
-    rewrite /ind_cpa_reduction_open_game_code
-      /ind_cpa_reduction_factored_outer_open_game_code
-      /ind_cpa_reduction_outer_challenge_init_code
-      /ind_cpa_reduction_open_guess_code
-      /IndCpaSecurity.IndCpaGame.IndCpaChallenger.
-    rewrite sep_linkE.
-    rewrite resolve_link.
-    rewrite resolve_set /= coerce_kleisliE.
-    ssprove_match_commut_gen.
-    case: a0=> [[pk evk] sk] /=.
-    ssprove_match_commut_gen.
-  Qed.
 
   Lemma ind_cpa_reduction_unfresh_open_game_code_factored_outer
       (A : nom_package) max_queries x :
@@ -942,22 +889,6 @@ Module NoiseFloodingSecure
     ssprove_match_commut_gen.
     case: a0=> [[pk evk] sk] /=.
     ssprove_match_commut_gen.
-  Qed.
-
-  Lemma ind_cpa_reduction_unfresh_open_game_code_alpha
-      (A : nom_package) max_queries x :
-    ind_cpa_reduction_unfresh_open_game_code A max_queries x ≡
-    ind_cpa_reduction_open_game_code A max_queries x.
-  Proof.
-    rewrite /ind_cpa_reduction_unfresh_open_game_code
-      /ind_cpa_reduction_open_game_code /ind_cpa_reduction.
-    exact: (resolve_alpha
-      ((IndCpaSecurity.IndCpaGame.IndCpaChallenger ∘
-        IndCpaDSim.IndCpaReduction A max_queries)%share)
-      ((IndCpaSecurity.IndCpaGame.IndCpaChallenger ∘
-        IndCpaDSim.IndCpaReduction A max_queries)%sep)
-      (IndCpaSecurity.IndCpaGame.main, ('unit, 'bool)) tt
-      (share_link_sep_link (ind_cpa_reduction_outer_disj A max_queries))).
   Qed.
 
   Lemma ind_cpa_reduction_unfresh_open_game_code_rename
@@ -1007,14 +938,6 @@ Module NoiseFloodingSecure
     raw_code bool :=
     code_link
       (ind_cpa_reduction_unfresh_open_game_code A max_queries tt)
-      IndCpaSecurity.IndCpaGame.IndCpaOracle.
-
-  Definition ind_cpa_reduction_factored_outer_linked_game_code
-      (A : nom_package) (max_queries : nat) (_ : chUnit) :
-      raw_code bool :=
-    init ← ind_cpa_reduction_outer_challenge_init_code tt ;;
-    code_link
-      (ind_cpa_reduction_open_guess_code A max_queries init)
       IndCpaSecurity.IndCpaGame.IndCpaOracle.
 
   Definition ind_cpa_reduction_unfresh_factored_outer_linked_game_code
@@ -1071,21 +994,6 @@ Module NoiseFloodingSecure
         A max_queries b pk evk out_keys).
   Qed.
 
-  Lemma ind_cpa_reduction_linked_game_code_factored_outer
-      (A : nom_package) max_queries x :
-    ind_cpa_reduction_linked_game_code A max_queries x =
-    ind_cpa_reduction_factored_outer_linked_game_code A max_queries x.
-  Proof.
-    case: x=> [].
-    rewrite /ind_cpa_reduction_linked_game_code
-      /ind_cpa_reduction_factored_outer_linked_game_code.
-    rewrite ind_cpa_reduction_open_game_code_factored_outer.
-    rewrite /ind_cpa_reduction_factored_outer_open_game_code.
-    rewrite code_link_bind.
-    rewrite ind_cpa_reduction_outer_challenge_init_code_link_closed.
-    by [].
-  Qed.
-
   Lemma ind_cpa_reduction_unfresh_linked_game_code_factored_outer
       (A : nom_package) max_queries x :
     ind_cpa_reduction_unfresh_linked_game_code A max_queries x =
@@ -1124,118 +1032,6 @@ Module NoiseFloodingSecure
     rewrite -/P -/R.
     rewrite ind_cpa_reduction_unfresh_open_game_code_rename.
     by [].
-  Qed.
-
-  Lemma ind_cpad_reduction_challenge_init_adv_rel_ae
-      (A : nom_package) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      ind_cpad_challenge_init_code
-      ≈( 0 )
-      ind_cpa_reduction_challenge_init_code
-    ⦃ same_result_sim_decrypt_reduction_opt ⦄.
-  Proof.
-    move=> Houter.
-    split; first exact: lexx.
-    move=> memL memR xL xR Hpre.
-    rewrite /game_initial_pre in Hpre.
-    move/eqP: Hpre=> Hpre.
-    inversion Hpre; subst.
-    exists ind_cpad_reduction_challenge_init_coupling.
-    split.
-    - exact: ind_cpad_reduction_challenge_init_coupling_margins.
-    - rewrite subr0.
-      exact: (supports_same_result_sim_decrypt_reduction_adv_opt_rel_pr_ge1
-        A ind_cpad_reduction_challenge_init_coupling
-        (Pr_code (ind_cpad_challenge_init_code tt) empty_heap)
-        (Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap)
-        ind_cpad_reduction_challenge_init_coupling_margins
-        (ind_cpad_reduction_challenge_init_adv_support_named A Houter)).
-  Qed.
-
-  Lemma ind_cpa_reduction_linked_to_factored_outer_ae
-      (A : nom_package) max_queries :
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpa_reduction_linked_game_code A max_queries)
-      ≈( 0 )
-      (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    apply: (additiveErrorConseqRule
-      (ind_cpa_reduction_linked_game_code A max_queries)
-      (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
-      game_initial_pre game_initial_pre
-      same_output_heap_opt same_game_output_opt
-      0 0).
-    - by [].
-    - move=> outs.
-      exact: same_output_heap_game_output_opt.
-    - exact: lexx.
-    apply: additiveErrorSameOutputTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR xL xR Hpre.
-      rewrite /game_initial_pre in Hpre.
-      move/eqP: Hpre=> Hpre.
-      inversion Hpre; subst.
-      rewrite ind_cpa_reduction_linked_game_code_factored_outer.
-      exact: total_variation_refl_le0.
-  Qed.
-
-  Lemma ind_cpa_reduction_factored_outer_to_linked_ae
-      (A : nom_package) max_queries :
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
-      ≈( 0 )
-      (ind_cpa_reduction_linked_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    apply: (additiveErrorConseqRule
-      (ind_cpa_reduction_factored_outer_linked_game_code A max_queries)
-      (ind_cpa_reduction_linked_game_code A max_queries)
-      game_initial_pre game_initial_pre
-      same_output_heap_opt same_game_output_opt
-      0 0).
-    - by [].
-    - move=> outs.
-      exact: same_output_heap_game_output_opt.
-    - exact: lexx.
-    apply: additiveErrorSameOutputTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR xL xR Hpre.
-      rewrite /game_initial_pre in Hpre.
-      move/eqP: Hpre=> Hpre.
-      inversion Hpre; subst.
-      rewrite -ind_cpa_reduction_linked_game_code_factored_outer.
-      exact: total_variation_refl_le0.
-  Qed.
-
-  Lemma ind_cpa_reduction_unfresh_linked_to_factored_outer_ae
-      (A : nom_package) max_queries :
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
-      ≈( 0 )
-      (ind_cpa_reduction_unfresh_factored_outer_linked_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    apply: (additiveErrorConseqRule
-      (ind_cpa_reduction_unfresh_linked_game_code A max_queries)
-      (ind_cpa_reduction_unfresh_factored_outer_linked_game_code A max_queries)
-      game_initial_pre game_initial_pre
-      same_output_heap_opt same_game_output_opt
-      0 0).
-    - by [].
-    - move=> outs.
-      exact: same_output_heap_game_output_opt.
-    - exact: lexx.
-    apply: additiveErrorSameOutputTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR xL xR Hpre.
-      rewrite /game_initial_pre in Hpre.
-      move/eqP: Hpre=> Hpre.
-      inversion Hpre; subst.
-      rewrite ind_cpa_reduction_unfresh_linked_game_code_factored_outer.
-      exact: total_variation_refl_le0.
   Qed.
 
   Lemma ind_cpa_reduction_unfresh_factored_outer_to_linked_ae
@@ -1278,34 +1074,6 @@ Module NoiseFloodingSecure
     by rewrite resolve_link.
   Qed.
 
-  Lemma ind_cpa_reduction_game_code_linked_ae
-      (A : nom_package) max_queries :
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpa_reduction_game_code A max_queries)
-      ≈( 0 )
-      (ind_cpa_reduction_linked_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    apply: (additiveErrorConseqRule
-      (ind_cpa_reduction_game_code A max_queries)
-      (ind_cpa_reduction_linked_game_code A max_queries)
-      game_initial_pre game_initial_pre
-      same_output_heap_opt same_game_output_opt
-      0 0).
-    - by [].
-    - move=> outs.
-      exact: same_output_heap_game_output_opt.
-    - by [].
-    apply: additiveErrorSameOutputTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR xL xR Hpre.
-      rewrite /game_initial_pre in Hpre.
-      move/eqP: Hpre=> Hpre.
-      inversion Hpre; subst.
-      rewrite ind_cpa_reduction_game_code_linked.
-      exact: total_variation_refl_le0.
-  Qed.
-
   Lemma ind_cpa_reduction_linked_game_code_ae
       (A : nom_package) max_queries :
     ⊨AE ⦃ game_initial_pre ⦄
@@ -1332,241 +1100,6 @@ Module NoiseFloodingSecure
       inversion Hpre; subst.
       rewrite -ind_cpa_reduction_game_code_linked.
       exact: total_variation_refl_le0.
-  Qed.
-
-  Lemma ind_cpad_reduction_challenge_init_rel_total_ae :
-    ⊨AE_raw ⦃ game_initial_pre ⦄
-      ind_cpad_challenge_init_code
-      ≈( 0 )
-      ind_cpa_reduction_challenge_init_code
-    ⦃ same_input_sim_decrypt_reduction_pre ⦄.
-  Proof.
-    split; first exact: lexx.
-    move=> memL memR xL xR Hpre.
-    rewrite /game_initial_pre in Hpre.
-    move/eqP: Hpre=> Hpre.
-    inversion Hpre; subst.
-    pose initD : {distr (bool * (pk_t * evk_t * sk_t)) / R} :=
-      \dlet_(b <- dflip (1 / 2))
-        \dlet_(keys <- keygen) dunit (b, keys).
-    pose outL (sample : bool * (pk_t * evk_t * sk_t)) :=
-      let '(b, ((pk, evk), sk)) := sample in
-      ((b, (pk, evk)), challenge_initialized_heap b pk evk sk).
-    pose outR (sample : bool * (pk_t * evk_t * sk_t)) :=
-      let '(b, ((pk, evk), _)) := sample in
-      ((b, (pk, evk)), reduction_initialized_heap b pk evk).
-    have HinitD_weight : dweight initD = 1.
-      rewrite /initD dweight_dlet.
-      transitivity (@psum R _ (fun b : bool => dflip (1 / 2) b * 1)).
-      - apply/eq_psum=> b.
-        congr (_ * _).
-        rewrite dweight_dlet.
-        transitivity (@psum R _ (fun keys : pk_t * evk_t * sk_t =>
-          keygen keys * 1)).
-        + apply/eq_psum=> keys.
-          by rewrite dunit_dweight mulr1.
-        + transitivity (@psum R _ keygen).
-            apply/eq_psum=> keys.
-            by rewrite mulr1.
-          by rewrite -pr_predT keygen_lossless.
-      - transitivity (@psum R _ (dflip (1 / 2) : {distr bool / R})).
-          apply/eq_psum=> b.
-          by rewrite mulr1.
-        by rewrite -pr_predT dflip_dweight.
-    exists (shared_complete_sample_coupling initD outL outR).
-    split.
-    - have [HmarginL HmarginR] :=
-        shared_complete_sample_coupling_margins initD outL outR.
-      split.
-      + move=> z.
-        rewrite HmarginL.
-        apply: complete_distr_ext=> y.
-        rewrite /initD /outL /ind_cpad_challenge_init_code.
-        rewrite dmarginE Pr_code_sample.
-        rewrite __deprecated__dlet_dlet.
-        apply: eq_in_dlet=> // b _ y'.
-        rewrite Pr_code_sample.
-        rewrite __deprecated__dlet_dlet.
-        apply: eq_in_dlet=> // keys _ y''.
-        case: keys=> [[pk evk] sk].
-        by rewrite dlet_unit /challenge_initialized_heap !Pr_code_put Pr_code_ret.
-      + move=> z.
-        rewrite HmarginR.
-        apply: complete_distr_ext=> y.
-        rewrite /initD /outR /ind_cpa_reduction_challenge_init_code.
-        rewrite dmarginE Pr_code_sample.
-        rewrite __deprecated__dlet_dlet.
-        apply: eq_in_dlet=> // b _ y'.
-        rewrite Pr_code_sample.
-        rewrite __deprecated__dlet_dlet.
-        apply: eq_in_dlet=> // keys _ y''.
-        case: keys=> [[pk evk] sk].
-        by rewrite dlet_unit /reduction_initialized_heap !Pr_code_put Pr_code_ret.
-    - rewrite subr0.
-      apply: shared_complete_sample_coupling_pr_ge1_total.
-      + exact: HinitD_weight.
-      + move=> sample Hsample.
-        case: sample Hsample=> [b [[pk evk] sk]] Hsample /=.
-        have Hkeys : (pk, evk, sk) \in dinsupp keygen.
-          move: Hsample.
-          rewrite /initD.
-          move=> Hsample.
-          have [b' Hb' Hafter_b] := @dinsupp_dlet R _ _ _ _ _ Hsample.
-          have [keys' Hkeys' Hafter_keys] :=
-            @dinsupp_dlet R _ _ _ _ _ Hafter_b.
-          have Heq :
-              (b, (pk, evk, sk)) = (b', keys').
-            exact: in_dunit Hafter_keys.
-          inversion Heq; subst keys'.
-          exact: Hkeys'.
-        have Hrel :=
-          ind_cpad_reduction_challenge_init_heaps_rel b pk evk sk Hkeys.
-        rewrite /lift_loss_post /same_input_sim_decrypt_reduction_pre
-          /outL /outR /= eqxx.
-        exact: Hrel.
-  Qed.
-
-  Lemma ind_cpad_reduction_challenge_init_rel_ae :
-    ⊨AE ⦃ game_initial_pre ⦄
-      ind_cpad_challenge_init_code
-      ≈( 0 )
-      ind_cpa_reduction_challenge_init_code
-    ⦃ same_result_sim_decrypt_reduction_opt ⦄.
-  Proof.
-    apply: (additiveErrorConseqRule
-      ind_cpad_challenge_init_code
-      ind_cpa_reduction_challenge_init_code
-      game_initial_pre game_initial_pre
-      (lift_loss_post same_input_sim_decrypt_reduction_pre)
-      same_result_sim_decrypt_reduction_opt 0 0).
-    - by [].
-    - move=> [outL outR] Hpost.
-      case: outL Hpost=> [[initL memL]|] Hpost.
-      + case: outR Hpost=> [[initR memR]|] Hpost; last by [].
-        rewrite /lift_loss_post /same_input_sim_decrypt_reduction_pre
-          /same_result_sim_decrypt_reduction_opt /= in Hpost *.
-        move/andP: Hpost=> [/eqP -> Hrel].
-        by rewrite eqxx Hrel.
-      + by case: outR Hpost=> [[initR memR]|] Hpost.
-    - exact: lexx.
-    - exact: ind_cpad_reduction_challenge_init_rel_total_ae.
-  Qed.
-
-  Lemma ind_cpad_reduction_factored_result_bridge_from_guess
-      (guessL guessR :
-        (bool * (pk_t * evk_t))%type -> raw_code bool) :
-    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
-      guessL
-      ≈( 0 )
-      guessR
-    ⦃ same_result_opt ⦄ ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (fun _ : chUnit =>
-        init ← ind_cpad_challenge_init_code tt ;;
-        guessL init)
-      ≈( 0 )
-      (fun _ : chUnit =>
-        init ← ind_cpa_reduction_challenge_init_code tt ;;
-        guessR init)
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    move=> Hguess.
-    have Hguess_game :
-        ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
-          guessL
-          ≈( 0 )
-          guessR
-        ⦃ same_game_result_opt ⦄.
-      apply: (additiveErrorConseqRule
-        guessL guessR
-        same_input_sim_decrypt_reduction_pre
-        same_input_sim_decrypt_reduction_pre
-        same_result_opt same_game_result_opt 0 0).
-      - by [].
-      - move=> outs.
-        by rewrite /same_result_opt /same_game_result_opt.
-      - exact: lexx.
-      - exact: Hguess.
-    have -> : (0 : R) = 0 + 0 by rewrite addr0.
-    exact: (additiveErrorSeqRule
-      ind_cpad_challenge_init_code
-      ind_cpa_reduction_challenge_init_code
-      guessL guessR
-      game_initial_pre
-      same_input_sim_decrypt_reduction_pre
-      same_game_result_opt
-      0 0
-      ind_cpad_reduction_challenge_init_rel_total_ae
-      Hguess_game).
-  Qed.
-
-  Definition ind_cpa_reduction_factored_game_code_from_guess
-      (guessR : (bool * (pk_t * evk_t))%type -> raw_code bool)
-      (_ : chUnit) : raw_code bool :=
-    init ← ind_cpa_reduction_challenge_init_code tt ;;
-    guessR init.
-
-  Lemma ind_cpa_reduction_direct_factored_game_code_from_guess
-      (A : nom_package) max_queries x :
-    ind_cpa_reduction_direct_factored_game_code A max_queries x =
-    ind_cpa_reduction_factored_game_code_from_guess
-      (ind_cpa_reduction_direct_guess_code A max_queries) x.
-  Proof. by []. Qed.
-
-  Lemma ind_cpad_sim_decrypt_to_factored_reduction_from_guess_ae
-      (A : nom_package) max_queries
-      (guessR : (bool * (pk_t * evk_t))%type -> raw_code bool) :
-    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
-      (fun init =>
-        code_link
-          (ind_cpad_open_guess_code A init)
-          (IndCpadSimDecryptOracle max_queries))
-      ≈( 0 )
-      guessR
-    ⦃ same_result_opt ⦄ ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_sim_decrypt_game_code A max_queries)
-      ≈( 0 )
-      (ind_cpa_reduction_factored_game_code_from_guess guessR)
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    move=> Hguess.
-    have Hfactored :=
-      ind_cpad_reduction_factored_result_bridge_from_guess
-        (fun init =>
-          code_link
-            (ind_cpad_open_guess_code A init)
-            (IndCpadSimDecryptOracle max_queries))
-        guessR Hguess.
-    split; first exact: Hfactored.1.
-    move=> memL memR xL xR Hpre.
-    have [d [Hd Hpost]] := Hfactored.2 memL memR xL xR Hpre.
-    exists d.
-    split; last exact: Hpost.
-    move: Hd.
-    rewrite (ind_cpad_sim_decrypt_game_code_factored A max_queries xL).
-    rewrite /ind_cpad_factored_sim_decrypt_game_code.
-    rewrite /ind_cpa_reduction_factored_game_code_from_guess.
-    by [].
-  Qed.
-
-  Lemma ind_cpad_sim_decrypt_to_direct_reduction_from_guess_ae
-      (A : nom_package) max_queries :
-    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
-      (fun init =>
-        code_link
-          (ind_cpad_open_guess_code A init)
-          (IndCpadSimDecryptOracle max_queries))
-      ≈( 0 )
-      (ind_cpa_reduction_direct_guess_code A max_queries)
-    ⦃ same_result_opt ⦄ ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_sim_decrypt_game_code A max_queries)
-      ≈( 0 )
-      (ind_cpa_reduction_direct_factored_game_code A max_queries)
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    exact: ind_cpad_sim_decrypt_to_factored_reduction_from_guess_ae.
   Qed.
 
   Lemma ind_cpad_sim_decrypt_to_direct_reduction_from_guess_adv_ae
@@ -1717,23 +1250,6 @@ Module NoiseFloodingSecure
         A max_queries A_valid Hprefix_vector)).
   Qed.
 
-  Lemma ind_cpad_factored_compiled_guess_decrypt_replacement
-      (A : nom_package) max_queries :
-    Package IndCpadGame.IndCpadAdv_import
-      IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_factored_compiled_real_guess_game_code A max_queries)
-      ≈( compile_security_error max_queries )
-      (ind_cpad_factored_compiled_sim_decrypt_guess_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    move=> A_valid.
-    exact: (ind_cpad_factored_compiled_guess_decrypt_replacement_ready_vector_bound
-      A max_queries A_valid
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
-  Qed.
-
   Lemma ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
@@ -1766,23 +1282,6 @@ Module NoiseFloodingSecure
     by [].
   Qed.
 
-  Lemma ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring
-      (A : nom_package) max_queries :
-    Package IndCpadGame.IndCpadAdv_import
-      IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_compiled_real_game_code A max_queries)
-      ≈( compile_security_error max_queries )
-      (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    move=> A_valid.
-    exact: (ind_cpad_compiled_open_decrypt_replacement_from_guess_factoring_ready_vector_bound
-      A max_queries A_valid
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
-  Qed.
-
   Lemma ind_cpad_game_to_compiled_sim_decrypt_additive_error_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpadGame.IndCpadAdv_import
@@ -1807,23 +1306,6 @@ Module NoiseFloodingSecure
     rewrite (ind_cpad_compiled_real_linked_correct A max_queries A_valid xL).
     rewrite ind_cpad_game_code_linked.
     by [].
-  Qed.
-
-  Lemma ind_cpad_game_to_compiled_sim_decrypt_additive_error
-      (A : nom_package) max_queries :
-    Package IndCpadGame.IndCpadAdv_import
-      IndCpadGame.IndCpadAdv_export A ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_game_code A max_queries)
-      ≈( compile_security_error max_queries )
-      (ind_cpad_compiled_sim_decrypt_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    move=> A_valid.
-    exact: (ind_cpad_game_to_compiled_sim_decrypt_additive_error_ready_vector_bound
-      A max_queries A_valid
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
   Qed.
 
   Lemma ind_cpad_compiled_sim_decrypt_self_link_to_sim_decrypt_ae
@@ -1970,41 +1452,6 @@ Module NoiseFloodingSecure
       by rewrite /same_game_result_opt /strip.
   Qed.
 
-  Lemma additiveErrorSameGameResultReflRule
-      (prog : chUnit -> raw_code bool) :
-    ⊨AE ⦃ game_initial_pre ⦄
-      prog ≈( 0 ) prog
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    apply: additiveErrorSameGameResultTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR xL xR Hpre.
-      have [Hx Hmem] := game_initial_pre_same_input
-        memL memR xL xR Hpre.
-      subst xR; subst memR.
-      exact: total_variation_refl_le0.
-  Qed.
-
-  Lemma additiveErrorSameGameResultRenameRule
-      (prog : chUnit -> raw_code bool) {π} :
-    ⊨AE ⦃ game_initial_pre ⦄
-      prog
-      ≈( 0 )
-      (fun x => π ∙ prog x)
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    apply: additiveErrorSameGameResultTvdEqRule.
-    - exact: lexx.
-    - move=> memL memR xL xR Hpre.
-      rewrite /game_initial_pre in Hpre.
-      move/eqP: Hpre=> Hpre.
-      inversion Hpre; subst.
-      apply: total_variation_eq_le0.
-      apply: complete_ext=> out.
-      symmetry.
-      exact: (dmargin_fst_Pr_code_rename_empty (prog tt) out).
-  Qed.
-
   Lemma additiveErrorSameGameResultAlphaRule
       (progL progR : chUnit -> raw_code bool) :
     (forall x, progL x ≡ progR x) ->
@@ -2027,18 +1474,6 @@ Module NoiseFloodingSecure
       rewrite -Hπ.
       symmetry.
       exact: (@dmargin_fst_Pr_code_rename_empty bool π (progL tt) out).
-  Qed.
-
-  Lemma ind_cpa_reduction_unfresh_open_to_open_ae
-      (A : nom_package) max_queries :
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpa_reduction_unfresh_open_game_code A max_queries)
-      ≈( 0 )
-      (ind_cpa_reduction_open_game_code A max_queries)
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    apply: additiveErrorSameGameResultAlphaRule.
-    exact: ind_cpa_reduction_unfresh_open_game_code_alpha.
   Qed.
 
   Lemma ind_cpa_reduction_unfresh_linked_to_linked_ae
@@ -2349,29 +1784,6 @@ Module NoiseFloodingSecure
     - exact: H.
   Qed.
 
-  Lemma additiveErrorTvBound
-    {inL_t inR_t : choice_type}
-    (progL : inL_t -> raw_code bool)
-    (progR : inR_t -> raw_code bool)
-    (pre : pred ((inL_t * heap) * (inR_t * heap)))
-    (ε : R) memL memR xL xR :
-    ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ same_game_output_opt ⦄ ->
-    pre ((xL, memL), (xR, memR)) ->
-    total_variation (complete (dmargin fst (Pr_code (progL xL) memL)))
-                    (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε.
-  Proof.
-    move=> Hae Hpre.
-    apply: (additiveErrorSameGameResultTvBound
-      progL progR pre ε memL memR xL xR).
-    - apply: (additiveErrorConseqRule
-        progL progR pre pre same_game_output_opt same_game_result_opt ε ε).
-      + by [].
-      + exact: same_game_output_result_opt.
-      + exact: lexx.
-      + exact: Hae.
-    - exact: Hpre.
-  Qed.
-
   (* The package-level reduction preserves the IND-CPA adversary interface. *)
   Lemma ind_cpa_reduction_valid (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
@@ -2436,35 +1848,6 @@ Module NoiseFloodingSecure
     lra.
   Qed.
 
-  (* Applies Micciancio-Walter to turn a Pythagorean judgment into AE_opt. *)
-  Lemma ind_cpa_reduction_additive_error_from_pyth
-    {ℓ : nat} (A : nom_package) max_queries
-    (s : (ℓ.+1).-tuple R) ε :
-    pythagorean_tv_bound s <= ε ->
-    ⊨Pyth ⦃ game_initial_pre ⦄
-      (ind_cpad_game_code A max_queries)
-      ≈( s )
-      (ind_cpa_reduction_game_code A max_queries)
-    ⦃ fun _ : bool * heap => true ⦄ ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_game_code A max_queries)
-      ≈( ε )
-      (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_output_opt ⦄.
-  Proof.
-    move=> Hbound Hpyth.
-    apply: (additiveErrorConseqRule
-      (ind_cpad_game_code A max_queries)
-      (ind_cpa_reduction_game_code A max_queries)
-      game_initial_pre game_initial_pre
-      same_game_output_opt same_game_output_opt
-      (pythagorean_tv_bound s) ε).
-    - by [].
-    - by [].
-    - exact: Hbound.
-    - exact: (MicciancioWalterRule _ _ _ _ _ Hpyth).
-  Qed.
-
   (* The cryptographic core: compose the compile-rule decrypt replacement
      with the exact endpoint identifications.  The final endpoint uses the
      value-only postcondition because the IND-CPA reduction presentation need
@@ -2524,22 +1907,6 @@ Module NoiseFloodingSecure
     - exact: H3.
   Qed.
 
-  Lemma ind_cpa_reduction_additive_error_from_compile
-    (A : nom_package) max_queries :
-    Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_game_code A max_queries)
-      ≈( compile_security_error max_queries )
-      (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    move=> A_valid.
-    exact: (ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
-      A max_queries A_valid
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
-  Qed.
-
   Lemma ind_cpa_reduction_additive_error_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
@@ -2554,23 +1921,6 @@ Module NoiseFloodingSecure
     rewrite security_loss_halfE.
     exact: (ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
       A max_queries A_valid Hprefix_vector).
-  Qed.
-
-  (* Packages the compile-rule loss as the AE obligation expected downstream. *)
-  Lemma ind_cpa_reduction_additive_error
-      (A : nom_package) max_queries :
-    Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
-    ⊨AE ⦃ game_initial_pre ⦄
-      (ind_cpad_game_code A max_queries)
-      ≈( security_loss dim max_queries gaussian_width_multiplier / 2 )
-      (ind_cpa_reduction_game_code A max_queries)
-    ⦃ same_game_result_opt ⦄.
-  Proof.
-    move=> A_valid.
-    exact: (ind_cpa_reduction_additive_error_ready_vector_bound
-      A max_queries A_valid
-      (ind_cpad_decrypt_prefix_code_readies_row_vector_bound
-        max_queries)).
   Qed.
 
   Theorem ind_cpa_reduction_bound_ready_vector_bound

@@ -95,30 +95,11 @@ Module NoiseFloodingSecureGameReduction
     exact: resolve_rename.
   Qed.
 
-  Lemma resolve_alpha (P P' : nom_package) (o : opsig) (x : src o) :
-    P ≡ P' ->
-    resolve P o x ≡ resolve P' o x.
-  Proof.
-    move=> [π Hπ].
-    exists π.
-    rewrite rename_resolve.
-    change (resolve (val (π ∙ P)) o x = resolve (val P') o x).
-    by rewrite Hπ.
-  Qed.
-
   Definition sim_decrypt_reduction_adversary_heap_eq
       (A : nom_package) (memL memR : heap) : Prop :=
     heap_eq_on_renamed
       (sim_decrypt_reduction_moved_adversary_perm A)
       (loc (ind_cpad_moved_adversary A)) memL memR.
-
-  Lemma sim_decrypt_reduction_adversary_heap_eq_refl
-      (A : nom_package) mem :
-    sim_decrypt_reduction_adversary_heap_eq A mem
-      (sim_decrypt_reduction_moved_adversary_perm A ∙ mem).
-  Proof.
-    exact: heap_eq_on_renamed_refl.
-  Qed.
 
   Lemma sim_decrypt_reduction_adversary_heap_eq_get
       (A : nom_package) memL memR (l : Location) :
@@ -173,21 +154,6 @@ Module NoiseFloodingSecureGameReduction
       outs \in dinsupp d ->
       same_result_sim_decrypt_reduction_adv_opt A outs.
 
-  Lemma sim_decrypt_reduction_adv_heap_rel_project A memL memR :
-    sim_decrypt_reduction_adv_heap_rel A memL memR ->
-    sim_decrypt_reduction_heap_rel memL memR.
-  Proof. by case. Qed.
-
-  Lemma same_input_sim_decrypt_reduction_adv_pre_project
-      A {T : choice_type} (inps : (T * heap) * (T * heap)) :
-    same_input_sim_decrypt_reduction_adv_pre A inps ->
-    same_input_sim_decrypt_reduction_pre inps.
-  Proof.
-    case: inps=> [[xL memL] [xR memR]] /=.
-    move=> [-> [Hrel _]].
-    by rewrite /same_input_sim_decrypt_reduction_pre /= eqxx Hrel.
-  Qed.
-
   Lemma same_result_sim_decrypt_reduction_adv_opt_project
       A {out_t : choice_type}
       (outs : option (out_t * heap) * option (out_t * heap)) :
@@ -208,53 +174,6 @@ Module NoiseFloodingSecureGameReduction
     move=> Houts.
     exact: (same_result_sim_decrypt_reduction_result_opt outs
       (same_result_sim_decrypt_reduction_adv_opt_project A outs Houts)).
-  Qed.
-
-  Lemma supports_same_result_sim_decrypt_reduction_adv_opt_pr_ge1
-      A {out_t : choice_type}
-      (d : {distr
-        (option (out_t * heap) * option (out_t * heap)) / R})
-      (outL outR : {distr (out_t * heap) / R}) :
-    clean_coupling d (complete outL) (complete outR) ->
-    supports_same_result_sim_decrypt_reduction_adv_opt A d ->
-    \P_[d] same_result_opt >= 1.
-  Proof.
-    move=> [HdL _] Hsupport.
-    have Hdweight : dweight d = 1.
-      rewrite -(dmargin_dweight fst d).
-      transitivity (dweight (complete outL)).
-      - apply: eq_psum=> z.
-        by rewrite !mul1r HdL.
-      - exact: complete_dweight.
-    rewrite (pr_eq1_of_support d same_result_opt Hdweight).
-    - exact: lexx.
-    - move=> outs Houts.
-      exact: (same_result_sim_decrypt_reduction_adv_result_opt A outs
-        (Hsupport outs Houts)).
-  Qed.
-
-  Lemma supports_same_result_sim_decrypt_reduction_adv_opt_rel_pr_ge1
-      A {out_t : choice_type}
-      (d : {distr
-        (option (out_t * heap) * option (out_t * heap)) / R})
-      (outL outR : {distr (out_t * heap) / R}) :
-    clean_coupling d (complete outL) (complete outR) ->
-    supports_same_result_sim_decrypt_reduction_adv_opt A d ->
-    \P_[d] same_result_sim_decrypt_reduction_opt >= 1.
-  Proof.
-    move=> [HdL _] Hsupport.
-    have Hdweight : dweight d = 1.
-      rewrite -(dmargin_dweight fst d).
-      transitivity (dweight (complete outL)).
-      - apply: eq_psum=> z.
-        by rewrite !mul1r HdL.
-      - exact: complete_dweight.
-    rewrite (pr_eq1_of_support d
-      same_result_sim_decrypt_reduction_opt Hdweight).
-    - exact: lexx.
-    - move=> outs Houts.
-      exact: (same_result_sim_decrypt_reduction_adv_opt_project A outs
-        (Hsupport outs Houts)).
   Qed.
 
   Lemma sim_decrypt_reduction_adv_heap_rel_get
@@ -336,17 +255,6 @@ Module NoiseFloodingSecureGameReduction
     #put IndCpaSecurity.IndCpaGame.evk_addr := Some evk ;;
     ret (b, (pk, evk)).
 
-  Definition ind_cpa_reduction_sim_top_init_code
-      (input : (bool * (pk_t * evk_t))%type) :
-      raw_code (bool * (pk_t * evk_t))%type :=
-    let '(b, (pk, evk)) := input in
-    ready ← get IndCpaDSim.ready_addr ;;
-    #assert (~~ ready) ;;
-    #put IndCpaDSim.ready_addr := true ;;
-    #put IndCpaDSim.pk_addr := Some pk ;;
-    #put IndCpaDSim.evk_addr := Some evk ;;
-    ret (b, (pk, evk)).
-
   Definition ind_cpad_factored_open_game_code
       (A : nom_package) (_ : chUnit) : raw_code bool :=
     init ← ind_cpad_challenge_init_code tt ;;
@@ -421,51 +329,6 @@ Module NoiseFloodingSecureGameReduction
     ssprove_match_commut_gen.
     case: keys=> [[pk evk] sk] /=.
     ssprove_match_commut_gen.
-  Qed.
-
-  Lemma ind_cpa_reduction_sim_top_init_outer_initialized_heapE b pk evk :
-    Pr_code (ind_cpa_reduction_sim_top_init_code (b, (pk, evk)))
-      (reduction_outer_initialized_heap b pk evk) =1
-    dunit ((b, (pk, evk)), reduction_initialized_heap b pk evk).
-  Proof.
-    move=> out.
-    rewrite /ind_cpa_reduction_sim_top_init_code.
-    rewrite Pr_code_get reduction_outer_initialized_heap_ready /assertD /=.
-    rewrite !Pr_code_put Pr_code_ret.
-    by rewrite /reduction_outer_initialized_heap /reduction_initialized_heap.
-  Qed.
-
-  Lemma ind_cpa_reduction_outer_sim_top_init_code_emptyE :
-    Pr_code
-      (init ← ind_cpa_reduction_outer_challenge_init_code tt ;;
-       ind_cpa_reduction_sim_top_init_code init) empty_heap =1
-    Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap.
-  Proof.
-    move=> out.
-    transitivity
-      ((\dlet_(b <- dflip (1 / 2))
-        \dlet_(keys <- keygen)
-          let '(pk, evk, _) := keys in
-          dunit ((b, (pk, evk)), reduction_initialized_heap b pk evk))
-        out).
-    - rewrite Pr_code_bind.
-      rewrite /ind_cpa_reduction_outer_challenge_init_code.
-      rewrite Pr_code_sample __deprecated__dlet_dlet.
-      apply: eq_in_dlet=> // b _ out_b.
-      rewrite Pr_code_sample __deprecated__dlet_dlet.
-      apply: eq_in_dlet=> // keys _ out_keys.
-      case: keys=> [[pk evk] sk].
-      rewrite !Pr_code_put Pr_code_ret dlet_unit.
-      exact: (ind_cpa_reduction_sim_top_init_outer_initialized_heapE
-        b pk evk out_keys).
-    - symmetry.
-      rewrite /ind_cpa_reduction_challenge_init_code.
-      rewrite Pr_code_sample.
-      apply: eq_in_dlet=> // b _ out_b.
-      rewrite Pr_code_sample.
-      apply: eq_in_dlet=> // keys _ out_keys.
-      case: keys=> [[pk evk] sk].
-      by rewrite !Pr_code_put Pr_code_ret /reduction_initialized_heap.
   Qed.
 
   Lemma ind_cpad_guess_in_adv_export :
@@ -554,39 +417,6 @@ Module NoiseFloodingSecureGameReduction
     exact: (challenge_heap_valid_initialized b (pk, evk, sk) Hkeys).
   Qed.
 
-  Lemma ind_cpa_reduction_challenge_init_code_empty_shape out :
-    out \in
-      dinsupp
-        (Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap) ->
-    exists b pk evk sk,
-      keygen (pk, evk, sk) != 0 /\
-      out = ((b, (pk, evk)), reduction_initialized_heap b pk evk).
-  Proof.
-    rewrite /ind_cpa_reduction_challenge_init_code.
-    rewrite Pr_code_sample.
-    move=> Hout.
-    have [b Hb Hout_b] := @dinsupp_dlet R _ _ _ _ _ Hout.
-    rewrite Pr_code_sample in Hout_b.
-    have [keys Hkeys Hout_keys] := @dinsupp_dlet R _ _ _ _ _ Hout_b.
-    case: keys Hkeys Hout_keys=> [[pk evk] sk] Hkeys.
-    rewrite !Pr_code_put Pr_code_ret.
-    move=> Hout_ret.
-    exists b, pk, evk, sk.
-    split; first exact: Hkeys.
-    exact: in_dunit Hout_ret.
-  Qed.
-
-  Lemma ind_cpad_reduction_challenge_init_heaps_rel b pk evk sk :
-    (pk, evk, sk) \in dinsupp keygen ->
-    sim_decrypt_reduction_heap_rel
-      (challenge_initialized_heap b pk evk sk)
-      (reduction_initialized_heap b pk evk).
-  Proof.
-    move=> Hkeys.
-    apply: sim_decrypt_reduction_heap_rel_initialized.
-    exact: (keygen_support_good (pk, evk, sk) Hkeys).
-  Qed.
-
   Lemma ind_cpad_challenge_init_code_dweight mem :
     dweight keygen = 1 ->
     dweight (Pr_code (ind_cpad_challenge_init_code tt) mem) = 1.
@@ -618,17 +448,6 @@ Module NoiseFloodingSecureGameReduction
 
   Definition IndCpadMain_export :=
     [interface [IndCpadGame.main] : { 'unit ~> 'bool }].
-
-  Lemma ind_cpad_open_main_package_valid (A : nom_package) :
-    Package IndCpadGame.IndCpadAdv_import
-      IndCpadGame.IndCpadAdv_export A ->
-    Package IndCpadGame.IndCpadAdv_import IndCpadMain_export
-      ((IndCpadGame.IndCpadChallenger ∘ A)%sep).
-  Proof.
-    move=> A_valid.
-    rewrite /IndCpadMain_export.
-    typeclasses eauto with ssprove_valid_db.
-  Qed.
 
   Lemma ind_cpad_open_game_code_valid (A : nom_package) :
     Package IndCpadGame.IndCpadAdv_import
@@ -666,17 +485,6 @@ Module NoiseFloodingSecureGameReduction
     change (disj (move (IndCpadGame.IndCpadChallenger : nom_package) A)
       (IndCpadGame.IndCpadChallenger : nom_package)).
     by rewrite disjC; exact: move_disj.
-  Qed.
-
-  Lemma ind_cpa_reduction_moved_adversary_sim_separate
-      (A : nom_package) :
-    fseparate IndCpaDSim.oracle_mem_spec
-      (loc (ind_cpa_reduction_moved_adversary A)).
-  Proof.
-    rewrite fseparate_disj /ind_cpa_reduction_moved_adversary.
-    change (disj (IndCpaDSim.IndCpaSimTop : nom_package)
-      (move (IndCpaDSim.IndCpaSimTop : nom_package) A)).
-    exact: move_disj.
   Qed.
 
   Lemma ind_cpa_reduction_moved_adversary_sim_separateC
@@ -786,18 +594,6 @@ Module NoiseFloodingSecureGameReduction
       + exact: ind_cpa_reduction_sim_oracle_outer_separate.
       + exact: ind_cpa_reduction_moved_adversary_outer_separate.
     - exact: ind_cpa_reduction_sim_oracle_outer_separate.
-  Qed.
-
-  Lemma ind_cpa_reduction_outer_disj
-      (A : nom_package) max_queries :
-    disj (IndCpaSecurity.IndCpaGame.IndCpaChallenger : nom_package)
-      (IndCpaDSim.IndCpaReduction A max_queries).
-  Proof.
-    rewrite /disj /=.
-    change (disj IndCpaSecurity.IndCpaGame.IndCpa_locs
-      (loc (IndCpaDSim.IndCpaReduction A max_queries))).
-    rewrite disjC -fseparate_disj.
-    exact: ind_cpa_reduction_outer_separate.
   Qed.
 
   Lemma fresh_fix_below_left_offset
@@ -1187,36 +983,6 @@ Module NoiseFloodingSecureGameReduction
     exact: Hkeys'.
   Qed.
 
-  Lemma ind_cpad_reduction_challenge_init_adv_support
-      (A : nom_package) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    supports_same_result_sim_decrypt_reduction_adv_opt A
-      (shared_complete_sample_coupling
-        ind_cpad_reduction_challenge_init_sample
-        ind_cpad_reduction_challenge_init_outL
-        ind_cpad_reduction_challenge_init_outR).
-  Proof.
-    move=> Houter outs Houts.
-    rewrite /shared_complete_sample_coupling in Houts.
-    have [os Hos Hinner] := @dinsupp_dlet R _ _ _ _ _ Houts.
-    case: os Hos Hinner=> [sample|] Hos Hinner.
-    - have Houts_eq : outs =
-          (Some (ind_cpad_reduction_challenge_init_outL sample),
-           Some (ind_cpad_reduction_challenge_init_outR sample)).
-        exact: in_dunit Hinner.
-      rewrite Houts_eq.
-      clear Hinner Houts_eq.
-      case: sample Hos=> [b [[pk evk] sk]] Hsample.
-      exact: (same_result_sim_decrypt_reduction_adv_opt_initialized
-        A b pk evk sk Houter
-        (ind_cpad_reduction_challenge_init_sample_keygen
-          b pk evk sk Hsample)).
-    - have -> : outs = (None, None).
-        exact: in_dunit Hinner.
-      by [].
-  Qed.
-
   Lemma ind_cpad_reduction_challenge_init_coupling_support_some outs :
     outs \in dinsupp ind_cpad_reduction_challenge_init_coupling ->
     exists b pk evk sk,
@@ -1249,16 +1015,6 @@ Module NoiseFloodingSecureGameReduction
       rewrite in_dinsupp completeE /=.
       rewrite ind_cpad_reduction_challenge_init_sample_weight subrr eqxx.
       by [].
-  Qed.
-
-  Lemma ind_cpad_reduction_challenge_init_adv_support_named
-      (A : nom_package) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    supports_same_result_sim_decrypt_reduction_adv_opt A
-      ind_cpad_reduction_challenge_init_coupling.
-  Proof.
-    exact: ind_cpad_reduction_challenge_init_adv_support.
   Qed.
 
   Lemma ind_cpad_reduction_challenge_init_coupling_margins :
@@ -1302,23 +1058,6 @@ Module NoiseFloodingSecureGameReduction
       apply: eq_in_dlet=> // keys _ y''.
       case: keys=> [[pk evk] sk].
       by rewrite dlet_unit /reduction_initialized_heap !Pr_code_put Pr_code_ret.
-  Qed.
-
-  Lemma ind_cpad_reduction_challenge_init_adv_coupling
-      (A : nom_package) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    clean_coupling ind_cpad_reduction_challenge_init_coupling
-      (complete (Pr_code (ind_cpad_challenge_init_code tt) empty_heap))
-      (complete
-        (Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap)) /\
-    supports_same_result_sim_decrypt_reduction_adv_opt A
-      ind_cpad_reduction_challenge_init_coupling.
-  Proof.
-    move=> Houter.
-    split.
-    - exact: ind_cpad_reduction_challenge_init_coupling_margins.
-    - exact: ind_cpad_reduction_challenge_init_adv_support_named.
   Qed.
 
   Definition sim_decrypt_reduction_adv_continuation_witness
@@ -1472,77 +1211,6 @@ Module NoiseFloodingSecureGameReduction
       split.
       + exact: Hfx.
       + exact: Hrel.
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_bind
-      (A : nom_package) {in_t mid_t out_t : choice_type}
-      (progL progR : in_t -> raw_code mid_t)
-      (contL contR : mid_t -> raw_code out_t) :
-    sim_decrypt_reduction_adv_continuation_witness A progL progR ->
-    sim_decrypt_reduction_adv_continuation_witness A contL contR ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun x => y ← progL x ;; contL y)
-      (fun x => y ← progR x ;; contR y).
-  Proof.
-    move=> Hprog Hcont memL memR xL xR.
-    have [d0 [Hd0 Hprog_support_if]] := Hprog memL memR xL xR.
-    pose KL (ymem : mid_t * heap) := Pr_code (contL ymem.1) ymem.2.
-    pose KR (ymem : mid_t * heap) := Pr_code (contR ymem.1) ymem.2.
-    pose K :=
-      sim_decrypt_reduction_adv_continuation_kernel A contL contR Hcont.
-    exists (\dlet_(xy <- d0) K xy).
-    split.
-    - have Hbind := coupling_bind_kernel d0
-        (complete (Pr_code (progL xL) memL))
-        (complete (Pr_code (progR xR) memR))
-        K (complete_bind_kernel KL) (complete_bind_kernel KR)
-        Hd0
-        (sim_decrypt_reduction_adv_continuation_kernel_margins
-          A contL contR Hcont).
-      move: Hbind=> [HL HR].
-      split.
-      + move=> z.
-        rewrite HL.
-        rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
-        rewrite /KL Pr_code_bind.
-        by [].
-      + move=> z.
-        rewrite HR.
-        rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
-        rewrite /KR Pr_code_bind.
-        by [].
-    - move=> Hpre outs Houts.
-      have Hprog_support := Hprog_support_if Hpre.
-      have [xy Hxy Hinner] := @dinsupp_dlet R _ _ _ _ _ Houts.
-      have Hmid := Hprog_support xy Hxy.
-      clear Hxy.
-      case: xy Hmid Hinner=> [[ymemL|] [ymemR|]].
-      + case: ymemL=> yL memL'.
-        case: ymemR=> yR memR' Hmid Hinner.
-        have Hcont_pre :
-            same_input_sim_decrypt_reduction_adv_pre A
-              ((yL, memL'), (yR, memR')).
-          exact: (same_result_sim_decrypt_reduction_adv_opt_some_pre
-            A yL yR memL' memR' Hmid).
-        have Hsupport :
-            supports_same_result_sim_decrypt_reduction_adv_opt A
-              (K (Some (yL, memL'), Some (yR, memR'))).
-          rewrite /K.
-          exact: (sim_decrypt_reduction_adv_continuation_kernel_support
-            A contL contR Hcont yL yR memL' memR' Hcont_pre).
-        exact: (Hsupport outs Hinner).
-      + case: ymemL=> yL memL' Hmid.
-        by [].
-      + case: ymemR=> yR memR' Hmid.
-        by [].
-      + move=> _ Hinner.
-        have -> : outs = (None, None).
-          rewrite /K /sim_decrypt_reduction_adv_continuation_kernel
-            /complete_bind_fallback_coupling /complete_bind_kernel
-            /product_coupling in Hinner.
-          rewrite !dlet_unit in Hinner.
-        exact: in_dunit Hinner.
-        by [].
   Qed.
 
   Lemma sim_decrypt_reduction_adv_continuation_witness_bind_input
@@ -2084,229 +1752,6 @@ Module NoiseFloodingSecureGameReduction
         case: Hpre=> _ [Hrel _].
         move: Hrel_bool.
         by rewrite Hrel.
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_encrypt_prefix
-      (A : nom_package) max_queries {in_t : choice_type}
-      (x : message * message) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun _ : in_t =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_encrypt
-            (chProd message message) ciphertext) x)
-      (fun _ : in_t =>
-        code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_encrypt
-              (chProd message message) ciphertext) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle).
-  Proof.
-    move=> Houter.
-    exact: (sim_decrypt_reduction_adv_continuation_witness_oracle_prefix
-      A max_queries (in_t := in_t)
-      (mkopsig IndCpadGame.oracle_encrypt
-        (chProd message message) ciphertext) x
-      ind_cpad_encrypt_in_adv_import Houter
-      (ind_cpad_sim_decrypt_reduction_encrypt_resolve_outer_link_rel_ae
-        max_queries)).
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_eval1_prefix
-      (A : nom_package) max_queries {in_t : choice_type}
-      (x : unary_gate * nat) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun _ : in_t =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_eval1
-            (chProd unary_gate nat) ciphertext) x)
-      (fun _ : in_t =>
-        code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_eval1
-              (chProd unary_gate nat) ciphertext) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle).
-  Proof.
-    move=> Houter.
-    exact: (sim_decrypt_reduction_adv_continuation_witness_oracle_prefix
-      A max_queries (in_t := in_t)
-      (mkopsig IndCpadGame.oracle_eval1
-        (chProd unary_gate nat) ciphertext) x
-      ind_cpad_eval1_in_adv_import Houter
-      (ind_cpad_sim_decrypt_reduction_eval1_resolve_outer_link_rel_ae
-        max_queries)).
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_eval2_prefix
-      (A : nom_package) max_queries {in_t : choice_type}
-      (x : (binary_gate * nat) * nat) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun _ : in_t =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_eval2
-            (chProd (chProd binary_gate nat) nat) ciphertext) x)
-      (fun _ : in_t =>
-        code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_eval2
-              (chProd (chProd binary_gate nat) nat) ciphertext) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle).
-  Proof.
-    move=> Houter.
-    exact: (sim_decrypt_reduction_adv_continuation_witness_oracle_prefix
-      A max_queries (in_t := in_t)
-      (mkopsig IndCpadGame.oracle_eval2
-        (chProd (chProd binary_gate nat) nat) ciphertext) x
-      ind_cpad_eval2_in_adv_import Houter
-      (ind_cpad_sim_decrypt_reduction_eval2_resolve_outer_link_rel_ae
-        max_queries)).
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_decrypt_prefix
-      (A : nom_package) max_queries {in_t : choice_type}
-      (x : nat) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun _ : in_t =>
-        resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
-      (fun _ : in_t =>
-        code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle).
-  Proof.
-    move=> Houter.
-    exact: (sim_decrypt_reduction_adv_continuation_witness_oracle_prefix
-      A max_queries (in_t := in_t)
-      (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x
-      ind_cpad_decrypt_in_adv_import Houter
-      (ind_cpad_sim_decrypt_reduction_decrypt_resolve_outer_link_rel_ae
-        max_queries)).
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_encrypt_call
-      (A : nom_package) max_queries {in_t out_t : choice_type}
-      (x : message * message)
-      (contL contR : ciphertext -> in_t -> raw_code out_t) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    (forall c,
-      sim_decrypt_reduction_adv_continuation_witness A
-        (contL c) (contR c)) ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun inp =>
-        c ← resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_encrypt
-            (chProd message message) ciphertext) x ;;
-        contL c inp)
-      (fun inp =>
-        c ← code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_encrypt
-              (chProd message message) ciphertext) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle ;;
-        contR c inp).
-  Proof.
-    move=> Houter Hcont.
-    apply: sim_decrypt_reduction_adv_continuation_witness_bind_input.
-    - exact: (sim_decrypt_reduction_adv_continuation_witness_encrypt_prefix
-        A max_queries (in_t := in_t) x Houter).
-    - exact: Hcont.
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_eval1_call
-      (A : nom_package) max_queries {in_t out_t : choice_type}
-      (x : unary_gate * nat)
-      (contL contR : ciphertext -> in_t -> raw_code out_t) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    (forall c,
-      sim_decrypt_reduction_adv_continuation_witness A
-        (contL c) (contR c)) ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun inp =>
-        c ← resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_eval1
-            (chProd unary_gate nat) ciphertext) x ;;
-        contL c inp)
-      (fun inp =>
-        c ← code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_eval1
-              (chProd unary_gate nat) ciphertext) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle ;;
-        contR c inp).
-  Proof.
-    move=> Houter Hcont.
-    apply: sim_decrypt_reduction_adv_continuation_witness_bind_input.
-    - exact: (sim_decrypt_reduction_adv_continuation_witness_eval1_prefix
-        A max_queries (in_t := in_t) x Houter).
-    - exact: Hcont.
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_eval2_call
-      (A : nom_package) max_queries {in_t out_t : choice_type}
-      (x : (binary_gate * nat) * nat)
-      (contL contR : ciphertext -> in_t -> raw_code out_t) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    (forall c,
-      sim_decrypt_reduction_adv_continuation_witness A
-        (contL c) (contR c)) ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun inp =>
-        c ← resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_eval2
-            (chProd (chProd binary_gate nat) nat) ciphertext) x ;;
-        contL c inp)
-      (fun inp =>
-        c ← code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_eval2
-              (chProd (chProd binary_gate nat) nat) ciphertext) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle ;;
-        contR c inp).
-  Proof.
-    move=> Houter Hcont.
-    apply: sim_decrypt_reduction_adv_continuation_witness_bind_input.
-    - exact: (sim_decrypt_reduction_adv_continuation_witness_eval2_prefix
-        A max_queries (in_t := in_t) x Houter).
-    - exact: Hcont.
-  Qed.
-
-  Lemma sim_decrypt_reduction_adv_continuation_witness_decrypt_call
-      (A : nom_package) max_queries {in_t out_t : choice_type}
-      (x : nat)
-      (contL contR : chOption message -> in_t -> raw_code out_t) :
-    fseparate (loc (ind_cpa_reduction_moved_adversary A))
-      IndCpaSecurity.IndCpaGame.IndCpa_locs ->
-    (forall m,
-      sim_decrypt_reduction_adv_continuation_witness A
-        (contL m) (contR m)) ->
-    sim_decrypt_reduction_adv_continuation_witness A
-      (fun inp =>
-        m ← resolve (IndCpadSimDecryptOracle max_queries)
-          (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x ;;
-        contL m inp)
-      (fun inp =>
-        m ← code_link
-          (resolve (IndCpaDSim.IndCpadOracle max_queries)
-            (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)) x)
-          IndCpaSecurity.IndCpaGame.IndCpaOracle ;;
-        contR m inp).
-  Proof.
-    move=> Houter Hcont.
-    apply: sim_decrypt_reduction_adv_continuation_witness_bind_input.
-    - exact: (sim_decrypt_reduction_adv_continuation_witness_decrypt_prefix
-        A max_queries (in_t := in_t) x Houter).
-    - exact: Hcont.
   Qed.
 
   Lemma ind_cpad_sim_decrypt_reduction_resolve_outer_link_rel_ae

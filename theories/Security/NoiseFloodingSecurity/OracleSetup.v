@@ -157,33 +157,6 @@ Module NoiseFloodingSecureOracleSetup
     typeclasses eauto with ssprove_valid_db.
   Qed.
 
-  Lemma ind_cpad_encrypt_in_adv_import :
-    fhas IndCpadGame.IndCpadAdv_import
-      (mkopsig IndCpadGame.oracle_encrypt
-        (chProd message message) ciphertext).
-  Proof.
-    rewrite /IndCpadGame.IndCpadAdv_import.
-    fmap_solve.
-  Qed.
-
-  Lemma ind_cpad_eval1_in_adv_import :
-    fhas IndCpadGame.IndCpadAdv_import
-      (mkopsig IndCpadGame.oracle_eval1
-        (chProd unary_gate nat) ciphertext).
-  Proof.
-    rewrite /IndCpadGame.IndCpadAdv_import.
-    fmap_solve.
-  Qed.
-
-  Lemma ind_cpad_eval2_in_adv_import :
-    fhas IndCpadGame.IndCpadAdv_import
-      (mkopsig IndCpadGame.oracle_eval2
-        (chProd (chProd binary_gate nat) nat) ciphertext).
-  Proof.
-    rewrite /IndCpadGame.IndCpadAdv_import.
-    fmap_solve.
-  Qed.
-
   Lemma ind_cpad_decrypt_in_adv_import :
     fhas IndCpadGame.IndCpadAdv_import
       (mkopsig IndCpadGame.oracle_decrypt nat (chOption message)).
@@ -252,22 +225,6 @@ Module NoiseFloodingSecureOracleSetup
       mem out Hbody_valid Houter_valid HKsim HKouter Hout).
   Qed.
 
-  Definition trivial_heap_invariant : pred heap := fun _ => true.
-
-  Lemma trivial_heap_invariant_depends_only_on K :
-    heap_pred_depends_only_on K trivial_heap_invariant.
-  Proof. by move=> mem0 mem1 _. Qed.
-
-  Lemma package_preserves_trivial_heap_invariant_except
-      M P fn :
-    package_preserves_heap_pred_except
-      M P fn trivial_heap_invariant.
-  Proof.
-    move=> o x _ _.
-    rewrite /hoareJudgment /trivial_heap_invariant.
-    by move=> y mem _ out _.
-  Qed.
-
   Definition same_input_invariant_pre
       {A : choice_type} (call_invariant : pred heap) :
     pred ((A * heap) * (A * heap)) :=
@@ -275,10 +232,6 @@ Module NoiseFloodingSecureOracleSetup
       let '((xL, memL), (xR, memR)) := inps in
       (xL == xR) && (memL == memR) &&
       call_invariant memL.
-
-  Definition same_input_heap_pre {A : choice_type} :
-    pred ((A * heap) * (A * heap)) :=
-    same_input_invariant_pre trivial_heap_invariant.
 
   Definition same_game_output_opt
     (outs : option (bool * heap) * option (bool * heap)) : bool :=
@@ -351,30 +304,6 @@ Module NoiseFloodingSecureOracleSetup
     b = true -> b.
   Proof. by move=> ->. Qed.
 
-  Lemma nth_valid_eq_true_irrel {A} (lst : seq A) n
-      (Htrue : (n < length lst)%N = true)
-      (H : (n < length lst)%N) :
-    nth_valid lst n (bool_eq_true_is_true _ Htrue) =
-    nth_valid lst n H.
-  Proof.
-    exact: nth_valid_irrel.
-  Qed.
-
-  Lemma dmargin_fst_assertD_ext
-      {out_t : choice_type} (b : bool)
-      (kL kR : b = true -> raw_code out_t) memL memR :
-    (forall Hb,
-      dmargin fst (Pr_code (kL Hb) memL) =1
-      dmargin fst (Pr_code (kR Hb) memR)) ->
-    dmargin fst (Pr_code (@assertD out_t b kL) memL) =1
-    dmargin fst (Pr_code (@assertD out_t b kR) memR).
-  Proof.
-    case: b kL kR=> kL kR Hcont out;
-      rewrite !dmarginE /assertD /=.
-    - exact: (Hcont erefl out).
-    - by rewrite !Pr_code_fail !dlet_null_ext.
-  Qed.
-
   Lemma Pr_code_assertD_true_ext
       {out_t : choice_type} (b : bool)
       (k : b = true -> raw_code out_t) (Hb : b = true) mem :
@@ -384,51 +313,6 @@ Module NoiseFloodingSecureOracleSetup
     - rewrite /assertD /=.
       by rewrite (eq_irrelevance Hb erefl).
     - discriminate Hb.
-  Qed.
-
-  Lemma Pr_code_assertD_false_ext
-      {out_t : choice_type} (b : bool)
-      (k : b = true -> raw_code out_t) mem :
-    b = false ->
-    Pr_code (@assertD out_t b k) mem =1 dnull.
-  Proof.
-    case: b k=> k Hb out.
-    - discriminate Hb.
-    - by rewrite /assertD /= Pr_code_fail.
-  Qed.
-
-  Lemma dmargin_fst_assertD_ext_eq
-      {out_t : choice_type} (bL bR : bool)
-      (kL : bL = true -> raw_code out_t)
-      (kR : bR = true -> raw_code out_t) memL memR :
-    bL = bR ->
-    (forall HbL HbR,
-      dmargin fst (Pr_code (kL HbL) memL) =1
-      dmargin fst (Pr_code (kR HbR) memR)) ->
-    dmargin fst (Pr_code (@assertD out_t bL kL) memL) =1
-    dmargin fst (Pr_code (@assertD out_t bR kR) memR).
-  Proof.
-    case: bL kL=> kL; case: bR kR=> kR Hguard Hcont out;
-      rewrite !dmarginE /assertD /= in Hguard *.
-    - exact: (Hcont erefl erefl out).
-    - discriminate Hguard.
-    - discriminate Hguard.
-    - by rewrite !Pr_code_fail !dlet_null_ext.
-  Qed.
-
-  Lemma dinsupp_assertD_intro
-      {out_t : choice_type} (b : bool)
-      (cont : b = true -> raw_code out_t) mem out
-      (Hb : b = true) :
-    out \in dinsupp (Pr_code (cont Hb) mem) ->
-    out \in dinsupp (Pr_code (@assertD out_t b cont) mem).
-  Proof.
-    case: b cont Hb=> cont Hb Hsupp.
-    - rewrite /assertD /=.
-      move: Hsupp.
-      rewrite (eq_irrelevance Hb erefl).
-      by [].
-    - by [].
   Qed.
 
   Lemma assertD_same_guard_coupling
@@ -488,98 +372,6 @@ Module NoiseFloodingSecureOracleSetup
         by rewrite lerBlDr lerDl.
   Qed.
 
-  Lemma shared_sample_relation_coupling
-      {sample_t outL_t outR_t : choice_type}
-      (D : {distr sample_t / R})
-      (outL : sample_t -> outL_t * heap)
-      (outR : sample_t -> outR_t * heap)
-      (progL : raw_code outL_t) (progR : raw_code outR_t)
-      memL memR
-      (post : pred (option (outL_t * heap) * option (outR_t * heap))) :
-    dmargin outL D =1 Pr_code progL memL ->
-    dmargin outR D =1 Pr_code progR memR ->
-    (forall x, x \in dinsupp D -> post (Some (outL x), Some (outR x))) ->
-    post (None, None) ->
-    exists d,
-      clean_coupling d (complete (Pr_code progL memL))
-        (complete (Pr_code progR memR)) /\
-      \P_[d] post >= 1.
-  Proof.
-    move=> Hleft Hright Hpost Hnone.
-    exists (shared_complete_sample_coupling D outL outR).
-    split.
-    - have [HmarginL HmarginR] :=
-        shared_complete_sample_coupling_margins D outL outR.
-      split.
-      + move=> z.
-        rewrite HmarginL.
-        exact: (complete_distr_ext _ _ Hleft z).
-      + move=> z.
-        rewrite HmarginR.
-        exact: (complete_distr_ext _ _ Hright z).
-    - exact: (shared_complete_sample_coupling_pr_ge1 D outL outR post
-        Hpost Hnone).
-  Qed.
-
-  Lemma additiveErrorSameResultTvdEqRule
-      {inL_t inR_t out_t : choice_type}
-      (progL : inL_t -> raw_code out_t)
-      (progR : inR_t -> raw_code out_t)
-      (pre : pred ((inL_t * heap) * (inR_t * heap)))
-      (ε : R) :
-    0 <= ε ->
-    (forall memL memR xL xR,
-      pre ((xL, memL), (xR, memR)) ->
-      total_variation
-        (complete (dmargin fst (Pr_code (progL xL) memL)))
-        (complete (dmargin fst (Pr_code (progR xR) memR))) <= ε) ->
-    ⊨AE ⦃ pre ⦄
-      progL ≈( ε ) progR
-    ⦃ same_result_opt ⦄.
-  Proof.
-    move=> Heps Htv.
-    split; first exact: Heps.
-    move=> memL memR xL xR Hpre.
-    set outL := Pr_code (progL xL) memL.
-    set outR := Pr_code (progR xR) memR.
-    pose strip (out : option (out_t * heap)) : option out_t :=
-      omap fst out.
-    have Htv_projected :
-        total_variation
-          (dmargin strip (complete outL))
-          (dmargin strip (complete outR)) <= ε.
-      rewrite (total_variation_ext
-        (dmargin strip (complete outL))
-        (complete (dmargin fst outL))
-        (dmargin strip (complete outR))
-        (complete (dmargin fst outR))).
-      exact: Htv.
-      + move=> z.
-        rewrite /strip.
-        change (dmargin (omap fst) (complete outL) z =
-          complete (dmargin fst outL) z).
-        exact: dmargin_omap_complete.
-      + move=> z.
-        rewrite /strip.
-        change (dmargin (omap fst) (complete outR) z =
-          complete (dmargin fst outR) z).
-        exact: dmargin_omap_complete.
-    have [d [HdL [HdR Hprob]]] :=
-      projected_total_variation_coupling strip
-        (complete outL) (complete outR) ε
-        (complete_dweight outL) (complete_dweight outR)
-        Htv_projected.
-    exists d.
-    split.
-    - split.
-      + exact: HdL.
-      + exact: HdR.
-    - apply: (le_trans Hprob).
-      apply: subset_pr=> xy Hxy.
-      case: xy Hxy=> outL' outR'.
-      by rewrite /same_result_opt /strip.
-  Qed.
-
   Definition selected_plaintext
       (b : bool) (row : IndCpadGame.challenger_table_row) : message :=
     let '(m0, m1, _) := row in if b then m1 else m0.
@@ -605,13 +397,6 @@ Module NoiseFloodingSecureOracleSetup
     | None, None, None => table == [::]
     | _, _, _ => false
     end.
-
-  Lemma challenge_heap_valid_empty :
-    challenge_heap_valid empty_heap.
-  Proof.
-    rewrite /challenge_heap_valid !get_empty_heap /=.
-    by rewrite eqxx.
-  Qed.
 
   Definition challenge_initialized_heap
       (b : bool) (pk : pk_t) (evk : evk_t) (sk : sk_t) : heap :=
@@ -689,91 +474,6 @@ Module NoiseFloodingSecureOracleSetup
     by move/andP=> [/eqP -> _]; rewrite /same_result_opt /= eqxx.
   Qed.
 
-  Lemma additiveErrorSeqSameResultSimDecryptReductionRule
-      {inL_t inR_t mid_t out_t : choice_type}
-      (progL : inL_t -> raw_code mid_t)
-      (progR : inR_t -> raw_code mid_t)
-      (contL contR : mid_t -> raw_code out_t)
-      (pre : pred ((inL_t * heap) * (inR_t * heap))) :
-    ⊨AE ⦃ pre ⦄
-      progL
-      ≈( 0 )
-      progR
-    ⦃ same_result_sim_decrypt_reduction_opt ⦄ ->
-    ⊨AE ⦃ same_input_sim_decrypt_reduction_pre ⦄
-      contL
-      ≈( 0 )
-      contR
-    ⦃ same_result_sim_decrypt_reduction_opt ⦄ ->
-    ⊨AE ⦃ pre ⦄
-      (fun xL => yL ← progL xL ;; contL yL)
-      ≈( 0 )
-      (fun xR => yR ← progR xR ;; contR yR)
-    ⦃ same_result_sim_decrypt_reduction_opt ⦄.
-  Proof.
-    move=> Hprefix Hcont.
-    split; first exact: lexx.
-    move=> memL memR xL xR Hpre.
-    have [d0 [Hd0 Hmidprob]] := Hprefix.2 memL memR xL xR Hpre.
-    pose mid := (@same_input_sim_decrypt_reduction_pre mid_t).
-    pose post := (@same_result_sim_decrypt_reduction_opt out_t).
-    pose KL (ymem : mid_t * heap) := Pr_code (contL ymem.1) ymem.2.
-    pose KR (ymem : mid_t * heap) := Pr_code (contR ymem.1) ymem.2.
-    pose K := additiveErrorSeqKernel contL contR mid post 0 Hcont.2.
-    exists (\dlet_(xy <- d0) K xy).
-    split.
-    - have Hbind := coupling_bind_kernel d0
-        (complete (Pr_code (progL xL) memL))
-        (complete (Pr_code (progR xR) memR))
-        K (complete_bind_kernel KL) (complete_bind_kernel KR)
-        Hd0
-        (additiveErrorSeqKernel_margins
-          contL contR mid post 0 Hcont.2).
-      move: Hbind=> [HL HR].
-      split.
-      + move=> z.
-        rewrite HL.
-        rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
-        rewrite /KL Pr_code_bind.
-        by [].
-      + move=> z.
-        rewrite HR.
-        rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
-        rewrite /KR Pr_code_bind.
-        by [].
-    - have Hprob :
-          \P_[\dlet_(xy <- d0) K xy] post >= 1 - (0 + 0).
-        apply: (pr_dlet_lower_bound_good d0 K
-          (@same_result_sim_decrypt_reduction_opt mid_t) post 0 0).
-        + exact: lexx.
-        + exact: lexx.
-        + exact: Hmidprob.
-        + move=> xy Hxy.
-          case: xy Hxy=> [[ymemL|] [ymemR|]] /=.
-          * case: ymemL=> yL memL'.
-            case: ymemR=> yR memR' /= Hmid.
-            have Hgood :
-                additiveErrorSeqGood mid
-                  (Some (yL, memL'), Some (yR, memR')).
-              by rewrite /additiveErrorSeqGood /mid
-                /same_input_sim_decrypt_reduction_pre.
-            exact: (additiveErrorSeqKernel_event
-              contL contR mid post 0 Hcont.2 _ Hgood).
-          * by case: ymemL.
-          * by case: ymemR.
-          * have HKnone :
-                K (None, None) =1 dunit (None, None).
-              move=> z.
-              rewrite /K /additiveErrorSeqKernel
-                /complete_bind_fallback_coupling /complete_bind_kernel
-                /product_coupling.
-              by rewrite !dlet_unit.
-            rewrite (pr_ext _ _ post HKnone).
-            rewrite pr_dunit /post /same_result_sim_decrypt_reduction_opt /=.
-            by rewrite lerBlDr lerDl.
-      by rewrite addr0 in Hprob.
-  Qed.
-
   Lemma challenge_initialized_heap_bit b pk evk sk :
     get_heap (challenge_initialized_heap b pk evk sk)
       IndCpadGame.bit_addr = b.
@@ -840,110 +540,6 @@ Module NoiseFloodingSecureOracleSetup
       IndCpadGame.decrypt_count_addr = 0.
   Proof.
     rewrite /challenge_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_bit b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaSecurity.IndCpaGame.bit_addr = b.
-  Proof.
-    rewrite /reduction_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_pk_outer b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaSecurity.IndCpaGame.pk_addr = Some pk.
-  Proof.
-    rewrite /reduction_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_evk_outer b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaSecurity.IndCpaGame.evk_addr = Some evk.
-  Proof.
-    rewrite /reduction_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_ready b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaDSim.ready_addr = true.
-  Proof.
-    rewrite /reduction_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_pk_sim b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaDSim.pk_addr = Some pk.
-  Proof.
-    rewrite /reduction_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_evk_sim b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaDSim.evk_addr = Some evk.
-  Proof.
-    rewrite /reduction_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_table b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaDSim.table_addr = [::].
-  Proof.
-    rewrite /reduction_initialized_heap.
-    repeat first [
-      rewrite get_set_heap_eq
-    | rewrite get_set_heap_neq; [| neq_loc_auto]
-    | rewrite get_empty_heap
-    ].
-    by [].
-  Qed.
-
-  Lemma reduction_initialized_heap_decrypt_count b pk evk :
-    get_heap (reduction_initialized_heap b pk evk)
-      IndCpaDSim.decrypt_count_addr = 0.
-  Proof.
-    rewrite /reduction_initialized_heap.
     repeat first [
       rewrite get_set_heap_eq
     | rewrite get_set_heap_neq; [| neq_loc_auto]
@@ -1268,20 +864,6 @@ Module NoiseFloodingSecureOracleSetup
         m0i m0j c' Hkeys Hrow_i Hrow_j Hc').
   Qed.
 
-  Lemma table_valid_for_branch_decrypt_row sk b table i
-      (i_in_range : (i < length table)%N) m c :
-    table_valid_for_branch sk b table ->
-    nth_valid table i i_in_range = (m, m, c) ->
-    is_underlying_plaintext sk c m.
-  Proof.
-    move=> Htable Hnth.
-    have Hrow :=
-      table_valid_for_branch_nth sk b table i i_in_range Htable.
-    clear Htable.
-    move: Hrow.
-    by rewrite Hnth /row_valid_for_branch /selected_plaintext /=; case: b.
-  Qed.
-
   Lemma row_valid_for_branch_equal_messages_some sk b m c :
     row_valid_for_branch sk b (m, m, c) ->
     exists data error_bound,
@@ -1316,34 +898,6 @@ Module NoiseFloodingSecureOracleSetup
     - exact: Hrel.
     - apply: challenge_heap_valid_set_decrypt_count.
       exact: (sim_decrypt_reduction_heap_rel_challenge_valid Hrel).
-  Qed.
-
-  Lemma challenge_heap_valid_good_keys mem pk evk sk :
-    challenge_heap_valid mem ->
-    get_heap mem IndCpadGame.pk_addr = Some pk ->
-    get_heap mem IndCpadGame.evk_addr = Some evk ->
-    get_heap mem IndCpadGame.sk_addr = Some sk ->
-    good_keys pk evk sk.
-  Proof.
-    rewrite /challenge_heap_valid=> Hinv Hpk Hevk Hsk.
-    move: Hinv.
-    rewrite Hpk Hevk Hsk=> /andP [].
-    by [].
-  Qed.
-
-  Lemma challenge_heap_valid_table_for_branch mem pk evk sk :
-    challenge_heap_valid mem ->
-    get_heap mem IndCpadGame.pk_addr = Some pk ->
-    get_heap mem IndCpadGame.evk_addr = Some evk ->
-    get_heap mem IndCpadGame.sk_addr = Some sk ->
-    table_valid_for_branch sk
-      (get_heap mem IndCpadGame.bit_addr)
-      (get_heap mem IndCpadGame.table_addr).
-  Proof.
-    rewrite /challenge_heap_valid=> Hinv Hpk Hevk Hsk.
-    move: Hinv.
-    rewrite Hpk Hevk Hsk=> /andP [].
-    by [].
   Qed.
 
   Lemma challenge_heap_valid_pk_initialized mem pk :
@@ -1407,26 +961,6 @@ Module NoiseFloodingSecureOracleSetup
     rewrite Hsk.
     move=> /andP [Hkeys Htable].
     by exists pk, evk.
-  Qed.
-
-  Lemma challenge_heap_valid_decrypt_row mem pk evk sk i
-      (i_in_range :
-        (i < length (get_heap mem IndCpadGame.table_addr))%N) m c :
-    challenge_heap_valid mem ->
-    get_heap mem IndCpadGame.pk_addr = Some pk ->
-    get_heap mem IndCpadGame.evk_addr = Some evk ->
-    get_heap mem IndCpadGame.sk_addr = Some sk ->
-    nth_valid (get_heap mem IndCpadGame.table_addr) i i_in_range =
-      (m, m, c) ->
-    is_underlying_plaintext sk c m.
-  Proof.
-    move=> Hinv Hpk Hevk Hsk Hnth.
-    have Htable := challenge_heap_valid_table_for_branch
-      mem pk evk sk Hinv Hpk Hevk Hsk.
-    exact: (table_valid_for_branch_decrypt_row
-      sk (get_heap mem IndCpadGame.bit_addr)
-      (get_heap mem IndCpadGame.table_addr) i i_in_range
-      m c Htable Hnth).
   Qed.
 
   Lemma challenge_heap_valid_set_table_encrypt
