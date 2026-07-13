@@ -544,8 +544,8 @@ Module NoiseFloodingSecure
     IndCpaDSim.IndCpaReduction_locs A max_queries.
 
   Definition security_bound (A : nom_package) (max_queries : nat) :=
-    IndCpaSecurity.IndCpaGame.winning_probability
-      (ind_cpa_reduction A max_queries) +
+    let B := ind_cpa_reduction A max_queries in
+    IndCpaSecurity.IndCpaGame.winning_probability B +
       security_loss dim max_queries gaussian_width_multiplier.
 
   Definition ind_cpad_game_code
