@@ -61,48 +61,6 @@ Definition additiveErrorRawJudgment
 Notation "⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄" :=
   (additiveErrorRawJudgment progL progR pre post ε) : AeNotations.
 
-Lemma additiveErrorCoupleRule
-  {inL_t inR_t outL_t outR_t : ord_choiceType}
-  (progL : inL_t -> raw_code outL_t)
-  (progR : inR_t -> raw_code outR_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (post : pred (option (outL_t * heap) * option (outR_t * heap)))
-  (ε : R)
-  (wit : forall memL memR xL xR,
-      pre ((xL, memL), (xR, memR)) ->
-      {distr _ / R}) :
-  0 <= ε ->
-  (forall memL memR xL xR Hpre,
-    let out1 := Pr_code (progL xL) memL in
-    let out2 := Pr_code (progR xR) memR in
-    clean_coupling (wit memL memR xL xR Hpre)
-      (complete out1) (complete out2)) ->
-  (forall memL memR xL xR Hpre,
-    \P_[ wit memL memR xL xR Hpre ] post >= 1 - ε) ->
-  ⊨AE ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄.
-Proof.
-move=> Heps Hcoupling Hpost.
-split; first exact: Heps.
-move=> memL memR xL xR Hpre.
-exists (wit memL memR xL xR Hpre).
-split.
-- exact: Hcoupling.
-- exact: Hpost.
-Qed.
-
-Lemma additiveErrorRawEpsNonneg
-  {inL_t inR_t outL_t outR_t : ord_choiceType}
-  (progL : inL_t -> raw_code outL_t)
-  (progR : inR_t -> raw_code outR_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (post : pred ((outL_t * heap) * (outR_t * heap)))
-  (ε : R) :
-  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ post ⦄ ->
-  0 <= ε.
-Proof.
-by move=> [Heps _].
-Qed.
-
 Lemma additiveErrorEpsNonneg
   {inL_t inR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code outL_t)
@@ -147,62 +105,6 @@ move=> HD [x|].
     by rewrite completeE /= HD subrr.
   move=> y.
   by rewrite dunit1E mulr0.
-Qed.
-
-Lemma additiveErrorRawTvdEqTotalRule
-  {inL_t inR_t out_t : ord_choiceType}
-  (progL : inL_t -> raw_code out_t)
-  (progR : inR_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (ε : R) :
-  0 <= ε ->
-  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
-    dweight (Pr_code (progL xL) memL) = 1) ->
-  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
-    dweight (Pr_code (progR xR) memR) = 1) ->
-  (forall memL memR xL xR, pre ((xL, memL), (xR, memR)) ->
-    total_variation (Pr_code (progL xL) memL)
-                    (Pr_code (progR xR) memR) <= ε) ->
-  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃
-    fun outs =>
-      let '((y_1, m_1'), (y_2, m_2')) := outs in
-      (y_1 == y_2) && (m_1' == m_2') ⦄.
-Proof.
-move=> Heps HweightL HweightR Htv.
-split; first exact: Heps.
-move=> memL memR xL xR Hpre.
-set outL := Pr_code (progL xL) memL.
-set outR := Pr_code (progR xR) memR.
-have HoutL : dweight outL = 1 by exact: (HweightL memL memR xL xR Hpre).
-have HoutR : dweight outR = 1 by exact: (HweightR memL memR xL xR Hpre).
-have [d [HdL [HdR Hprob]]] :=
-  maximal_coupling_total_variation outL outR ε
-    HoutL HoutR (Htv _ _ _ _ Hpre).
-pose lift (xy : (out_t * heap) * (out_t * heap)) :=
-  (Some xy.1, Some xy.2).
-exists (dmargin lift d).
-split.
-- split.
-  + move=> z.
-    rewrite (dmargin_comp fst lift d z).
-    change (dmargin (fun xy : (out_t * heap) * (out_t * heap) =>
-      Some xy.1) d z = complete outL z).
-    rewrite -(dmargin_comp (@Some (out_t * heap)) fst d z).
-    rewrite (dmargin_ext (@Some (out_t * heap)) _ _ HdL z).
-    exact: dmargin_some.
-  + move=> z.
-    rewrite (dmargin_comp snd lift d z).
-    change (dmargin (fun xy : (out_t * heap) * (out_t * heap) =>
-      Some xy.2) d z = complete outR z).
-    rewrite -(dmargin_comp (@Some (out_t * heap)) snd d z).
-    rewrite (dmargin_ext (@Some (out_t * heap)) _ _ HdR z).
-    exact: dmargin_some.
-- apply: (le_trans Hprob).
-  rewrite pr_dmargin.
-  apply: subset_pr=> xy.
-  case: xy=> [[yL memL'] [yR memR']] /= Hxy.
-  rewrite /lift_loss_post /=.
-  exact: Hxy.
 Qed.
 
 Definition same_output_heap_opt {out_t : choice_type}
@@ -492,41 +394,6 @@ have Hthreshold : 1 - ε' <= 1 - ε by lra.
 exact: (le_trans Hthreshold (le_trans Hprob Hmono)).
 Qed.
 
-Lemma additiveErrorRawReflTotalRule
-  {in_t out_t : ord_choiceType}
-  (prog : in_t -> raw_code out_t)
-  (pre : pred ((in_t * heap) * (in_t * heap))) :
-  (forall memL memR xL xR,
-    pre ((xL, memL), (xR, memR)) -> xL = xR /\ memL = memR) ->
-  (forall memL memR xL xR,
-    pre ((xL, memL), (xR, memR)) ->
-    dweight (Pr_code (prog xL) memL) = 1) ->
-  ⊨AE_raw ⦃ pre ⦄ prog ≈( 0 ) prog ⦃ fun outs => outs.1.1 == outs.2.1 ⦄.
-Proof.
-move=> Hsame Hweight.
-apply: (additiveErrorRawConseqRule
-  prog prog pre pre
-  (fun outs =>
-    let '((y_1, m_1'), (y_2, m_2')) := outs in
-    (y_1 == y_2) && (m_1' == m_2'))
-  (fun outs => outs.1.1 == outs.2.1) 0 0).
-- by [].
-- case=> [[yL memL] [yR memR]] /=.
-  by move/andP=> [/eqP -> _]; rewrite eqxx.
-- exact: lexx.
-apply: (additiveErrorRawTvdEqTotalRule prog prog pre 0).
-- exact: lexx.
-- exact: Hweight.
-- move=> memL memR xL xR Hpre.
-  have [Hx Hmem] := Hsame memL memR xL xR Hpre.
-  subst xR; subst memR.
-  exact: (Hweight memL memL xL xL Hpre).
-- move=> memL memR xL xR Hpre.
-  have [Hx Hmem] := Hsame memL memR xL xR Hpre.
-  subst xR; subst memR.
-  exact: total_variation_refl_le0.
-Qed.
-
 Definition additiveErrorSeqKernel
   {midL_t midR_t outL_t outR_t : ord_choiceType}
   (contL : midL_t -> raw_code outL_t)
@@ -698,51 +565,6 @@ split.
     by apply: eq_in_dlet=> // y _ z'; rewrite HdR.
 Qed.
 
-Lemma additiveErrorSeqRule_coupling
-  {inL_t inR_t midL_t midR_t outL_t outR_t : ord_choiceType}
-  (progL : inL_t -> raw_code midL_t)
-  (progR : inR_t -> raw_code midR_t)
-  (contL : midL_t -> raw_code outL_t)
-  (contR : midR_t -> raw_code outR_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (mid : pred ((midL_t * heap) * (midR_t * heap)))
-  (post : pred (option (outL_t * heap) * option (outR_t * heap)))
-  (ε ε' : R) memL memR xL xR :
-  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
-  ⊨AE ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
-  pre ((xL, memL), (xR, memR)) ->
-  exists d,
-    clean_coupling d
-      (complete (Pr_code (yL ← progL xL ;; contL yL) memL))
-      (complete (Pr_code (yR ← progR xR ;; contR yR) memR)).
-Proof.
-move=> [_ Hprefix] [_ Hcont] Hpre.
-have [d0 [Hd0 Hmidprob]] := Hprefix memL memR xL xR Hpre.
-pose KL (ymem : midL_t * heap) := Pr_code (contL ymem.1) ymem.2.
-pose KR (ymem : midR_t * heap) := Pr_code (contR ymem.1) ymem.2.
-pose K := additiveErrorSeqKernel contL contR mid post ε' Hcont.
-exists (\dlet_(xy <- d0) K xy).
-have Hbind := coupling_bind_kernel d0
-  (complete (Pr_code (progL xL) memL))
-  (complete (Pr_code (progR xR) memR))
-  K (complete_bind_kernel KL) (complete_bind_kernel KR)
-  Hd0 (additiveErrorSeqKernel_margins contL contR mid post ε' Hcont).
-move: Hbind=> [HL HR].
-split.
-- move=> z.
-  rewrite HL.
-  rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
-  rewrite /KL.
-  rewrite Pr_code_bind.
-  by [].
-- move=> z.
-  rewrite HR.
-  rewrite (complete_bind (Pr_code (progR xR) memR) KR z).
-  rewrite /KR.
-  rewrite Pr_code_bind.
-  by [].
-Qed.
-
 Lemma additiveErrorSeqRule
   {inL_t inR_t midL_t midR_t outL_t outR_t : ord_choiceType}
   (progL : inL_t -> raw_code midL_t)
@@ -805,91 +627,4 @@ split.
   + exact: Heps'.
   + exact: Hgoodprob.
   + exact: (additiveErrorSeqKernel_event contL contR mid post ε' Hcont).
-Qed.
-
-Lemma additiveErrorRawSeqRule
-  {inL_t inR_t midL_t midR_t outL_t outR_t : ord_choiceType}
-  (progL : inL_t -> raw_code midL_t)
-  (progR : inR_t -> raw_code midR_t)
-  (contL : midL_t -> raw_code outL_t)
-  (contR : midR_t -> raw_code outR_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (mid : pred ((midL_t * heap) * (midR_t * heap)))
-  (post : pred ((outL_t * heap) * (outR_t * heap)))
-  (ε ε' : R) :
-  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ mid ⦄ ->
-  ⊨AE_raw ⦃ mid ⦄ contL ≈( ε' ) contR ⦃ post ⦄ ->
-  ⊨AE_raw ⦃ pre ⦄
-    (fun xL => yL ← progL xL ;; contL yL)
-    ≈( ε + ε' )
-    (fun xR => yR ← progR xR ;; contR yR)
-  ⦃ post ⦄.
-Proof.
-exact: additiveErrorSeqRule.
-Qed.
-
-Lemma additiveErrorRawTvBound
-  {inL_t inR_t out_t : ord_choiceType}
-  (progL : inL_t -> raw_code out_t)
-  (progR : inR_t -> raw_code out_t)
-  (pre : pred ((inL_t * heap) * (inR_t * heap)))
-  (ε : R) memL memR xL xR :
-	  ⊨AE_raw ⦃ pre ⦄ progL ≈( ε ) progR ⦃ fun outs => outs.1.1 == outs.2.1 ⦄ ->
-	  pre ((xL, memL), (xR, memR)) ->
-	  total_variation (dmargin fst (Pr_code (progL xL) memL))
-	                  (dmargin fst (Pr_code (progR xR) memR)) <= ε.
-Proof.
-move=> [_ Hae] Hpre.
-move: (Hae memL memR xL xR Hpre)=> [d [Hd Hpost]].
-set outL := Pr_code (progL xL) memL.
-set outR := Pr_code (progR xR) memR.
-pose strip (out : option (out_t * heap)) : option out_t := omap fst out.
-pose project (xy : option (out_t * heap) * option (out_t * heap)) :=
-  (strip xy.1, strip xy.2).
-pose d' := dmargin project d.
-have HdL : dmargin fst d =1 complete outL.
-  move: Hd=> [HdL _] z.
-  by rewrite -HdL.
-have HdR : dmargin snd d =1 complete outR.
-  move: Hd=> [_ HdR] z.
-  by rewrite -HdR.
-have Hd'L :
-    dmargin fst d' =1 complete (dmargin fst outL).
-  move=> z.
-  rewrite /d'.
-  rewrite (dmargin_comp fst project d z).
-  rewrite -(dmargin_comp strip fst d z).
-  rewrite (dmargin_ext strip _ _ HdL z).
-  rewrite /strip.
-  exact: dmargin_omap_complete.
-have Hd'R :
-    dmargin snd d' =1 complete (dmargin fst outR).
-  move=> z.
-  rewrite /d'.
-  rewrite (dmargin_comp snd project d z).
-  rewrite -(dmargin_comp strip snd d z).
-  rewrite (dmargin_ext strip _ _ HdR z).
-  rewrite /strip.
-  exact: dmargin_omap_complete.
-have Hpost' :
-    \P_[d'] (fun xy => eq_op xy.1 xy.2) >= 1 - ε.
-  apply: (le_trans Hpost).
-  rewrite /d' pr_dmargin.
-  apply: subset_pr=> xy Hxy.
-  case: xy Hxy=> outL' outR' /= Hxy.
-  rewrite /lift_loss_post /=.
-  case: outL' Hxy=> [[yL memL']|] //= Hxy.
-  case: outR' Hxy=> [[yR memR']|] //= Hxy.
-have Hcomplete :
-    total_variation (complete (dmargin fst outL))
-                    (complete (dmargin fst outR)) <= ε.
-  apply: (exact_coupling_eq_pr_total_variation
-    d' (complete (dmargin fst outL)) (complete (dmargin fst outR)) ε).
-  - exact: complete_dweight.
-  - exact: complete_dweight.
-  - exact: Hd'L.
-  - exact: Hd'R.
-  - exact: Hpost'.
-exact: (le_trans (total_variation_complete_ge
-  (dmargin fst outL) (dmargin fst outR)) Hcomplete).
 Qed.
