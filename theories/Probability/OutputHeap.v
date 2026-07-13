@@ -200,33 +200,6 @@ Definition complete_output_heap {out_t : choice_type}
     {distr (option (nat * heap)) / R} :=
   complete (dmargin (@pack_output_heap out_t) out).
 
-Lemma total_variation_complete_output_heap_ge
-  {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
-  total_variation P Q <=
-  total_variation (complete_output_heap P) (complete_output_heap Q).
-Proof.
-rewrite (total_variation_pack_output_heap P Q).
-rewrite /complete_output_heap.
-set P' := dmargin _ P.
-set Q' := dmargin _ Q.
-rewrite /total_variation.
-apply: ler_wpM2l.
-  by lra.
-rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
-set S := fun x : option (nat * heap) => `|complete P' x - complete Q' x|.
-have HSnonneg : forall x, 0 <= S x by move=> x; exact: normr_ge0.
-have HSsumm : summable S.
-  apply/summable_abs.
-  apply: summableD; first exact: summable_mu.
-  by apply: summableN; exact: summable_mu.
-have -> : psum (fun x : nat * heap => `|P' x - Q' x|) =
-    psum (fun x : nat * heap => S (Some x)).
-  apply/eq_psum=> x.
-  by rewrite /S !completeE.
-rewrite (psum_option_split S HSnonneg HSsumm).
-by rewrite lerDl.
-Qed.
-
 Lemma total_variation_complete_output_heap
   {out_t : choice_type} (P Q : {distr (out_t * heap) / R}) :
   total_variation (complete P) (complete Q) =

@@ -65,13 +65,6 @@ rewrite rmorphN.
 lra.
 Qed.
 
-Lemma gaussian_weight_shift_int (center : int) (s : R) :
-  sum (fun x : int => gaussian s (x - center)) =
-  sum (gaussian s).
-Proof.
-exact: (sum_shift_sub_int (gaussian s) center).
-Qed.
-
 Lemma discrete_gaussian_translate (center : int) (s : R) :
   s > 0 ->
   dmargin (fun x => x - center) (discrete_gaussian center s) =1

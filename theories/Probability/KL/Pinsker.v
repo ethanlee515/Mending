@@ -32,13 +32,6 @@ apply: derivableM; first exact: derivable_id.
 exact: derivable_cst.
 Qed.
 
-Lemma is_derive_div_const (q x : R) :
-  is_derive x 1 (fun z : R => z / q) q^-1.
-Proof.
-apply: DeriveDef; first exact: derivable_div_const.
-by rewrite -derive1E deriv_div_const.
-Qed.
-
 Lemma derivable_ln_div_const (q x : R) :
   0 < q -> 0 < x -> derivable (fun z : R => ln (z / q)) x 1.
 Proof.
@@ -361,19 +354,6 @@ have H1qq : (1 - q) / (1 - q) = 1.
 by rewrite Hqq H1qq !ln1 !mulr0 addr0.
 Qed.
 
-Lemma deriv_bern_gap_diag (q : R) :
-  0 < q -> q < 1 ->
-  (fun z : R => bern_gap z q)^`()%classic q = 0.
-Proof.
-move=> Hq0 Hq1.
-rewrite deriv_bern_gap // /bern_gap_deriv_expr.
-have Hqq : q / q = 1 by rewrite divff ?lt0r_neq0.
-have H1qq : (1 - q) / (1 - q) = 1.
-  by rewrite divff ?subr_eq0; lra.
-rewrite Hqq H1qq !ln1.
-ring.
-Qed.
-
 Lemma bern_gap_deriv_expr_diag (q : R) :
   0 < q -> q < 1 ->
   bern_gap_deriv_expr q q = 0.
@@ -385,147 +365,6 @@ have H1qq : (1 - q) / (1 - q) = 1.
   by rewrite divff ?subr_eq0; lra.
 rewrite Hqq H1qq !ln1.
 ring.
-Qed.
-
-Lemma ln_lower_exp_ratio (r h : R) :
-  0 < r ->
-  r * h - sequences.expR h + 1 <= r * ln r - r + 1.
-Proof.
-move=> Hr.
-have Hpos : 0 < sequences.expR h / r by rewrite divr_gt0 ?expR_gt0.
-have Harg_gt : -1 < sequences.expR h / r - 1 by lra.
-have Hln := le_ln1Dx Harg_gt.
-have Harg : 1 + (sequences.expR h / r - 1) = sequences.expR h / r by ring.
-rewrite Harg in Hln.
-rewrite ln_div in Hln.
-- rewrite (@expRK R h) in Hln.
-  have Hscaled := ler_wpM2l (ltW Hr) Hln.
-  have Hcancel : r * (sequences.expR h / r) = sequences.expR h.
-    by rewrite mulrC divfK ?lt0r_neq0.
-  have Hrhs : r * (sequences.expR h / r - 1) = sequences.expR h - r.
-    by rewrite mulrBr Hcancel; ring.
-  rewrite Hrhs in Hscaled.
-  lra.
-- by rewrite qualifE /= expR_gt0.
-- by rewrite qualifE.
-Qed.
-
-Lemma kl_integrand_variational_pointwise (p q h : R) :
-  0 <= p ->
-  0 <= q ->
-  (q = 0 -> p = 0) ->
-  p * h - q * (sequences.expR h - 1) <=
-    p * ln (p / q) - p + q.
-Proof.
-move=> Hp Hq Hac.
-case Hq0: (q == 0).
-  have Hp0 : p = 0 by exact: Hac (eqP Hq0).
-  rewrite (eqP Hq0) Hp0 !mul0r sub0r addr0.
-  have Hexp_nonneg : 0 <= sequences.expR h by exact: expR_ge0.
-  lra.
-case Hp0: (p == 0).
-  rewrite (eqP Hp0) mul0r.
-  have Hqpos : 0 < q by rewrite lt_def Hq Hq0.
-  have Hexp_nonneg : 0 <= sequences.expR h by exact: expR_ge0.
-  have Hprod : 0 <= q * sequences.expR h.
-    exact: mulr_ge0 Hq Hexp_nonneg.
-  lra.
-have Hqpos : 0 < q by rewrite lt_def Hq Hq0.
-have Hppos : 0 < p by rewrite lt_def Hp Hp0.
-pose r := p / q.
-have Hrpos : 0 < r by rewrite /r divr_gt0.
-have Hineq := ln_lower_exp_ratio r h Hrpos.
-have Hscaled := ler_wpM2l (ltW Hqpos) Hineq.
-have HpE : p = q * r by rewrite /r mulrC divfK ?lt0r_neq0.
-rewrite HpE.
-have Hscaled_lhs :
-    q * (r * h - sequences.expR h + 1) =
-    q * r * h - q * (sequences.expR h - 1) by ring.
-have Hscaled_rhs :
-    q * (r * ln r - r + 1) =
-    q * r * ln r - q * r + q by ring.
-rewrite Hscaled_lhs Hscaled_rhs in Hscaled.
-have Hratio : q * r / q = r.
-  by rewrite [q * r]mulrC divfK ?lt0r_neq0.
-rewrite Hratio.
-exact: Hscaled.
-Qed.
-
-Lemma kl_variational_bound {T : choiceType} (P Q : {distr T / R})
-    (h : T -> R) :
-  finite_kl P Q ->
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  summable (fun x => P x * h x) ->
-  summable (fun x => Q x * (sequences.expR (h x) - 1)) ->
-  sum (fun x => P x * h x) -
-    sum (fun x => Q x * (sequences.expR (h x) - 1)) <= δ_KL P Q.
-Proof.
-move=> Hfin HP HQ HsummPh HsummQe.
-have Hac := finite_kl_absolute_continuous P Q Hfin.
-pose F := fun x : T =>
-  P x * h x - Q x * (sequences.expR (h x) - 1).
-pose G := fun x : T =>
-  P x * ln (P x / Q x) - P x + Q x.
-have HsummF : summable F.
-  apply: (eq_summable
-    (S1 := (fun x => P x * h x) \+
-      (fun x => - (Q x * (sequences.expR (h x) - 1))))).
-    by move=> x; rewrite /F /=; ring.
-  apply: summableD; first exact: HsummPh.
-  exact: summableN.
-have HsummG : summable G.
-  apply: (eq_summable
-    (S1 := (fun x => P x * ln (P x / Q x)) \+
-      ((fun x => - P x) \+ Q))).
-    by move=> x; rewrite /G /=; ring.
-  apply: summableD; first exact: finite_kl_summable.
-  apply: summableD; first exact: summableN.
-  exact: summable_mu.
-have Hpoint x : F x <= G x.
-  rewrite /F /G.
-  exact: (kl_integrand_variational_pointwise
-    (P x) (Q x) (h x) (ge0_mu P x) (ge0_mu Q x) (Hac x)).
-have Hle := le_sum HsummF HsummG Hpoint.
-rewrite /F in Hle.
-rewrite (@sumD R T (fun x => P x * h x)
-  (fun x => - (Q x * (sequences.expR (h x) - 1)))
-  HsummPh (summableN HsummQe)) in Hle.
-have HGsum :
-    sum G =
-    sum ((fun x => P x * ln (P x / Q x)) \+
-      ((fun x : T => - P x) \+ Q)).
-  apply/eq_sum=> x.
-  by rewrite /G /=; ring.
-rewrite HGsum in Hle.
-have HsummNPQ : summable ((fun x : T => - P x) \+ Q).
-  apply: summableD; first exact: summableN.
-  exact: summable_mu.
-rewrite (@sumD R T (fun x => P x * ln (P x / Q x))
-  ((fun x : T => - P x) \+ Q)
-  (finite_kl_summable P Q Hfin) HsummNPQ) in Hle.
-rewrite (@sumD R T (fun x : T => - P x) Q
-  (summableN (summable_mu P)) (summable_mu Q)) in Hle.
-have HsumP : sum P = 1.
-  by rewrite -(@psum_sum R T P) ?ge0_mu // -pr_predT HP.
-have HsumQ : sum Q = 1.
-  by rewrite -(@psum_sum R T Q) ?ge0_mu // -pr_predT HQ.
-have HsumNegQe :
-    sum (fun x : T => - (Q x * (sequences.expR (h x) - 1))) =
-    - sum (fun x : T => Q x * (sequences.expR (h x) - 1)).
-  exact: sumN.
-rewrite HsumNegQe sumN HsumP HsumQ in Hle.
-have Hdelta :
-    δ_KL P Q = sum (fun x : T => P x * ln (P x / Q x)).
-  rewrite /δ_KL /esp.
-  apply/eq_sum=> x.
-  by rewrite mulrC.
-have Hcancel_mass :
-    sum (fun x : T => P x * ln (P x / Q x)) + (-1 + 1) =
-    sum (fun x : T => P x * ln (P x / Q x)) by ring.
-rewrite Hcancel_mass in Hle.
-rewrite Hdelta.
-exact: Hle.
 Qed.
 
 Lemma summable_abs_diff {T : choiceType}
@@ -622,14 +461,6 @@ Proof.
 by rewrite /pr -psum_sum // => x; rewrite mulr_ge0 ?ler0n ?ge0_mu.
 Qed.
 
-Lemma summable_pr_scaled {T : choiceType}
-    (M : {distr T / R}) (A : pred T) (c : R) :
-  summable (c \*o (fun x => (A x)%:R * M x)).
-Proof.
-apply: summableZ.
-exact: summable_pr.
-Qed.
-
 Lemma tv_sign_expectation_pr {T : choiceType}
     (P Q M : {distr T / R}) :
   sum (fun x => M x * tv_sign P Q x) =
@@ -700,46 +531,6 @@ have HPc0 := Hzero (predC A) HQc0.
 move: HPc0.
 rewrite pr_predC HP.
 lra.
-Qed.
-
-Lemma dmargin_event_true {T : choiceType}
-    (P : {distr T / R}) (A : pred T) :
-  dmargin A P true = \P_[P] A.
-Proof.
-rewrite pr_pred1 pr_dmargin.
-apply/eq_pr=> x.
-by rewrite /in_mem /=; case: (A x).
-Qed.
-
-Lemma dmargin_event_false {T : choiceType}
-    (P : {distr T / R}) (A : pred T) :
-  dweight P = 1 ->
-  dmargin A P false = 1 - \P_[P] A.
-Proof.
-move=> HP.
-rewrite pr_pred1 pr_dmargin.
-transitivity (\P_[P] (predC A)).
-  apply/eq_pr=> x.
-  by rewrite /in_mem /=; case: (A x).
-by rewrite pr_predC HP.
-Qed.
-
-Lemma binary_kl_dmargin_event {T : choiceType}
-    (P Q : {distr T / R}) (A : pred T) :
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  δ_KL (dmargin A P) (dmargin A Q) =
-  binary_kl (\P_[P] A) (\P_[Q] A).
-Proof.
-move=> HP HQ.
-rewrite /δ_KL /esp.
-rewrite (sum_finseq (r := [:: true; false])); last 2 first.
-- by [].
-- by move=> b _; case: b.
-rewrite big_cons big_cons big_nil addr0.
-rewrite !dmargin_event_true !dmargin_event_false //.
-rewrite /binary_kl.
-ring.
 Qed.
 
 Lemma binary_event_data_processing {T : choiceType}

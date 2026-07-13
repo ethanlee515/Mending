@@ -241,27 +241,6 @@ case=> [z|].
 - exact: complete_bind_none.
 Qed.
 
-Lemma total_variation_complete_ge
-    {T : choiceType} (P Q : {distr T / R}) :
-  total_variation P Q <= total_variation (complete P) (complete Q).
-Proof.
-rewrite /total_variation.
-apply: ler_wpM2l; first by lra.
-rewrite -!psum_sum; try by move=> x; exact: normr_ge0.
-set S := fun x : option T => `|complete P x - complete Q x|.
-have HSnonneg : forall x, 0 <= S x by move=> x; exact: normr_ge0.
-have HSsumm : summable S.
-  apply/summable_abs.
-  apply: summableD; first exact: summable_mu.
-  by apply: summableN; exact: summable_mu.
-have -> : psum (fun x : T => `|P x - Q x|) =
-    psum (fun x : T => S (Some x)).
-  apply/eq_psum=> x.
-  by rewrite /S !completeE.
-rewrite (psum_option_split S HSnonneg HSsumm).
-by rewrite lerDl.
-Qed.
-
 Lemma total_variation_eq_le0
     {T : choiceType} (P Q : {distr T / R}) :
   P =1 Q -> total_variation P Q <= 0.
@@ -563,13 +542,6 @@ case: (leP ε' 1)=> Heps'le1.
     exact: ge0_pr.
   exact: (le_trans Htarget Hnonneg).
 Qed.
-
-Definition coupling_with_loss
-  {outL_t outR_t : choiceType}
-  (d : {distr (outL_t * outR_t) / R})
-  (outL : {distr outL_t / R})
-  (outR : {distr outR_t / R}) : Prop :=
-  dmargin fst d <=1 outL /\ dmargin snd d <=1 outR.
 
 Definition overlap_mass {T : choiceType}
     (P Q : {distr T / R}) : T -> R :=
@@ -923,17 +895,6 @@ transitivity ((\dlet_(y <- overlap_distr P Q) dunit y) x).
 by rewrite dlet_dunit_id.
 Qed.
 
-Lemma diagonal_overlap_coupling_with_loss {T : choiceType}
-    (P Q : {distr T / R}) :
-  coupling_with_loss (diagonal_overlap P Q) P Q.
-Proof.
-split=> x.
-- rewrite diagonal_overlap_margin_l overlap_distrE.
-  exact: minr_lel.
-- rewrite diagonal_overlap_margin_r overlap_distrE.
-  exact: minr_ler.
-Qed.
-
 Lemma dweight_diagonal_overlap {T : choiceType}
     (P Q : {distr T / R}) :
   dweight (diagonal_overlap P Q) = dweight (overlap_distr P Q).
@@ -1231,43 +1192,6 @@ Lemma shared_complete_sample_coupling_pr_ge1
 Proof.
 move=> Hsome Hnone.
 by rewrite shared_complete_sample_coupling_pr_eq1.
-Qed.
-
-Lemma shared_complete_sample_coupling_pr_eq1_total
-    {T U V : choiceType} (D : {distr T / R})
-    (f : T -> U) (g : T -> V)
-    (post : pred (option U * option V)) :
-  dweight D = 1 ->
-  (forall x, x \in dinsupp D -> post (Some (f x), Some (g x))) ->
-  \P_[shared_complete_sample_coupling D f g] post = 1.
-Proof.
-move=> HD Hsome.
-apply: pr_eq1_of_support.
-- exact: shared_complete_sample_coupling_dweight.
-- move=> xy Hxy.
-  rewrite /shared_complete_sample_coupling in Hxy.
-  have [ox Hox Hinner] := @dinsupp_dlet R _ _ _ _ _ Hxy.
-  case: ox Hox Hinner=> [x|] Hox Hinner.
-  + have -> : xy = (Some (f x), Some (g x)).
-      exact: in_dunit Hinner.
-    apply: Hsome.
-    move: Hox.
-    by rewrite in_dinsupp completeE /= -in_dinsupp.
-  + exfalso.
-    move: Hox.
-    by rewrite in_dinsupp completeE /= HD subrr eqxx.
-Qed.
-
-Lemma shared_complete_sample_coupling_pr_ge1_total
-    {T U V : choiceType} (D : {distr T / R})
-    (f : T -> U) (g : T -> V)
-    (post : pred (option U * option V)) :
-  dweight D = 1 ->
-  (forall x, x \in dinsupp D -> post (Some (f x), Some (g x))) ->
-  \P_[shared_complete_sample_coupling D f g] post >= 1.
-Proof.
-move=> HD Hsome.
-by rewrite shared_complete_sample_coupling_pr_eq1_total.
 Qed.
 
 Lemma diagonal_overlap_eq_pr {T : choiceType}

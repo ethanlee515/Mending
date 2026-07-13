@@ -125,14 +125,6 @@ rewrite /linear_geometric_tail_scale /q /u.
 lra.
 Qed.
 
-Lemma linear_geometric_tail_scale_ge0 (r : R) :
-  0 <= linear_geometric_tail_scale r.
-Proof.
-rewrite /linear_geometric_tail_scale.
-rewrite addr_ge0 ?ler01 //.
-exact: sqr_ge0.
-Qed.
-
 Lemma summable_nat_mul_geometric (r : R) :
   0 <= r < 1 ->
   summable (T := nat) (fun n : nat => n%:R * geometric 1 r n).

@@ -109,20 +109,4 @@ have HQx_zero : Q x = 0.
 by rewrite (Hac x HQx_zero) mul0r.
 Qed.
 
-Lemma conditional_coordinate_absolute_continuous
-  {n : nat}
-  {A : choiceType}
-  (P Q : {distr (n.-tuple A) / R})
-  (i : 'I_n)
-  (a : i.-tuple A) :
-  absolute_continuous P Q ->
-  absolute_continuous
-    (conditional_coordinate P a)
-    (conditional_coordinate Q a).
-Proof.
-move=> Hac.
-apply: dmargin_absolute_continuous.
-exact: dcond_absolute_continuous.
-Qed.
-
 End ConditionalCoordinate.

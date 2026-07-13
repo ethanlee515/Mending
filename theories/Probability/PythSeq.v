@@ -415,61 +415,6 @@ Definition completedPythTraceBindPair
   P =1 completedPythTraceBindL mid P0 K /\
   Q =1 completedPythTraceBindR mid Q0 K.
 
-Lemma completedPythTraceKernel_absolute_continuous
-  {ℓ1 ℓ2 : nat}
-  {mid_t : choice_type}
-  (mid : pred (mid_t * heap))
-  (s2 : (ℓ2.+1).-tuple R)
-  (K : { y : mid_t * heap | mid y } ->
-      completedPythKernelPair (ℓ := ℓ2))
-  (omega : (ℓ1.+1).-tuple (option (nat * heap))) :
-  (forall y, pythDist (K y).1 (K y).2 s2) ->
-  absolute_continuous
-    (completedPythTraceKernelL mid K omega)
-    (completedPythTraceKernelR mid K omega).
-Proof.
-move=> HK.
-rewrite /completedPythTraceKernelL /completedPythTraceKernelR.
-case: (tnth omega ord_max)=> [packed|]; last by move=> x Hx.
-case: (decode_output_heap packed)=> [y|]; last by move=> x Hx.
-destruct (@idP (mid y)) as [Hy|Hnot].
-  exact: (pythDist_absolute_continuous
-    (K (exist _ y Hy)).1 (K (exist _ y Hy)).2 s2
-    (HK (exist _ y Hy))).
-by move=> x Hx.
-Qed.
-
-Lemma completedTraceBind_absolute_continuous
-  {ℓ1 ℓ2 : nat}
-  {mid_t : choice_type}
-  (mid : pred (mid_t * heap))
-  (s1 : (ℓ1.+1).-tuple R)
-  (s2 : (ℓ2.+1).-tuple R)
-  (P0 Q0 : {distr ((ℓ1.+1).-tuple (option (nat * heap))) / R})
-  (K : { y : mid_t * heap | mid y } ->
-      completedPythKernelPair (ℓ := ℓ2))
-  (P Q : {distr ((ℓ1.+1 + ℓ2.+1).-tuple
-      (option (nat * heap))) / R}) :
-  completedPythTraceBindPair mid P0 Q0 K P Q ->
-  pythDist P0 Q0 s1 ->
-  (forall y, pythDist (K y).1 (K y).2 s2) ->
-  absolute_continuous P Q.
-Proof.
-move=> [HP HQ] Hdist0 HK.
-have Hac0 := pythDist_absolute_continuous P0 Q0 s1 Hdist0.
-have Hac_bind :
-    absolute_continuous
-      (completedPythTraceBindL mid P0 K)
-      (completedPythTraceBindR mid Q0 K).
-  rewrite /completedPythTraceBindL /completedPythTraceBindR.
-  apply: dlet_dunit_cat_absolute_continuous=> // omega1 _.
-  exact: (completedPythTraceKernel_absolute_continuous mid s2 K omega1 HK).
-move=> omega HQomega0.
-rewrite HP.
-apply: Hac_bind.
-by rewrite -HQ.
-Qed.
-
 Lemma completedPythTraceKernelL_dweight1
   {ℓ1 ℓ2 : nat}
   {mid_t : choice_type}

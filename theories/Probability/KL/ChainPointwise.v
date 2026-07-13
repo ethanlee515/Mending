@@ -101,16 +101,6 @@ rewrite Hnorm Hnorm.
 by rewrite subrK.
 Qed.
 
-Lemma sum_le_of_psum_fpos_le_add_fneg {T : choiceType}
-    (F : T -> R) (c : R) :
-  psum (fpos F) <= c + psum (fneg F) ->
-  sum F <= c.
-Proof.
-move=> Hle.
-rewrite /sum.
-lra.
-Qed.
-
 Lemma scaled_kl_integrand_fneg_psum_le
     {T : choiceType} (P Q : {distr T / R}) (c : R) :
   0 <= c ->
@@ -174,28 +164,6 @@ rewrite sumZ /S /δ_KL /esp.
 congr (c * _).
 apply/eq_sum=> x.
 by rewrite mulrC.
-Qed.
-
-Lemma fpos_mul_le_of_le (p r l : R) :
-  0 <= p -> p <= r ->
-  fpos (fun _ : unit => p * l) tt <=
-  fpos (fun _ : unit => r * l) tt.
-Proof.
-move=> Hp Hpr.
-have Hr : 0 <= r := le_trans Hp Hpr.
-rewrite /fpos /=.
-case Hl : (l <= 0).
-  have Hle0 : l <= 0 by rewrite Hl.
-  have Hple0 : p * l <= 0 := mulr_ge0_le0 Hp Hle0.
-  have Hrle0 : r * l <= 0 := mulr_ge0_le0 Hr Hle0.
-  by rewrite (max_l Hple0) (max_l Hrle0) !normr0.
-have Hlt : 0 < l by rewrite ltNge Hl.
-have Hl_ge0 : 0 <= l := ltW Hlt.
-have Hpge0 : 0 <= p * l by rewrite mulr_ge0.
-have Hrge0 : 0 <= r * l by rewrite mulr_ge0.
-rewrite (max_r Hpge0) (max_r Hrge0) !ger0_norm //.
-apply: ler_wpM2r; first exact: ltW Hlt.
-exact: Hpr.
 Qed.
 
 Lemma finite_sum_fpos_scaled_le {T : choiceType}
@@ -921,30 +889,6 @@ exact: (scaled_kl_integrand_fpos_psum_le
   (conditional_coordinate Q a)
   (\P_[P] (fun x => tuple_prefix_eq a x))
   (ge0_pr _ _) Hfin).
-Qed.
-
-Lemma prefix_coordinate_weighted_kl_sum
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R})
-    (i : 'I_n) (a : i.-tuple A) :
-  finite_kl
-    (conditional_coordinate P a)
-    (conditional_coordinate Q a) ->
-  sum
-    (fun b : A =>
-      \P_[P] (fun x => tuple_prefix_eq a x) *
-      (conditional_coordinate P a b *
-       ln (conditional_coordinate P a b /
-           conditional_coordinate Q a b))) =
-  \P_[P] (fun x => tuple_prefix_eq a x) *
-  δ_KL (conditional_coordinate P a)
-       (conditional_coordinate Q a).
-Proof.
-move=> Hfin.
-exact: (sum_scaled_kl_integrand
-  (conditional_coordinate P a)
-  (conditional_coordinate Q a)
-  (\P_[P] (fun x => tuple_prefix_eq a x)) Hfin).
 Qed.
 
 Lemma finite_sum_selected_prefix_mass_le1
@@ -2125,43 +2069,6 @@ apply: (iterated_kl_chain_bound_from_pointwise P Q eps
 exact: (kl_integrand_chain_decomp_pointwise P Q HP HQ Hac).
 Qed.
 
-
-Lemma prefix_coordinate_weighted_kl_bound
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R)
-    (i : 'I_n) (J : seq (n.-tuple A)) :
-  0 <= tnth eps i ->
-  (forall a : i.-tuple A,
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <=
-      tnth eps i) ->
-  \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-    \P_[P] (fun x => tuple_prefix_eq a x) *
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <=
-  tnth eps i.
-Proof.
-move=> Heps_i Hcond.
-pose pref_mass (a : i.-tuple A) :=
-  \P_[P] (fun x => tuple_prefix_eq a x).
-have Hsumpoint :
-    \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-      pref_mass a *
-      δ_KL (conditional_coordinate P a)
-           (conditional_coordinate Q a) <=
-    \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-      tnth eps i * pref_mass a.
-  apply: ler_sum=> a _.
-  rewrite [tnth eps i * _]mulrC.
-  apply: ler_wpM2l; first exact: ge0_pr.
-  exact: Hcond.
-apply: (le_trans Hsumpoint).
-rewrite -mulr_sumr.
-apply: (le_trans (ler_wpM2l Heps_i
-  (finite_sum_prefix_event_mass_le1 P i
-    (undup [seq tuple_prefix i (tnth x) | x <- J]) (undup_uniq _)))).
-by rewrite mulr1.
-Qed.
 
 Lemma finite_sum_fpos_kl_from_coordinate_bounded_kl
     {n : nat} {A : choiceType}

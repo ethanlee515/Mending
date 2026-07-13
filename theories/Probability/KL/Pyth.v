@@ -18,80 +18,6 @@ Section PythagoreanDistributionJudgments.
 
 Context {R : realType}.
 
-Theorem pythagorean_probability_preservation
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
-  (forall i : 'I_n, 0 <= tnth eps i) ->
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  (forall (i : 'I_n) (a : i.-tuple A),
-    finite_kl
-      (conditional_coordinate P a)
-      (conditional_coordinate Q a)) ->
-  (forall (i : 'I_n) (a : i.-tuple A),
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <=
-      tnth eps i) ->
-  total_variation P Q <= Num.sqrt ((\sum_(i < n) tnth eps i) / 2).
-Proof.
-move=> Heps HP HQ Hfin Hcond.
-have Hcond_all : forall (i : 'I_n) (a : i.-tuple A),
-    finite_kl
-      (conditional_coordinate P a)
-      (conditional_coordinate Q a) /\
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <=
-      tnth eps i.
-  by move=> i a; split; [exact: Hfin | exact: Hcond].
-have Hac : absolute_continuous P Q.
-  exact: (coordinate_finite_kl_absolute_continuous P Q HP HQ Hfin).
-have HfinPQ : finite_kl P Q.
-  exact: (coordinate_bounded_kl_finite_kl P Q eps
-    Heps HP HQ Hcond_all).
-have Hpin := pinsker P Q HfinPQ HP HQ.
-apply: (le_trans Hpin).
-apply: ler_wsqrtr.
-have Hkl :
-    δ_KL P Q <= \sum_(i < n) tnth eps i :=
-  iterated_kl_chain_bound_via_pointwise
-    P Q eps Heps HP HQ HfinPQ Hfin Hcond.
-lra.
-Qed.
-
-Corollary pythagorean_probability_preservation_sup_pinsker
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) (eps : R) :
-  0 <= eps ->
-  dweight P = 1 ->
-  dweight Q = 1 ->
-  (forall (i : 'I_n) (a : i.-tuple A),
-    finite_kl
-      (conditional_coordinate P a)
-      (conditional_coordinate Q a)) ->
-  (forall (i : 'I_n) (a : i.-tuple A),
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <= eps) ->
-  total_variation P Q <= Num.sqrt ((n%:R * eps) / 2).
-Proof.
-move=> Heps HP HQ Hfin Hcond.
-pose eps_tuple : n.-tuple R := [tuple eps | i < n].
-have Heps_tuple : forall i : 'I_n, 0 <= tnth eps_tuple i.
-  by move=> i; rewrite /eps_tuple tnth_mktuple.
-have Hcond_tuple : forall (i : 'I_n) (a : i.-tuple A),
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <=
-      tnth eps_tuple i.
-  by move=> i a; rewrite /eps_tuple tnth_mktuple; apply: Hcond.
-have Htv :=
-  pythagorean_probability_preservation P Q eps_tuple
-    Heps_tuple HP HQ Hfin Hcond_tuple.
-apply: (le_trans Htv).
-apply: ler_wsqrtr.
-rewrite (eq_bigr (fun _ : 'I_n => eps)); last first.
-  by move=> i _; rewrite /eps_tuple tnth_mktuple.
-by rewrite big_const_ord iter_addr_0 mulr_natl.
-Qed.
-
 Definition pythDist
     {n : nat} {A : choiceType}
     (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) : Prop :=
@@ -618,22 +544,6 @@ Proof.
 by rewrite /pythCallErrorStep tuple_sum_cat tuple_sum_pythCallErrorBlock.
 Qed.
 
-Lemma tuple_sum_pythCallContErrorBase {ℓ : nat}
-    (s : (ℓ.+1).-tuple R) :
-  tuple_sum (pythCallContErrorBase s) = tuple_sum s.
-Proof.
-rewrite /pythCallContErrorBase tuple_sum_cat tuple_sum_singleton.
-by rewrite addr0.
-Qed.
-
-Lemma tuple_sum_pythCallContErrorStep {ℓ1 ℓ2 : nat}
-    (s : (ℓ1.+1).-tuple R) (tail : (ℓ2.+1).-tuple R) :
-  tuple_sum (pythCallContErrorStep s tail) =
-  tuple_sum s + tuple_sum tail.
-Proof.
-by rewrite /pythCallContErrorStep tuple_sum_cat.
-Qed.
-
 Lemma pythCallErrorBaseE {ℓ : nat}
     (s : (ℓ.+1).-tuple R) :
   pythCallErrorBase s = cat_tuple [tuple 0] (pythCallContErrorBase s).
@@ -647,14 +557,6 @@ Lemma pythCallErrorStepE {ℓ1 ℓ2 : nat}
   cat_tuple [tuple 0] (pythCallContErrorStep s tail).
 Proof.
 by apply: val_inj.
-Qed.
-
-Lemma pythagorean_tv_bound_pythCallErrorBase {ℓ : nat}
-    (s : (ℓ.+1).-tuple R) :
-  pythagorean_tv_bound (pythCallErrorBase s) =
-  pythagorean_tv_bound s.
-Proof.
-by rewrite /pythagorean_tv_bound tuple_sum_pythCallErrorBase.
 Qed.
 
 Lemma pythCallErrorsTuple_nonneg {ℓ : nat}
@@ -692,83 +594,6 @@ change
   (Num.sqrt (pythErrorTupleSum (pythCallErrorsTuple q s) / 2) =
    Num.sqrt ((q.+1%:R * tuple_sum s) / 2)).
 by rewrite tuple_sum_pythCallErrorsTuple.
-Qed.
-
-Fixpoint pythCallErrors (q : nat) (eps : R) : (q.*2).+3.-tuple R :=
-  if q is q'.+1 then
-    cat_tuple [tuple 0; eps] (pythCallErrors q' eps)
-  else
-    [tuple 0; eps; 0].
-
-Lemma pythCallErrors_nonneg (q : nat) (eps : R) :
-  0 <= eps ->
-  forall i : 'I_(q.*2).+3, 0 <= tnth (pythCallErrors q eps) i.
-Proof.
-move=> Heps.
-elim: q=> [|q IH] i.
-- rewrite /=.
-  by case: i=> [[|[|[|n]]]].
-- rewrite /=.
-  apply: (cat_tuple_nonneg [tuple 0; eps] (pythCallErrors q eps) i).
-  + by case=> [[|[|n]]].
-  exact: IH.
-Qed.
-
-Lemma pythCallErrors0 (eps : R) :
-  pythCallErrors 0 eps = [tuple 0; eps; 0].
-Proof.
-by [].
-Qed.
-
-Lemma pythCallErrorsS (q : nat) (eps : R) :
-  pythCallErrors q.+1 eps =
-  cat_tuple [tuple 0; eps] (pythCallErrors q eps).
-Proof.
-by [].
-Qed.
-
-Lemma tuple_sum_pythCallErrors (q : nat) (eps : R) :
-  tuple_sum (pythCallErrors q eps) = q.+1%:R * eps.
-Proof.
-elim: q=> [|q IH].
-- rewrite /tuple_sum /= !big_ord_recl big_ord0 /=.
-  by rewrite !(tnth_nth 0) /= !addr0 !add0r mul1r.
-- change
-    (tuple_sum (cat_tuple [tuple 0; eps] (pythCallErrors q eps)) =
-      q.+2%:R * eps).
-  rewrite tuple_sum_cat IH.
-  rewrite /tuple_sum /= !big_ord_recl big_ord0 /=.
-  rewrite !(tnth_nth 0) /= !addr0 !add0r.
-  by rewrite -[q.+2%:R]natr1 mulrDl mul1r addrC.
-Qed.
-
-Lemma pythagorean_tv_bound_pythCallErrors (q : nat) (eps : R) :
-  pythagorean_tv_bound (pythCallErrors q eps) =
-  Num.sqrt ((q.+1%:R * eps) / 2).
-Proof.
-by rewrite /pythagorean_tv_bound tuple_sum_pythCallErrors.
-Qed.
-
-Lemma pythDist_total_variation
-    {n : nat} {A : choiceType}
-    (P Q : {distr (n.-tuple A) / R}) (eps : n.-tuple R) :
-  pythDist P Q eps ->
-  total_variation P Q <= Num.sqrt ((\sum_(i < n) tnth eps i) / 2).
-Proof.
-move=> Hdist.
-case: Hdist=> Heps [HP [HQ Hcond_all]].
-have Hfin : forall (i : 'I_n) (a : i.-tuple A),
-    finite_kl
-      (conditional_coordinate P a)
-      (conditional_coordinate Q a).
-  by move=> i a; have [Hfin _] := Hcond_all i a.
-have Hcond : forall (i : 'I_n) (a : i.-tuple A),
-    δ_KL (conditional_coordinate P a)
-         (conditional_coordinate Q a) <=
-      tnth eps i.
-  by move=> i a; have [_ Hle] := Hcond_all i a.
-exact: (pythagorean_probability_preservation P Q eps
-          Heps HP HQ Hfin Hcond).
 Qed.
 
 Lemma pythDist_final_total_variation
