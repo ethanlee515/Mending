@@ -324,13 +324,13 @@ Module NoiseFloodingSecureOracleSetup
     0 <= ε ->
     (forall HbL HbR,
       exists d,
-        clean_coupling d
+        coupling d
           (complete (Pr_code (kL HbL) memL))
           (complete (Pr_code (kR HbR) memR)) /\
         \P_[d] post >= 1 - ε) ->
     post (None, None) ->
     exists d,
-      clean_coupling d
+      coupling d
         (complete (Pr_code (@assertD outL_t b kL) memL))
         (complete (Pr_code (@assertD outR_t b kR) memR)) /\
       \P_[d] post >= 1 - ε.
@@ -339,8 +339,8 @@ Module NoiseFloodingSecureOracleSetup
     - have [d [Hd Hprob]] := Hcont erefl erefl.
       exists d.
       split; last exact: Hprob.
-      move: Hd=> [HdL HdR].
-      split.
+      have [HdL HdR] := coupling_margins Hd.
+      apply: coupling_of_margins; split.
       + move=> z.
         rewrite HdL.
         symmetry.
@@ -357,7 +357,7 @@ Module NoiseFloodingSecureOracleSetup
           (Pr_code_assertD_true_ext true kR erefl memR) z).
     - exists (dunit (None, None)).
       split.
-      + split.
+      + apply: coupling_of_margins; split.
         * move=> z.
           rewrite dmargin_dunit.
           rewrite /assertD Pr_code_fail.

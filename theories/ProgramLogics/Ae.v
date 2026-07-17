@@ -24,10 +24,35 @@ Import pkg_heap.
 Import PackageNotation.
 Local Open Scope package_scope.
 
-Definition clean_coupling {A1 A2 : choiceType}
+Lemma coupling_iff_dmargin {A1 A2 : choiceType}
     (d : {distr (A1 * A2) / R})
-    (c1 : {distr A1 / R}) (c2 : {distr A2 / R}) : Prop :=
-  dmargin fst d =1 c1 /\ dmargin snd d =1 c2.
+    (c1 : {distr A1 / R}) (c2 : {distr A2 / R}) :
+  coupling d c1 c2 <->
+    dmargin fst d =1 c1 /\ dmargin snd d =1 c2.
+Proof.
+rewrite /coupling /lmg /rmg.
+split.
+- move=> [HdL HdR]; split=> z.
+  + by rewrite HdL.
+  + by rewrite HdR.
+- move=> [HdL HdR]; split.
+  + exact: distr_ext HdL.
+  + exact: distr_ext HdR.
+Qed.
+
+Lemma coupling_margins {A1 A2 : choiceType}
+    {d : {distr (A1 * A2) / R}}
+    {c1 : {distr A1 / R}} {c2 : {distr A2 / R}} :
+  coupling d c1 c2 ->
+    dmargin fst d =1 c1 /\ dmargin snd d =1 c2.
+Proof. exact: (proj1 (coupling_iff_dmargin d c1 c2)). Qed.
+
+Lemma coupling_of_margins {A1 A2 : choiceType}
+    {d : {distr (A1 * A2) / R}}
+    {c1 : {distr A1 / R}} {c2 : {distr A2 / R}} :
+  dmargin fst d =1 c1 /\ dmargin snd d =1 c2 ->
+    coupling d c1 c2.
+Proof. exact: (proj2 (coupling_iff_dmargin d c1 c2)). Qed.
 
 Definition additiveErrorJudgment
   {inL_t inR_t outL_t outR_t : ord_choiceType}
@@ -40,7 +65,7 @@ Definition additiveErrorJudgment
   ∀ memL memR xL xR, pre ((xL, memL), (xR, memR)) →
     let out1 := Pr_code (progL xL) memL in
     let out2 := Pr_code (progR xR) memR in
-    ∃ d, clean_coupling d (complete out1) (complete out2) ∧
+    ∃ d, coupling d (complete out1) (complete out2) ∧
       \P_[ d ] post >= 1 - ε.
 
 Declare Scope AeNotations.
@@ -134,7 +159,7 @@ have [d [HdL [HdR Hprob]]] :=
     (complete_dweight out1) (complete_dweight out2) (Htv _ _ _ _ Hpre).
 exists d.
 split.
-- split.
+- apply: coupling_of_margins; split.
   + exact: HdL.
   + exact: HdR.
 - rewrite (eq_pr (B := fun xy => xy.1 == xy.2)).
@@ -171,7 +196,7 @@ have [d [HdL [HdR Hprob]]] :=
     (complete_dweight out1) (complete_dweight out2) Htv_complete.
 exists d.
 split.
-- split.
+- apply: coupling_of_margins; split.
   + exact: HdL.
   + exact: HdR.
 - rewrite (eq_pr (B := fun xy => xy.1 == xy.2)).
@@ -195,7 +220,7 @@ move=> [_ Hae] Hpre.
 set outL := Pr_code (progL xL) memL.
 set outR := Pr_code (progR xR) memR.
 have [d [Hd Hprob]] := Hae memL memR xL xR Hpre.
-have [HdL HdR] := Hd.
+have [HdL HdR] := coupling_margins Hd.
 have HdL' : dmargin fst d =1 complete outL.
   move=> z.
   by rewrite -HdL.
@@ -287,7 +312,7 @@ pose post_lift := lift_loss_post
     post (y_1, m_1') && (y_1 == y_2) && (m_1' == m_2')).
 exists (dmargin lift d).
 split.
-- split.
+- apply: coupling_of_margins; split.
   + move=> z.
     rewrite (dmargin_comp fst lift d z).
     change (dmargin (fun xy : (out_t * heap) * (out_t * heap) =>
@@ -404,7 +429,7 @@ Definition additiveErrorSeqKernel
   (Hcont : forall memL memR yL yR,
       mid ((yL, memL), (yR, memR)) ->
       exists d,
-        clean_coupling d
+        coupling d
           (complete (Pr_code (contL yL) memL))
           (complete (Pr_code (contR yR) memR)) /\
         \P_[ d ] post >= 1 - ε')
@@ -434,14 +459,14 @@ Lemma additiveErrorSeqKernel_margins
   (Hcont : forall memL memR yL yR,
       mid ((yL, memL), (yR, memR)) ->
       exists d,
-        clean_coupling d
+        coupling d
           (complete (Pr_code (contL yL) memL))
           (complete (Pr_code (contR yR) memR)) /\
         \P_[ d ] post >= 1 - ε')
   (xy : option (midL_t * heap) * option (midR_t * heap)) :
   let KL ymem := Pr_code (contL ymem.1) ymem.2 in
   let KR ymem := Pr_code (contR ymem.1) ymem.2 in
-  clean_coupling (additiveErrorSeqKernel contL contR mid post ε' Hcont xy)
+  coupling (additiveErrorSeqKernel contL contR mid post ε' Hcont xy)
     (complete_bind_kernel KL xy.1)
     (complete_bind_kernel KR xy.2).
 Proof.
@@ -450,14 +475,14 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
   rewrite /additiveErrorSeqKernel /=.
   destruct (@idP (mid ((yL, memL), (yR, memR)))) as [Hmid|Hmid].
   + case: (boolp.constructive_indefinite_description
-      (Hcont memL memR yL yR Hmid))=> d [[HdL HdR] Hprob] /=.
-    split; [exact: HdL | exact: HdR].
+      (Hcont memL memR yL yR Hmid))=> d [Hd Hprob] /=.
+    exact: Hd.
   + have [HdL HdR] :=
       complete_bind_fallback_coupling_margins
         (fun ymem : midL_t * heap => Pr_code (contL ymem.1) ymem.2)
         (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
         (Some (yL, memL), Some (yR, memR)).
-    split.
+    apply: coupling_of_margins; split.
     * exact: HdL.
     * exact: HdR.
 - case: ymemL=> yL memL.
@@ -466,7 +491,7 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
       (fun ymem : midL_t * heap => Pr_code (contL ymem.1) ymem.2)
       (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
       (Some (yL, memL), None).
-  split.
+  apply: coupling_of_margins; split.
   - exact: HdL.
   - exact: HdR.
 - case: ymemR=> yR memR.
@@ -475,7 +500,7 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
       (fun ymem : midL_t * heap => Pr_code (contL ymem.1) ymem.2)
       (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
       (None, Some (yR, memR)).
-  split.
+  apply: coupling_of_margins; split.
   - exact: HdL.
   - exact: HdR.
 - have [HdL HdR] :=
@@ -483,7 +508,7 @@ case: xy=> [[ymemL|] [ymemR|]] /=.
       (fun ymem : midL_t * heap => Pr_code (contL ymem.1) ymem.2)
       (fun ymem : midR_t * heap => Pr_code (contR ymem.1) ymem.2)
       (None, None).
-  split.
+  apply: coupling_of_margins; split.
   - exact: HdL.
   - exact: HdR.
 Qed.
@@ -508,7 +533,7 @@ Lemma additiveErrorSeqKernel_event
   (Hcont : forall memL memR yL yR,
       mid ((yL, memL), (yR, memR)) ->
       exists d,
-        clean_coupling d
+        coupling d
           (complete (Pr_code (contL yL) memL))
           (complete (Pr_code (contR yR) memR)) /\
         \P_[ d ] post >= 1 - ε')
@@ -539,19 +564,20 @@ Lemma coupling_bind_kernel
     {distr (option (outL_t * heap) * option (outR_t * heap)) / R})
   (KL : option (midL_t * heap) -> {distr (option (outL_t * heap)) / R})
   (KR : option (midR_t * heap) -> {distr (option (outR_t * heap)) / R}) :
-  clean_coupling d PL PR ->
-  (forall xy, clean_coupling (K xy) (KL xy.1) (KR xy.2)) ->
-  clean_coupling (\dlet_(xy <- d) K xy)
+  coupling d PL PR ->
+  (forall xy, coupling (K xy) (KL xy.1) (KR xy.2)) ->
+  coupling (\dlet_(xy <- d) K xy)
     (\dlet_(x <- PL) KL x)
     (\dlet_(y <- PR) KR y).
 Proof.
-move=> [HdL HdR] HK.
-split.
+move=> Hd HK.
+have [HdL HdR] := coupling_margins Hd.
+apply: coupling_of_margins; split.
 - move=> z.
   rewrite dmargin_dlet_partition.
   transitivity ((\dlet_(xy <- d) KL xy.1) z).
   + apply: eq_in_dlet=> // xy _ z'.
-    have [HKL _] := HK xy.
+    have [HKL _] := coupling_margins (HK xy).
     by rewrite -HKL.
   + rewrite -(dlet_dmargin_partition d fst KL z).
     by apply: eq_in_dlet=> // x _ z'; rewrite HdL.
@@ -559,7 +585,7 @@ split.
   rewrite dmargin_dlet_partition.
   transitivity ((\dlet_(xy <- d) KR xy.2) z).
   + apply: eq_in_dlet=> // xy _ z'.
-    have [_ HKR] := HK xy.
+    have [_ HKR] := coupling_margins (HK xy).
     by rewrite -HKR.
   + rewrite -(dlet_dmargin_partition d snd KR z).
     by apply: eq_in_dlet=> // y _ z'; rewrite HdR.
@@ -599,8 +625,8 @@ split.
     (complete (Pr_code (progR xR) memR))
     K (complete_bind_kernel KL) (complete_bind_kernel KR)
     Hd0 (additiveErrorSeqKernel_margins contL contR mid post ε' Hcont).
-  move: Hbind=> [HL HR].
-  split.
+  have [HL HR] := coupling_margins Hbind.
+  apply: coupling_of_margins; split.
   + move=> z.
     rewrite HL.
     rewrite (complete_bind (Pr_code (progL xL) memL) KL z).

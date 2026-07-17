@@ -2120,9 +2120,9 @@ Qed.
 
 Lemma diagonalCoupling
   (A : ord_choiceType) (D : {distr A / R}) :
-  clean_coupling (\dlet_(z <- D) dunit (z, z)) D D.
+  coupling (\dlet_(z <- D) dunit (z, z)) D D.
 Proof.
-split.
+apply: coupling_of_margins; split.
 - move=> x.
   rewrite dmargin_dlet_partition.
   rewrite (eq_dlet (m := D) (g := fun y => dunit y)); last first.

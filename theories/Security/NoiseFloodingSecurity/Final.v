@@ -89,7 +89,7 @@ Module NoiseFloodingSecure
       Pr_code
         (init ← ind_cpa_reduction_challenge_init_code tt ;; guessR init)
         empty_heap.
-    have Hfinal_coupling : clean_coupling finalD (complete leftD)
+    have Hfinal_coupling : coupling finalD (complete leftD)
         (complete rightD).
       have Hbind := coupling_bind_kernel d0
         (complete (Pr_code (ind_cpad_challenge_init_code tt) empty_heap))
@@ -99,8 +99,8 @@ Module NoiseFloodingSecure
         ind_cpad_reduction_challenge_init_coupling_margins
         (sim_decrypt_reduction_adv_continuation_kernel_margins
           A guessL guessR Hcont).
-      move: Hbind=> [HL HR].
-      split.
+      have [HL HR] := coupling_margins Hbind.
+      apply: coupling_of_margins; split.
       - move=> z.
         rewrite /finalD /leftD HL.
         rewrite (complete_bind
@@ -118,7 +118,7 @@ Module NoiseFloodingSecure
     split; first exact: Hfinal_coupling.
     rewrite subr0.
     have Hfinal_weight : dweight finalD = 1.
-      move: Hfinal_coupling=> [HfinalL _].
+      have [HfinalL _] := coupling_margins Hfinal_coupling.
       rewrite -(dmargin_dweight fst finalD).
       transitivity (dweight (complete leftD)).
       - apply: eq_psum=> z.
@@ -1443,7 +1443,7 @@ Module NoiseFloodingSecure
         Htv_projected.
     exists d.
     split.
-    - split.
+    - apply: coupling_of_margins; split.
       + exact: HdL.
       + exact: HdR.
     - apply: (le_trans Hprob).
@@ -1507,12 +1507,7 @@ Module NoiseFloodingSecure
     pose project (xy : option (bool * heap) * option (bool * heap)) :=
       (strip xy.1, strip xy.2).
     pose d' := dmargin project d.
-    have HdL : dmargin fst d =1 complete outL.
-      move: Hd=> [HdL _] z.
-      by rewrite -HdL.
-    have HdR : dmargin snd d =1 complete outR.
-      move: Hd=> [_ HdR] z.
-      by rewrite -HdR.
+    have [HdL HdR] := coupling_margins Hd.
     have Hd'L :
         dmargin fst d' =1 complete (dmargin fst outL).
       move=> z.

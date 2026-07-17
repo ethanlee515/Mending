@@ -210,7 +210,7 @@ Module NoiseFloodingSecureOperationBridges
       split.
       + have [HmarginL HmarginR] :=
           shared_complete_sample_coupling_margins (encrypt pk m) outL outR.
-        split.
+        apply: coupling_of_margins; split.
         * move=> z.
           rewrite HmarginL.
           apply: complete_ext=> y.
@@ -253,7 +253,7 @@ Module NoiseFloodingSecureOperationBridges
           shared_complete_sample_coupling_margins
             (dnull : {distr ciphertext / R})
             (fun c => (c, memL)) (fun c => (c, memR)).
-        split.
+        apply: coupling_of_margins; split.
         * move=> z.
           rewrite HmarginL.
           rewrite complete_dmargin_dnull.
@@ -297,8 +297,8 @@ Module NoiseFloodingSecureOperationBridges
     have [d [Hd Hpost]] := Hbase.2 memL memR xL xR Hpre.
     exists d.
     split; last exact: Hpost.
-    move: Hd=> [HdL HdR].
-    split; first exact: HdL.
+    have [HdL HdR] := coupling_margins Hd.
+    apply: coupling_of_margins; split; first exact: HdL.
     move=> z.
     rewrite HdR.
     apply: complete_ext=> out.
@@ -639,7 +639,7 @@ Module NoiseFloodingSecureOperationBridges
         * have [HmarginL HmarginR] :=
             shared_complete_sample_coupling_margins
               (eval1 evk gate c) outL outR.
-          split.
+          apply: coupling_of_margins; split.
           -- move=> z.
              rewrite HmarginL.
              apply: complete_distr_ext=> y.
@@ -679,7 +679,7 @@ Module NoiseFloodingSecureOperationBridges
         rewrite HevkL_none /assertD /= !Pr_code_fail.
         exists (dunit (None, None)).
         split.
-        * split.
+        * apply: coupling_of_margins; split.
           -- move=> z.
              rewrite dmargin_dunit.
              exact/esym/complete_dnull.
@@ -719,8 +719,8 @@ Module NoiseFloodingSecureOperationBridges
     have [d [Hd Hpost]] := Hbase.2 memL memR xL xR Hpre.
     exists d.
     split; last exact: Hpost.
-    move: Hd=> [HdL HdR].
-    split; first exact: HdL.
+    have [HdL HdR] := coupling_margins Hd.
+    apply: coupling_of_margins; split; first exact: HdL.
     rewrite ind_cpa_reduction_sim_eval1_resolve_link_closed.
     exact: HdR.
   Qed.
@@ -945,7 +945,7 @@ Module NoiseFloodingSecureOperationBridges
           -- have [HmarginL HmarginR] :=
               shared_complete_sample_coupling_margins
                 (eval2 evk gate ci cj) outL outR.
-             split.
+             apply: coupling_of_margins; split.
              ++ move=> z.
                 rewrite HmarginL.
                 apply: complete_distr_ext=> y.
@@ -992,7 +992,7 @@ Module NoiseFloodingSecureOperationBridges
           rewrite HevkL_none /assertD /= !Pr_code_fail.
           exists (dunit (None, None)).
           split.
-          -- split.
+          -- apply: coupling_of_margins; split.
              ++ move=> z.
                 rewrite dmargin_dunit.
                 exact/esym/complete_dnull.
@@ -1036,8 +1036,8 @@ Module NoiseFloodingSecureOperationBridges
     have [d [Hd Hpost]] := Hbase.2 memL memR xL xR Hpre.
     exists d.
     split; last exact: Hpost.
-    move: Hd=> [HdL HdR].
-    split; first exact: HdL.
+    have [HdL HdR] := coupling_margins Hd.
+    apply: coupling_of_margins; split; first exact: HdL.
     rewrite ind_cpa_reduction_sim_eval2_resolve_link_closed.
     exact: HdR.
   Qed.
@@ -1339,7 +1339,7 @@ Module NoiseFloodingSecureOperationBridges
              split.
              ++ have [HmarginL HmarginR] :=
                   shared_complete_sample_coupling_margins D outL outR.
-                split.
+                apply: coupling_of_margins; split.
                 ** move=> z.
                    rewrite HmarginL.
                    apply: complete_distr_ext=> y.
@@ -1365,7 +1365,7 @@ Module NoiseFloodingSecureOperationBridges
           -- rewrite /assertD /= !Pr_code_fail.
              exists (dunit (None, None)).
              split.
-             ++ split.
+             ++ apply: coupling_of_margins; split.
                 ** move=> z.
                    rewrite dmargin_dunit.
                    exact/esym/complete_dnull.
@@ -1384,7 +1384,7 @@ Module NoiseFloodingSecureOperationBridges
           split.
           -- have [HmarginL HmarginR] :=
                shared_complete_sample_coupling_margins Dnone outL outR.
-             split.
+             apply: coupling_of_margins; split.
              ++ move=> z.
                 rewrite HmarginL.
                 apply: complete_distr_ext=> y.
@@ -1431,8 +1431,8 @@ Module NoiseFloodingSecureOperationBridges
     have [d [Hd Hpost]] := Hbase.2 memL memR xL xR Hpre.
     exists d.
     split; last exact: Hpost.
-    move: Hd=> [HdL HdR].
-    split; first exact: HdL.
+    have [HdL HdR] := coupling_margins Hd.
+    apply: coupling_of_margins; split; first exact: HdL.
     rewrite ind_cpa_reduction_sim_decrypt_resolve_link_closed.
     exact: HdR.
   Qed.

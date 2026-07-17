@@ -1018,7 +1018,7 @@ Module NoiseFloodingSecureGameReduction
   Qed.
 
   Lemma ind_cpad_reduction_challenge_init_coupling_margins :
-    clean_coupling ind_cpad_reduction_challenge_init_coupling
+    coupling ind_cpad_reduction_challenge_init_coupling
       (complete (Pr_code (ind_cpad_challenge_init_code tt) empty_heap))
       (complete
         (Pr_code (ind_cpa_reduction_challenge_init_code tt) empty_heap)).
@@ -1029,7 +1029,7 @@ Module NoiseFloodingSecureGameReduction
         ind_cpad_reduction_challenge_init_sample
         ind_cpad_reduction_challenge_init_outL
         ind_cpad_reduction_challenge_init_outR.
-    split.
+    apply: coupling_of_margins; split.
     - move=> z.
       rewrite HmarginL.
       apply: complete_distr_ext=> y.
@@ -1065,7 +1065,7 @@ Module NoiseFloodingSecureGameReduction
       (contL contR : in_t -> raw_code out_t) : Prop :=
     forall memL memR xL xR,
       exists d,
-        clean_coupling d
+        coupling d
           (complete (Pr_code (contL xL) memL))
           (complete (Pr_code (contR xR) memR)) /\
         (same_input_sim_decrypt_reduction_adv_pre A
@@ -1109,7 +1109,7 @@ Module NoiseFloodingSecureGameReduction
         A contL contR) xy :
     let KL ymem := Pr_code (contL ymem.1) ymem.2 in
     let KR ymem := Pr_code (contR ymem.1) ymem.2 in
-    clean_coupling
+    coupling
       (sim_decrypt_reduction_adv_continuation_kernel
         A contL contR Hcont xy)
       (complete_bind_kernel KL xy.1)
@@ -1119,8 +1119,8 @@ Module NoiseFloodingSecureGameReduction
     - case: ymemL=> yL memL; case: ymemR=> yR memR /=.
       rewrite /sim_decrypt_reduction_adv_continuation_kernel /=.
       case: (boolp.constructive_indefinite_description
-        (Hcont memL memR yL yR))=> d [[HdL HdR] Hsupport] /=.
-      split; [exact: HdL | exact: HdR].
+        (Hcont memL memR yL yR))=> d [Hd Hsupport] /=.
+      exact: Hd.
     - case: ymemL=> yL memL.
       rewrite /sim_decrypt_reduction_adv_continuation_kernel /=.
       have [HdL HdR] :=
@@ -1128,7 +1128,7 @@ Module NoiseFloodingSecureGameReduction
           (fun ymem : mid_t * heap => Pr_code (contL ymem.1) ymem.2)
           (fun ymem : mid_t * heap => Pr_code (contR ymem.1) ymem.2)
           (Some (yL, memL), None).
-      split.
+      apply: coupling_of_margins; split.
       + exact: HdL.
       + exact: HdR.
     - case: ymemR=> yR memR.
@@ -1138,7 +1138,7 @@ Module NoiseFloodingSecureGameReduction
           (fun ymem : mid_t * heap => Pr_code (contL ymem.1) ymem.2)
           (fun ymem : mid_t * heap => Pr_code (contR ymem.1) ymem.2)
           (None, Some (yR, memR)).
-      split.
+      apply: coupling_of_margins; split.
       + exact: HdL.
       + exact: HdR.
     - rewrite /sim_decrypt_reduction_adv_continuation_kernel /=.
@@ -1147,7 +1147,7 @@ Module NoiseFloodingSecureGameReduction
           (fun ymem : mid_t * heap => Pr_code (contL ymem.1) ymem.2)
           (fun ymem : mid_t * heap => Pr_code (contR ymem.1) ymem.2)
           (None, None).
-      split.
+      apply: coupling_of_margins; split.
       + exact: HdL.
       + exact: HdR.
   Qed.
@@ -1189,7 +1189,7 @@ Module NoiseFloodingSecureGameReduction
         (Some (fL xL, memL), Some (fR xR, memR)).
     exists d.
     split.
-    - split.
+    - apply: coupling_of_margins; split.
       + move=> z.
         rewrite /d dmargin_dunit Pr_code_ret.
         case: z=> [[y mem]|] /=.
@@ -1246,7 +1246,7 @@ Module NoiseFloodingSecureGameReduction
       | _ => complete_bind_fallback_coupling KL KR xy
       end.
     have HK xy :
-        clean_coupling (K xy)
+        coupling (K xy)
           (complete_bind_kernel KL xy.1)
           (complete_bind_kernel KR xy.2).
       case: xy=> [[ymemL|] [ymemR|]] /=.
@@ -1256,32 +1256,32 @@ Module NoiseFloodingSecureGameReduction
         + move/eqP: Heq=> Heq.
           subst yR.
           case: (boolp.constructive_indefinite_description
-            (Hcont yL memL' memR' xL xR))=> d [[HdL HdR] Hsupport] /=.
-          split; [exact: HdL | exact: HdR].
+            (Hcont yL memL' memR' xL xR))=> d [Hd Hsupport] /=.
+          exact: Hd.
         + have [HdL HdR] :=
             completed_fallback_coupling_margins
               (Pr_code (contL yL xL) memL')
               (Pr_code (contR yR xR) memR').
-          split.
+          apply: coupling_of_margins; split.
           * exact: HdL.
           * exact: HdR.
       - case: ymemL=> yL memL'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (Some (yL, memL'), None).
-        split.
+        apply: coupling_of_margins; split.
         + exact: HdL.
         + exact: HdR.
       - case: ymemR=> yR memR'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (None, Some (yR, memR')).
-        split.
+        apply: coupling_of_margins; split.
         + exact: HdL.
         + exact: HdR.
       - have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR (None, None).
-        split.
+        apply: coupling_of_margins; split.
         + exact: HdL.
         + exact: HdR.
     exists (\dlet_(xy <- d0) K xy).
@@ -1291,8 +1291,8 @@ Module NoiseFloodingSecureGameReduction
         (complete (Pr_code (progR xR) memR))
         K (complete_bind_kernel KL) (complete_bind_kernel KR)
         Hd0 HK.
-      move: Hbind=> [HL HR].
-      split.
+      have [HL HR] := coupling_margins Hbind.
+      apply: coupling_of_margins; split.
       + move=> z.
         rewrite HL.
         rewrite (complete_bind (Pr_code (progL xL) memL) KL z).
@@ -1374,7 +1374,7 @@ Module NoiseFloodingSecureGameReduction
           completed_fallback_coupling_margins
             (Pr_code (progL xL) memL)
             (Pr_code (progR xR) memR).
-        split.
+        apply: coupling_of_margins; split.
         * exact: HdL.
         * exact: HdR.
       + move=> Hpre.
@@ -1407,8 +1407,8 @@ Module NoiseFloodingSecureGameReduction
       Hcont (set_heap memL l v) (set_heap memR lR v) xL xR.
     exists d.
       split.
-      - move: Hd=> [HL HR].
-        split.
+      - have [HL HR] := coupling_margins Hd.
+        apply: coupling_of_margins; split.
         + move=> z.
           rewrite Pr_code_put.
           by rewrite HL.
@@ -1451,8 +1451,8 @@ Module NoiseFloodingSecureGameReduction
       have [d [Hd Hsupport_if]] := Hcont vL memL memR xL xR.
       exists d.
       split.
-      + move: Hd=> [HL HR].
-        split.
+      + have [HL HR] := coupling_margins Hd.
+        apply: coupling_of_margins; split.
         * move=> z.
           rewrite Pr_code_get /vL.
           by rewrite HL.
@@ -1470,7 +1470,7 @@ Module NoiseFloodingSecureGameReduction
           completed_fallback_coupling_margins
             (Pr_code (contL vL xL) memL)
             (Pr_code (contR vR xR) memR).
-        split.
+        apply: coupling_of_margins; split.
         * move=> z.
           rewrite /d.
           rewrite Pr_code_get /vL.
@@ -1525,16 +1525,16 @@ Module NoiseFloodingSecureGameReduction
           end
       | _ => complete_bind_fallback_coupling KL KR xy
       end.
-    have Hd0 : clean_coupling d0
+    have Hd0 : coupling d0
         (complete (dmargin outL D))
         (complete (dmargin outR D)).
       have [HmarginL HmarginR] :=
         shared_complete_sample_coupling_margins D outL outR.
-      split.
+      apply: coupling_of_margins; split.
       + exact: HmarginL.
       + exact: HmarginR.
     have HK xy :
-        clean_coupling (K xy)
+        coupling (K xy)
           (complete_bind_kernel KL xy.1)
           (complete_bind_kernel KR xy.2).
       case: xy=> [[ymemL|] [ymemR|]] /=.
@@ -1544,32 +1544,32 @@ Module NoiseFloodingSecureGameReduction
         + move/eqP: Heq=> Heq.
           subst aR.
           case: (boolp.constructive_indefinite_description
-            (Hcont aL memL' memR' xL xR))=> d [[HdL HdR] Hsupport] /=.
-          split; [exact: HdL | exact: HdR].
+            (Hcont aL memL' memR' xL xR))=> d [Hd Hsupport] /=.
+          exact: Hd.
         + have [HdL HdR] :=
             completed_fallback_coupling_margins
               (Pr_code (contL aL xL) memL')
               (Pr_code (contR aR xR) memR').
-          split.
+          apply: coupling_of_margins; split.
           * exact: HdL.
           * exact: HdR.
       - case: ymemL=> aL memL'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (Some (aL, memL'), None).
-        split.
+        apply: coupling_of_margins; split.
         + exact: HdL.
         + exact: HdR.
       - case: ymemR=> aR memR'.
         have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR
             (None, Some (aR, memR')).
-        split.
+        apply: coupling_of_margins; split.
         + exact: HdL.
         + exact: HdR.
       - have [HdL HdR] :=
           complete_bind_fallback_coupling_margins KL KR (None, None).
-        split.
+        apply: coupling_of_margins; split.
         + exact: HdL.
         + exact: HdR.
     exists (\dlet_(xy <- d0) K xy).
@@ -1577,8 +1577,8 @@ Module NoiseFloodingSecureGameReduction
     - have Hbind := coupling_bind_kernel d0
         (complete (dmargin outL D)) (complete (dmargin outR D))
         K (complete_bind_kernel KL) (complete_bind_kernel KR) Hd0 HK.
-      move: Hbind=> [HL HR].
-      split.
+      have [HL HR] := coupling_margins Hbind.
+      apply: coupling_of_margins; split.
       + move=> z.
         rewrite HL.
         rewrite (complete_bind (dmargin outL D) KL z).
@@ -1630,7 +1630,7 @@ Module NoiseFloodingSecureGameReduction
     fseparate (loc (ind_cpa_reduction_moved_adversary A))
       IndCpaSecurity.IndCpaGame.IndCpa_locs ->
     sim_decrypt_reduction_adv_heap_rel A memL memR ->
-    clean_coupling d
+    coupling d
       (complete
         (Pr_code (resolve (IndCpadSimDecryptOracle max_queries) o x) memL))
       (complete
@@ -1642,7 +1642,8 @@ Module NoiseFloodingSecureGameReduction
     \P_[d] same_result_sim_decrypt_reduction_opt >= 1 ->
     supports_same_result_sim_decrypt_reduction_adv_opt A d.
   Proof.
-    move=> Ho Houter [Hheap Hadv] [HdL HdR] Hprob outs Houts.
+    move=> Ho Houter [Hheap Hadv] Hd Hprob outs Houts.
+    have [HdL HdR] := coupling_margins Hd.
     have Hdweight : dweight d = 1.
       rewrite -(dmargin_dweight fst d).
       transitivity (dweight (complete
@@ -1745,7 +1746,7 @@ Module NoiseFloodingSecureGameReduction
                 (resolve (IndCpaDSim.IndCpadOracle max_queries) o x)
                 IndCpaSecurity.IndCpaGame.IndCpaOracle)
               memR).
-        split.
+        apply: coupling_of_margins; split.
         * exact: HdL.
         * exact: HdR.
       + move=> Hpre.
