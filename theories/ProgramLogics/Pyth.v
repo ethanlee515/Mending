@@ -16,8 +16,9 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
 From Mending.NextMessage Require Import Trace.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
-From Mending.LibExtras.SSProveExtras Require Import DiscreteGaussian.
 From Mending.Probability Require Import Ae OutputHeap PythSeq.
+From Mending.Probability.DiscreteGaussians Require Import
+  DiscreteGaussian DiscreteGaussianKL.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
 Local Open Scope AeNotations.
@@ -238,6 +239,241 @@ split.
   have [x Hx Hunit] := dinsupp_dlet HyD.
   have -> : y = (x, memL) by exact: (in_dunit Hunit).
   exact: (HpostR memL memL xL xR x Hpre Hx).
+Qed.
+
+Fixpoint dg_tuple {n : nat}
+    (center : n.-tuple int) (stdev : R) : {distr (n.-tuple int) / R} :=
+  match n as n' return n'.-tuple int -> {distr (n'.-tuple int) / R} with
+  | 0 => fun _ => dunit [tuple]
+  | n'.+1 => fun center' =>
+      \dlet_(x <- discrete_gaussian (thead center') stdev)
+      \dlet_(xs <- dg_tuple (behead_tuple center') stdev)
+        dunit (cons_tuple x xs)
+  end center.
+
+Lemma dg_tuple_cons_cat {n : nat}
+    (c : int) (center : n.-tuple int) (stdev : R) :
+  dg_tuple [tuple of c :: center] stdev =1
+    \dlet_(x <- discrete_gaussian c stdev)
+    \dlet_(xs <- dg_tuple center stdev)
+      dunit (cat_tuple [tuple x] xs).
+Proof.
+move=> y.
+rewrite /= theadE.
+have Hbehead : behead_tuple [tuple of c :: center] = center.
+  by apply: val_inj.
+rewrite Hbehead.
+apply: eq_in_dlet=> // x _ z.
+apply: eq_in_dlet=> // xs _ w.
+by rewrite cat_tuple_singleton_cons.
+Qed.
+
+Lemma dg_tuple_singleton_pyth_trace (c : int) (stdev : R) :
+  dg_tuple [tuple c] stdev =1
+    dmargin (@singleton_pyth_trace int) (discrete_gaussian c stdev).
+Proof.
+move=> y.
+have Hcenter : [tuple c] = [tuple of c :: [tuple]] :> 1.-tuple int.
+  by apply: val_inj.
+rewrite Hcenter.
+rewrite (dg_tuple_cons_cat c [tuple] stdev y).
+rewrite dmarginE.
+apply: eq_in_dlet=> // x _ z.
+rewrite /= dlet_unit.
+have -> : cat_tuple [tuple x] [tuple] = singleton_pyth_trace x.
+  by apply: val_inj.
+by [].
+Qed.
+
+Lemma dgTuplePythDist
+    {n : nat} (centerL centerR : n.-tuple int)
+    (stdev eps : R) :
+  0 <= eps ->
+  0 < stdev ->
+  (forall i : 'I_n,
+    ((tnth centerR i - tnth centerL i)%:~R) ^+ 2 /
+      (2 * stdev ^ 2) <= eps) ->
+  pythDist
+    (dg_tuple centerL stdev)
+    (dg_tuple centerR stdev)
+    [tuple eps | i < n].
+Proof.
+elim: n centerL centerR=> [|n IH] centerL centerR Heps Hstdev Hcoord.
+- rewrite [centerL](tuple0 centerL) [centerR](tuple0 centerR) /=.
+  apply: pythDist_refl.
+  + by move=> i; case: i.
+  exact: dunit_dweight.
+case: n IH centerL centerR Hcoord=> [IH0|n IH] centerL centerR Hcoord.
+- pose cL := thead centerL.
+  pose cR := thead centerR.
+  have HcenterL : centerL = [tuple cL].
+    apply: eq_from_tnth=> i.
+    rewrite [i]ord1 /cL /thead.
+    by rewrite tnth0.
+  have HcenterR : centerR = [tuple cR].
+    apply: eq_from_tnth=> i.
+    rewrite [i]ord1 /cR /thead.
+    by rewrite tnth0.
+  have Hfin : finite_kl
+      (discrete_gaussian cL stdev)
+      (discrete_gaussian cR stdev).
+    exact: (finite_kl_discrete_gaussian cL cR stdev Hstdev).
+  have Hkl :
+      δ_KL (discrete_gaussian cL stdev)
+        (discrete_gaussian cR stdev) <= eps.
+    rewrite kl_discrete_gaussian //.
+    exact: (Hcoord ord0).
+  rewrite (mktuple_const_1 eps).
+  apply: (pythDist_ext
+    (dmargin (@singleton_pyth_trace int)
+      (discrete_gaussian cL stdev))
+    (dg_tuple centerL stdev)
+    (dmargin (@singleton_pyth_trace int)
+      (discrete_gaussian cR stdev))
+    (dg_tuple centerR stdev)
+    [tuple eps]).
+  + move=> y; symmetry.
+    rewrite HcenterL.
+    exact: dg_tuple_singleton_pyth_trace.
+  + move=> y; symmetry.
+    rewrite HcenterR.
+    exact: dg_tuple_singleton_pyth_trace.
+  apply: pythDist_kl_singleton.
+  + exact: Heps.
+  + exact: Hfin.
+  + by rewrite discrete_gaussian_mass1.
+  + by rewrite discrete_gaussian_mass1.
+  exact: Hkl.
+pose cL := thead centerL.
+pose tailL := behead_tuple centerL.
+pose cR := thead centerR.
+pose tailR := behead_tuple centerR.
+have HcenterL : centerL = [tuple of cL :: tailL].
+  by rewrite (tuple_eta centerL).
+have HcenterR : centerR = [tuple of cR :: tailR].
+  by rewrite (tuple_eta centerR).
+have HtailL i : tnth centerL (lift ord0 i) = tnth tailL i.
+  by rewrite HcenterL tnthS.
+have HtailR i : tnth centerR (lift ord0 i) = tnth tailR i.
+  by rewrite HcenterR tnthS.
+have Hfin_head : finite_kl
+    (discrete_gaussian cL stdev)
+    (discrete_gaussian cR stdev).
+  exact: (finite_kl_discrete_gaussian cL cR stdev Hstdev).
+have Hkl_head :
+    δ_KL (discrete_gaussian cL stdev)
+      (discrete_gaussian cR stdev) <= eps.
+  rewrite kl_discrete_gaussian //.
+  exact: (Hcoord ord0).
+have Hhead :
+    pythDist
+      (dmargin (@singleton_pyth_trace int)
+        (discrete_gaussian cL stdev))
+      (dmargin (@singleton_pyth_trace int)
+        (discrete_gaussian cR stdev))
+      [tuple eps].
+  apply: pythDist_kl_singleton.
+  + exact: Heps.
+  + exact: Hfin_head.
+  + by rewrite discrete_gaussian_mass1.
+  + by rewrite discrete_gaussian_mass1.
+  exact: Hkl_head.
+have Htail :
+    pythDist
+      (dg_tuple tailL stdev)
+      (dg_tuple tailR stdev)
+      [tuple eps | i < n.+1].
+  apply: IH=> // i.
+  move: (Hcoord (lift ord0 i)).
+  by rewrite HtailL HtailR.
+rewrite HcenterL HcenterR.
+rewrite -cat_tuple_singleton_const.
+apply: (pythDist_ext
+  (\dlet_(omega0 <-
+      dmargin (@singleton_pyth_trace int)
+        (discrete_gaussian cL stdev))
+   \dlet_(omega1 <- dg_tuple tailL stdev)
+     dunit (cat_tuple omega0 omega1))
+  (dg_tuple [tuple of cL :: tailL] stdev)
+  (\dlet_(omega0 <-
+      dmargin (@singleton_pyth_trace int)
+        (discrete_gaussian cR stdev))
+   \dlet_(omega1 <- dg_tuple tailR stdev)
+     dunit (cat_tuple omega0 omega1))
+  (dg_tuple [tuple of cR :: tailR] stdev)
+  (cat_tuple [tuple eps] [tuple eps | i < n.+1])).
+- move=> y.
+  rewrite (dg_tuple_cons_cat cL tailL stdev y).
+  rewrite dmarginE __deprecated__dlet_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  by rewrite dlet_unit /singleton_pyth_trace.
+- move=> y.
+  rewrite (dg_tuple_cons_cat cR tailR stdev y).
+  rewrite dmarginE __deprecated__dlet_dlet.
+  apply: eq_in_dlet=> // x _ z.
+  by rewrite dlet_unit /singleton_pyth_trace.
+exact: (pythDist_dlet_cat_const _ _ _ _ _ _ Hhead Htail).
+Qed.
+
+Lemma klDgNRule
+    {n : nat} {out_t : choice_type}
+    (centerL centerR : n.-tuple int)
+    (encode : n.-tuple int -> out_t)
+    (stdev eps : R)
+    (pre : pred ((chUnit * heap) * (chUnit * heap)))
+    (post : pred (out_t * heap)) :
+  injective encode ->
+  0 <= eps ->
+  0 < stdev ->
+  (forall i : 'I_n,
+    ((tnth centerR i - tnth centerL i)%:~R) ^+ 2 /
+      (2 * stdev ^ 2) <= eps) ->
+  (forall memL memR,
+    pre ((tt, memL), (tt, memR)) -> memL = memR) ->
+  (forall memL memR y,
+    pre ((tt, memL), (tt, memR)) -> post (y, memL)) ->
+  (forall memL memR y,
+    pre ((tt, memL), (tt, memR)) -> post (y, memR)) ->
+  ⊨Pyth1 ⦃ pre ⦄
+    (fun _ : chUnit =>
+      sampleRaw (dmargin encode (dg_tuple centerL stdev)))
+    ≈( n%:R * eps )
+    (fun _ : chUnit =>
+      sampleRaw (dmargin encode (dg_tuple centerR stdev)))
+  ⦃ post ⦄.
+Proof.
+move=> Hencode Heps Hstdev Hcoord Hsame HpostL HpostR.
+have Hpyth := dgTuplePythDist
+  centerL centerR stdev eps Heps Hstdev Hcoord.
+have Hfin := pythDist_finite_kl _ _ _ Hpyth.
+have Hkl := pythDist_kl_bound _ _ _ Hpyth.
+have [_ [HmassL [HmassR _]]] := Hpyth.
+apply: (klSampRule
+  (fun _ : chUnit => dmargin encode (dg_tuple centerL stdev))
+  (fun _ : chUnit => dmargin encode (dg_tuple centerR stdev))
+  pre post (n%:R * eps)).
+- apply: mulr_ge0; first exact: ler0n.
+  exact: Heps.
+- by move=> memL memR [] []; exact: Hsame.
+- move=> [] [].
+  exact: (finite_kl_dmargin_injective encode _ _ Hencode Hfin).
+- move=> [].
+  rewrite dmargin_dweight.
+  exact: HmassL.
+- move=> [].
+  rewrite dmargin_dweight.
+  exact: HmassR.
+- move=> memL memR [] [] Hpre.
+  rewrite (kl_dmargin_injective encode _ _ Hencode Hfin).
+  apply: (le_trans Hkl).
+  rewrite (eq_bigr (fun _ : 'I_n => eps)); last first.
+    by move=> i _; rewrite tnth_mktuple.
+  rewrite big_const_ord iter_addr_0 mulr_natl.
+  exact: lexx.
+- move=> memL memR [] [] y Hpre _.
+  exact: (HpostL memL memR y Hpre).
+- move=> memL memR [] [] y Hpre _.
+  exact: (HpostR memL memR y Hpre).
 Qed.
 
 Lemma pythReflRule

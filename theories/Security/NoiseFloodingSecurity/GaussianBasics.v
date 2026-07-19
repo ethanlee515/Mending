@@ -153,28 +153,6 @@ Module NoiseFloodingSecureGaussianBasics
     exact: (leq_trans (ivec_dist_tnth_le centerL centerR i) Hdist).
   Qed.
 
-  Lemma noise_flooding_coordinate_kl
-      error_bound (centerL centerR : dim.-tuple int) (i : 'I_dim) :
-    (ivec_dist centerL centerR <= error_bound)%N ->
-    let stdev :=
-      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
-    finite_kl
-      (discrete_gaussian (tnth centerL i) stdev)
-      (discrete_gaussian (tnth centerR i) stdev) /\
-    δ_KL
-      (discrete_gaussian (tnth centerL i) stdev)
-      (discrete_gaussian (tnth centerR i) stdev) <=
-    1 / (2 * gaussian_width_multiplier ^+ 2).
-  Proof.
-    move=> Hdist stdev.
-    split.
-    - apply: finite_kl_discrete_gaussian.
-      exact: noise_flooding_dg_stdev_pos.
-    rewrite kl_discrete_gaussian; first
-      exact: noise_flooding_coordinate_kl_budget.
-    exact: noise_flooding_dg_stdev_pos.
-  Qed.
-
   Lemma noise_flooding_coordinate_epsilon_nonnegative :
     0 <= 1 / (2 * gaussian_width_multiplier ^+ 2).
   Proof.
@@ -184,177 +162,16 @@ Module NoiseFloodingSecureGaussianBasics
     exact: ltW gt0_gaussian_width_multiplier.
   Qed.
 
-  Lemma noise_flooding_coordinate_epsilon_sum :
-    \sum_(i < dim) (1 / (2 * gaussian_width_multiplier ^+ 2)) =
-    (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
+  Lemma dg_tuple_n_dg_shifted {n : nat}
+      (center : n.-tuple int) stdev :
+    dg_tuple center stdev =1 n_dg_shifted center stdev.
   Proof.
-    rewrite big_const_ord iter_addr_0 mulr_natl.
-    field.
-    have Hg : 0 < gaussian_width_multiplier :=
-      gt0_gaussian_width_multiplier.
-    nra.
-  Qed.
-
-  Lemma n_dg_shifted_singleton_pyth_trace (c : int) s :
-    n_dg_shifted [tuple c] s =1
-      dmargin (@singleton_pyth_trace int) (discrete_gaussian c s).
-  Proof.
-    move=> y.
-    have Hcenter : [tuple c] = [tuple of c :: [tuple]] :> 1.-tuple int.
-      by apply: val_inj.
-    rewrite Hcenter.
-    rewrite (n_dg_shifted_cons_cat c [tuple] s y).
-    rewrite dmarginE.
+    elim: n center=> [|n IH] center y.
+    - by rewrite [center](tuple0 center).
+    rewrite [center](tuple_eta center) /=.
     apply: eq_in_dlet=> // x _ z.
-    rewrite /= dlet_unit.
-    have -> : cat_tuple [tuple x] [tuple] = singleton_pyth_trace x.
-      by apply: val_inj.
-    by [].
-  Qed.
-
-  Lemma n_dg_shifted_pythDist
-      {n : nat} (centerL centerR : n.-tuple int)
-      (stdev eps : R) :
-    0 <= eps ->
-    0 < stdev ->
-    (forall i : 'I_n,
-      finite_kl
-        (discrete_gaussian (tnth centerL i) stdev)
-        (discrete_gaussian (tnth centerR i) stdev) /\
-      δ_KL
-        (discrete_gaussian (tnth centerL i) stdev)
-        (discrete_gaussian (tnth centerR i) stdev) <= eps) ->
-    pythDist
-      (n_dg_shifted centerL stdev)
-      (n_dg_shifted centerR stdev)
-      [tuple eps | i < n].
-  Proof.
-    elim: n centerL centerR=> [|n IH] centerL centerR Heps Hstdev Hcoord.
-    - rewrite [centerL](tuple0 centerL) [centerR](tuple0 centerR) /=.
-      apply: pythDist_refl.
-      + by move=> i; case: i.
-      exact: dunit_dweight.
-    case: n IH centerL centerR Hcoord=> [IH0|n IH] centerL centerR Hcoord.
-    - pose cL := thead centerL.
-      pose cR := thead centerR.
-      have HcenterL : centerL = [tuple cL].
-        apply: eq_from_tnth=> i.
-        rewrite [i]ord1 /cL /thead.
-        by rewrite tnth0.
-      have HcenterR : centerR = [tuple cR].
-        apply: eq_from_tnth=> i.
-        rewrite [i]ord1 /cR /thead.
-        by rewrite tnth0.
-      have [Hfin Hkl] :
-          finite_kl (discrete_gaussian cL stdev)
-            (discrete_gaussian cR stdev) /\
-          δ_KL (discrete_gaussian cL stdev)
-            (discrete_gaussian cR stdev) <= eps.
-        exact: (Hcoord ord0).
-      rewrite (mktuple_const_1 eps).
-      apply: (pythDist_ext
-        (dmargin (@singleton_pyth_trace int) (discrete_gaussian cL stdev))
-        (n_dg_shifted centerL stdev)
-        (dmargin (@singleton_pyth_trace int) (discrete_gaussian cR stdev))
-        (n_dg_shifted centerR stdev)
-        [tuple eps]).
-      + move=> y; symmetry.
-        rewrite HcenterL.
-        exact: n_dg_shifted_singleton_pyth_trace.
-      + move=> y; symmetry.
-        rewrite HcenterR.
-        exact: n_dg_shifted_singleton_pyth_trace.
-      apply: pythDist_kl_singleton.
-      + exact: Heps.
-      + exact: Hfin.
-      + by rewrite discrete_gaussian_mass1.
-      + by rewrite discrete_gaussian_mass1.
-      exact: Hkl.
-    pose cL := thead centerL.
-    pose tailL := behead_tuple centerL.
-    pose cR := thead centerR.
-    pose tailR := behead_tuple centerR.
-    have HcenterL : centerL = [tuple of cL :: tailL].
-      by rewrite (tuple_eta centerL).
-    have HcenterR : centerR = [tuple of cR :: tailR].
-      by rewrite (tuple_eta centerR).
-    have HtailL i : tnth centerL (lift ord0 i) = tnth tailL i.
-      by rewrite HcenterL tnthS.
-    have HtailR i : tnth centerR (lift ord0 i) = tnth tailR i.
-      by rewrite HcenterR tnthS.
-    have [Hfin_head Hkl_head] :
-        finite_kl (discrete_gaussian cL stdev)
-          (discrete_gaussian cR stdev) /\
-        δ_KL (discrete_gaussian cL stdev)
-          (discrete_gaussian cR stdev) <= eps.
-      exact: (Hcoord ord0).
-    have Hhead :
-        pythDist
-          (dmargin (@singleton_pyth_trace int)
-            (discrete_gaussian cL stdev))
-          (dmargin (@singleton_pyth_trace int)
-            (discrete_gaussian cR stdev))
-          [tuple eps].
-      apply: pythDist_kl_singleton.
-      + exact: Heps.
-      + exact: Hfin_head.
-      + by rewrite discrete_gaussian_mass1.
-      + by rewrite discrete_gaussian_mass1.
-      exact: Hkl_head.
-    have Htail :
-        pythDist
-          (n_dg_shifted tailL stdev)
-          (n_dg_shifted tailR stdev)
-          [tuple eps | i < n.+1].
-      apply: IH=> // i.
-      move: (Hcoord (lift ord0 i)).
-      by rewrite HtailL HtailR.
-    rewrite HcenterL HcenterR.
-    rewrite -cat_tuple_singleton_const.
-    apply: (pythDist_ext
-      (\dlet_(omega0 <-
-          dmargin (@singleton_pyth_trace int)
-            (discrete_gaussian cL stdev))
-       \dlet_(omega1 <- n_dg_shifted tailL stdev)
-         dunit (cat_tuple omega0 omega1))
-      (n_dg_shifted [tuple of cL :: tailL] stdev)
-      (\dlet_(omega0 <-
-          dmargin (@singleton_pyth_trace int)
-            (discrete_gaussian cR stdev))
-       \dlet_(omega1 <- n_dg_shifted tailR stdev)
-         dunit (cat_tuple omega0 omega1))
-      (n_dg_shifted [tuple of cR :: tailR] stdev)
-      (cat_tuple [tuple eps] [tuple eps | i < n.+1])).
-    - move=> y.
-      rewrite (n_dg_shifted_cons_cat cL tailL stdev y).
-      rewrite dmarginE __deprecated__dlet_dlet.
-      apply: eq_in_dlet=> // x _ z.
-      by rewrite dlet_unit /singleton_pyth_trace.
-    - move=> y.
-      rewrite (n_dg_shifted_cons_cat cR tailR stdev y).
-      rewrite dmarginE __deprecated__dlet_dlet.
-      apply: eq_in_dlet=> // x _ z.
-      by rewrite dlet_unit /singleton_pyth_trace.
-    exact: (pythDist_dlet_cat_const
-      _ _ _ _ _ _ Hhead Htail).
-  Qed.
-
-  Lemma noise_flooding_vector_pythDist
-      error_bound (centerL centerR : dim.-tuple int) :
-    (ivec_dist centerL centerR <= error_bound)%N ->
-    let stdev :=
-      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
-    pythDist
-      (n_dg_shifted centerL stdev)
-      (n_dg_shifted centerR stdev)
-      [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim].
-  Proof.
-    move=> Hdist stdev.
-    apply: n_dg_shifted_pythDist.
-    - exact: noise_flooding_coordinate_epsilon_nonnegative.
-    - exact: noise_flooding_dg_stdev_pos.
-    move=> i.
-    exact: (noise_flooding_coordinate_kl error_bound centerL centerR i Hdist).
+    apply: eq_in_dlet; first by move=> xs _ w.
+    exact: IH.
   Qed.
 
   Lemma inverse_isometry_shifted_gaussian_one_chart
@@ -392,63 +209,6 @@ Module NoiseFloodingSecureGaussianBasics
     have Hid : injective (fun noise : n.-tuple int => noise) by [].
     exact: (dmargin_injectiveE
       (fun noise : n.-tuple int => noise) (n_dg n stdev) Hid y).
-  Qed.
-
-  Lemma noise_flooding_vector_pythDist_one_chart
-      error_bound (centerL centerR : message) :
-    (metric centerL centerR <= error_bound)%N ->
-    let stdev :=
-      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
-    pythDist
-      (n_dg dim stdev)
-      (n_dg_shifted (isometry centerL centerR) stdev)
-      [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim].
-  Proof.
-    move=> Hmetric stdev.
-    apply: (pythDist_ext
-      (n_dg_shifted (ivec_zero : dim.-tuple int) stdev)
-      (n_dg dim stdev)
-      (n_dg_shifted (isometry centerL centerR) stdev)
-      (n_dg_shifted (isometry centerL centerR) stdev)
-      [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim]).
-    - exact: n_dg_shifted_ivec_zeroE.
-    - by [].
-    apply: (noise_flooding_vector_pythDist
-      error_bound (ivec_zero : dim.-tuple int)
-      (isometry centerL centerR)).
-    by rewrite -metric_chartE.
-  Qed.
-
-  Lemma noise_flooding_vector_kl_bound_one_chart
-      error_bound (centerL centerR : message) :
-    (metric centerL centerR <= error_bound)%N ->
-    let stdev :=
-      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
-    finite_kl
-      (n_dg dim stdev)
-      (n_dg_shifted (isometry centerL centerR) stdev) /\
-    δ_KL
-      (n_dg dim stdev)
-      (n_dg_shifted (isometry centerL centerR) stdev) <=
-      (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
-  Proof.
-    move=> Hmetric stdev.
-    have Hpyth :
-        pythDist
-          (n_dg dim stdev)
-          (n_dg_shifted (isometry centerL centerR) stdev)
-          [tuple 1 / (2 * gaussian_width_multiplier ^+ 2) | i < dim].
-      exact: (noise_flooding_vector_pythDist_one_chart
-        error_bound centerL centerR Hmetric).
-    split.
-    - exact: (pythDist_finite_kl _ _ _ Hpyth).
-    have Hbound := pythDist_kl_bound _ _ _ Hpyth.
-    rewrite (eq_bigr
-      (fun _ : 'I_dim =>
-        1 / (2 * gaussian_width_multiplier ^+ 2)) _ ) in Hbound.
-    - by rewrite noise_flooding_coordinate_epsilon_sum in Hbound.
-    - move=> i _.
-      by rewrite tnth_mktuple.
   Qed.
 
   Lemma scheme_decrypt_deterministic_dec_dunit sk c :
@@ -770,33 +530,6 @@ Module NoiseFloodingSecureGaussianBasics
     by rewrite -(toIntVec_toChIntVec x) Hxy toIntVec_toChIntVec.
   Qed.
 
-  Lemma noise_flooding_ch_vector_kl_bound_one_chart
-      error_bound (centerL centerR : message) :
-    (metric centerL centerR <= error_bound)%N ->
-    let stdev :=
-      noise_flooding_dg_stdev gaussian_width_multiplier error_bound in
-    finite_kl
-      (dmargin (@toChIntVec dim) (n_dg dim stdev))
-      (dmargin (@toChIntVec dim)
-        (n_dg_shifted (isometry centerL centerR) stdev)) /\
-    δ_KL
-      (dmargin (@toChIntVec dim) (n_dg dim stdev))
-      (dmargin (@toChIntVec dim)
-        (n_dg_shifted (isometry centerL centerR) stdev)) <=
-      (dim%:R / (2 * gaussian_width_multiplier ^+ 2)).
-  Proof.
-    move=> Hmetric stdev.
-    have [Hfin Hkl] :=
-      noise_flooding_vector_kl_bound_one_chart
-        error_bound centerL centerR Hmetric.
-    split.
-    - exact: (finite_kl_dmargin_injective
-        (@toChIntVec dim) _ _ toChIntVec_injective Hfin).
-    rewrite (kl_dmargin_injective
-      (@toChIntVec dim) _ _ toChIntVec_injective Hfin).
-    exact: Hkl.
-  Qed.
-
   Lemma noise_flooding_ch_vector_sample_pyth_one_chart
       error_bound (centerL centerR : message) :
     (metric centerL centerR <= error_bound)%N ->
@@ -813,33 +546,64 @@ Module NoiseFloodingSecureGaussianBasics
     ⦃ fun _ : chVec chInt dim * heap => true ⦄.
   Proof.
     move=> Hmetric stdev.
-    have [Hfin Hkl] :=
-      noise_flooding_ch_vector_kl_bound_one_chart
-        error_bound centerL centerR Hmetric.
-    apply: (klSampRule
+    set coord_eps := 1 / (2 * gaussian_width_multiplier ^+ 2).
+    have Hbudget :
+        dim%:R * coord_eps =
+          dim%:R / (2 * gaussian_width_multiplier ^+ 2).
+      rewrite /coord_eps.
+      field.
+      have Hg : 0 < gaussian_width_multiplier :=
+        gt0_gaussian_width_multiplier.
+      nra.
+    rewrite -Hbudget.
+    pose zero := (ivec_zero : dim.-tuple int).
+    pose shift := isometry centerL centerR.
+    have HdgL : dg_tuple zero stdev =1 n_dg dim stdev.
+      move=> y.
+      rewrite (dg_tuple_n_dg_shifted zero stdev y).
+      exact: n_dg_shifted_ivec_zeroE.
+    have HdgR : dg_tuple shift stdev =1 n_dg_shifted shift stdev.
+      exact: dg_tuple_n_dg_shifted.
+    have HdistL :
+        dmargin (@toChIntVec dim) (dg_tuple zero stdev) =1
+        dmargin (@toChIntVec dim) (n_dg dim stdev).
+      exact: (dmargin_ext (@toChIntVec dim) _ _ HdgL).
+    have HdistR :
+        dmargin (@toChIntVec dim) (dg_tuple shift stdev) =1
+        dmargin (@toChIntVec dim) (n_dg_shifted shift stdev).
+      exact: (dmargin_ext (@toChIntVec dim) _ _ HdgR).
+    apply: (pythJudgment_ext_true
       (fun _ : chUnit =>
-        dmargin (@toChIntVec dim) (n_dg dim stdev))
+        sampleRaw (dmargin (@toChIntVec dim) (dg_tuple zero stdev)))
       (fun _ : chUnit =>
-        dmargin (@toChIntVec dim)
-          (n_dg_shifted (isometry centerL centerR) stdev))
+        sampleRaw (dmargin (@toChIntVec dim) (n_dg dim stdev)))
+      (fun _ : chUnit =>
+        sampleRaw (dmargin (@toChIntVec dim) (dg_tuple shift stdev)))
+      (fun _ : chUnit =>
+        sampleRaw (dmargin (@toChIntVec dim) (n_dg_shifted shift stdev)))
       (fun inps =>
         let '((_, memL), (_, memR)) := inps in eq_op memL memR)
-      (fun _ : chVec chInt dim * heap => true)
-      ((dim%:R / (2 * gaussian_width_multiplier ^+ 2)))).
-    - exact: noise_flooding_call_error_nonnegative.
-    - by move=> memL memR [] [] /eqP.
-    - by move=> [] [].
-    - move=> [].
-      rewrite dmargin_dweight.
-      apply: n_dg_mass1.
-      exact: noise_flooding_dg_stdev_pos.
-    - move=> [].
-      rewrite dmargin_dweight.
-      apply: n_dg_shifted_mass1.
-      exact: noise_flooding_dg_stdev_pos.
-    - by move=> memL memR [] [] Hpre.
-    - by move=> memL memR [] [] y Hpre Hy.
-    - by move=> memL memR [] [] y Hpre Hy.
+      [tuple dim%:R * coord_eps]).
+    - move=> [] mem out.
+      rewrite !sampleRawE.
+      exact: (dmargin_ext (fun y => (y, mem)) _ _ HdistL out).
+    - move=> [] mem out.
+      rewrite !sampleRawE.
+      exact: (dmargin_ext (fun y => (y, mem)) _ _ HdistR out).
+    apply: (klDgNRule zero shift (@toChIntVec dim)
+      stdev coord_eps
+      (fun inps =>
+        let '((_, memL), (_, memR)) := inps in eq_op memL memR)
+      (fun _ : chVec chInt dim * heap => true)).
+    - exact: toChIntVec_injective.
+    - exact: noise_flooding_coordinate_epsilon_nonnegative.
+    - exact: noise_flooding_dg_stdev_pos.
+    - move=> i.
+      apply: noise_flooding_coordinate_kl_budget.
+      by rewrite /zero /shift -metric_chartE.
+    - by move=> memL memR /eqP.
+    - by move=> memL memR y Hpre.
+    - by move=> memL memR y Hpre.
   Qed.
 
   Lemma noise_flooding_successful_decrypt_some_target_pyth_one_chart
