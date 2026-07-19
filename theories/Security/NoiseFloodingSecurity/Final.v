@@ -1801,7 +1801,7 @@ Module NoiseFloodingSecure
       ≈( ε )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_result_opt ⦄ ->
-    2 * ε <= security_loss dim max_queries gaussian_width_multiplier ->
+    ε <= security_loss dim max_queries gaussian_width_multiplier ->
     IndCpadGame.winning_probability max_queries A <=
     IndCpaSecurity.IndCpaGame.winning_probability
       (ind_cpa_reduction A max_queries) +
@@ -1816,9 +1816,9 @@ Module NoiseFloodingSecure
     have Hpoint :
       `|IndCpadGame.winning_probability max_queries A -
         IndCpaSecurity.IndCpaGame.winning_probability
-          (ind_cpa_reduction A max_queries)| <= 2 * ε.
+          (ind_cpa_reduction A max_queries)| <= ε.
       apply: (@le_trans _ _
-        (2 * total_variation
+        (total_variation
           (complete
             (dmargin fst
               (Pr_code (ind_cpad_game_code A max_queries tt) empty_heap)))
@@ -1830,8 +1830,8 @@ Module NoiseFloodingSecure
           /IndCpaSecurity.IndCpaGame.winning_probability
           /IndCpadGame.game_out /IndCpaSecurity.IndCpaGame.game_out
           /ind_cpad_game_code /ind_cpa_reduction_game_code /Pr_op.
-        exact: total_variation_complete_point_bound2.
-      lra.
+        exact: total_variation_complete_point_bound.
+      exact: Htv.
     set pL := IndCpadGame.winning_probability max_queries A.
     set pR := IndCpaSecurity.IndCpaGame.winning_probability
       (ind_cpa_reduction A max_queries).
@@ -1904,12 +1904,12 @@ Module NoiseFloodingSecure
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     ⊨AE ⦃ game_initial_pre ⦄
       (ind_cpad_game_code A max_queries)
-      ≈( security_loss dim max_queries gaussian_width_multiplier / 2 )
+      ≈( security_loss dim max_queries gaussian_width_multiplier )
       (ind_cpa_reduction_game_code A max_queries)
     ⦃ same_game_result_opt ⦄.
   Proof.
     move=> A_valid Hprefix_vector.
-    rewrite security_loss_halfE.
+    rewrite security_lossE.
     exact: (ind_cpa_reduction_additive_error_from_compile_ready_vector_bound
       A max_queries A_valid Hprefix_vector).
   Qed.

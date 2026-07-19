@@ -23,8 +23,8 @@ of guessing the hidden challenge bit by the supplied IND-CPA security bound
 for a concrete reduction plus the verified noise-flooding loss.  The only
 nonzero hybrid loss is the compiler/Micciancio-Walter replacement of the
 first `q` decrypt calls, with completed-output additive error
-`sqrt(q * epsilon_nf / 2)`; the final winning-probability bound uses twice this
-compile distance.
+`sqrt(q * epsilon_nf / 2)`; the final winning-probability bound uses this
+compile distance directly.
 
 ## Setup
 

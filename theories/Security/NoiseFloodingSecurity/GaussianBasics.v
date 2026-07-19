@@ -50,12 +50,12 @@ Module NoiseFloodingSecureGaussianBasics
       ((max_queries%:R *
         (dim%:R / (2 * gaussian_width_multiplier ^+ 2))) / 2).
 
-  Lemma security_loss_halfE max_queries :
-    security_loss dim max_queries gaussian_width_multiplier / 2 =
+  Lemma security_lossE max_queries :
+    security_loss dim max_queries gaussian_width_multiplier =
     compile_security_error max_queries.
   Proof.
     rewrite /security_loss /compile_security_error.
-    lra.
+    by [].
   Qed.
 
   Lemma noise_flooding_dg_stdev_pos error_bound :

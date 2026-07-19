@@ -38,7 +38,7 @@ Local Open Scope PythNotations.
 
 Definition security_loss
     (dim max_queries : nat) (gaussian_width_multiplier : R) : R :=
-  2 * Num.sqrt
+  Num.sqrt
     ((max_queries%:R *
       (dim%:R / (2 * gaussian_width_multiplier ^+ 2))) / 2).
 

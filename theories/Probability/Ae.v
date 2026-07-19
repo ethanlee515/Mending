@@ -297,15 +297,6 @@ apply: (@le_trans _ _ (sum (fun y => `|P y - Q y|))).
 lra.
 Qed.
 
-Lemma total_variation_complete_point_bound2
-    {T : choiceType} (P Q : {distr T / R}) (x : T) :
-  `|P x - Q x| <=
-    2 * total_variation (complete P) (complete Q).
-Proof.
-have H := total_variation_point_bound2 (complete P) (complete Q) (Some x).
-by rewrite !completeE /= in H.
-Qed.
-
 Lemma dmargin_dunit_fst_pair {T U : choiceType} (x : T) (y : U) :
   dmargin fst (dunit (x, y) : {distr (T * U) / R}) =1 dunit x.
 Proof.
@@ -1058,6 +1049,46 @@ rewrite -(@psum_sum R T (fun x => `|P x - Q x|)).
   move=> x.
   exact: abs_diff_residual_sum.
 - move=> x; exact: normr_ge0.
+Qed.
+
+Lemma distr_point_le_dweight {T : choiceType}
+    (D : {distr T / R}) (x : T) :
+  D x <= dweight D.
+Proof.
+rewrite pr_predT.
+have H := gerfinseq_psum
+  (S := D) (r := [:: x]) (erefl true) (summable_mu D).
+by rewrite big_seq1 ger0_norm ?ge0_mu in H.
+Qed.
+
+Lemma total_variation_point_bound
+    {T : choiceType} (P Q : {distr T / R}) (x : T) :
+  dweight P = dweight Q ->
+  `|P x - Q x| <= total_variation P Q.
+Proof.
+move=> HPQ.
+rewrite (total_variation_residual P Q HPQ).
+case: (lerP (P x) (Q x))=> Hle.
+- have Hpoint := distr_point_le_dweight (residual_distr Q P) x.
+  rewrite residual_distrE overlap_distrE (min_idPr Hle) in Hpoint.
+  have Hweights := dweight_residual_distr_eq P Q HPQ.
+  rewrite -Hweights in Hpoint.
+  lra.
+- have Hge : Q x <= P x := ltW Hle.
+  have Hpoint := distr_point_le_dweight (residual_distr P Q) x.
+  rewrite residual_distrE overlap_distrE (min_idPr Hge) in Hpoint.
+  lra.
+Qed.
+
+Lemma total_variation_complete_point_bound
+    {T : choiceType} (P Q : {distr T / R}) (x : T) :
+  `|P x - Q x| <=
+    total_variation (complete P) (complete Q).
+Proof.
+have H := total_variation_point_bound (complete P) (complete Q) (Some x).
+rewrite !completeE /= in H.
+apply: H.
+by rewrite !complete_dweight.
 Qed.
 
 Lemma total_variation_overlap {T : choiceType}
