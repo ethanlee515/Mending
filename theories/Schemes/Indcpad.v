@@ -172,12 +172,9 @@ Module IndCpad(Import S: ApproxFheScheme).
 
   Local Open Scope ring_scope.
 
-  Definition success_probability
-    (max_queries : nat) (Adv : nom_package) :=
-    game_out max_queries Adv true.
-
-  Definition winning_probability (max_queries : nat) (Adv : nom_package) :=
-    `|success_probability max_queries Adv - 1 / 2|.
+  Definition winning_probability
+    (max_queries : nat) (A : nom_package) :=
+    game_out max_queries A true.
 
 End IndCpad.
 

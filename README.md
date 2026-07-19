@@ -18,12 +18,13 @@ Secure.is_secure
 ```
 
 The theorem lives in `theories/Security/NoiseFloodingSecurity/Final.v`, in the
-functor `NoiseFloodingSecure`.  It states that IND-CPAD security of the
-noise-flooded scheme is bounded by IND-CPA security of the underlying scheme
-plus the verified noise-flooding loss.  The only nonzero hybrid loss is the
-compiler/Micciancio-Walter replacement of the first `q` decrypt calls, with
-completed-output additive error `sqrt(q * epsilon_nf / 2)`; the final
-winning-probability bound uses twice this compile distance.
+functor `NoiseFloodingSecure`.  It bounds the IND-CPAD adversary's probability
+of guessing the hidden challenge bit by the supplied IND-CPA security bound
+for a concrete reduction plus the verified noise-flooding loss.  The only
+nonzero hybrid loss is the compiler/Micciancio-Walter replacement of the
+first `q` decrypt calls, with completed-output additive error
+`sqrt(q * epsilon_nf / 2)`; the final winning-probability bound uses twice this
+compile distance.
 
 ## Setup
 

@@ -43,7 +43,8 @@ Module NoiseFloodingSecure
   (Import Metric : ApproxFheMetric(Scheme))
   (Import Correctness : ApproxCorrectnessPerfect(Scheme)(Metric))
   (Import IndCpaSecurity : IsIndCpa(Scheme))
-  (Import Params : NoiseFloodingParams).
+  (Import Params : NoiseFloodingParams)
+  <: NoiseFloodingIsIndCpad(Scheme)(Metric)(Params).
   Include GameReduction.NoiseFloodingSecureGameReduction(Scheme)(Metric)(Correctness)(IndCpaSecurity)(Params).
 
   Definition game_initial_pre :
@@ -528,7 +529,7 @@ Module NoiseFloodingSecure
 
   Definition security_bound (A : nom_package) (max_queries : nat) :=
     let B := ind_cpa_reduction A max_queries in
-    IndCpaSecurity.IndCpaGame.winning_probability B +
+    IndCpaSecurity.security_bound B +
       security_loss dim max_queries gaussian_width_multiplier.
 
   Definition ind_cpad_game_code
@@ -1791,7 +1792,8 @@ Module NoiseFloodingSecure
     exact: (IndCpaDSim.IndCpaReduction_valid A max_queries A_valid).
   Qed.
 
-  (* Converts a whole-game AE judgment into the sampled-game advantage bound. *)
+  (* Converts a whole-game AE judgment into a bound on the probability that
+     the adversary guesses the challenge bit. *)
   Lemma ind_cpa_reduction_bound_from_additive_error
     (A : nom_package) max_queries ε :
     ⊨AE ⦃ game_initial_pre ⦄
@@ -1812,8 +1814,8 @@ Module NoiseFloodingSecure
       additiveErrorSameGameResultTvBound
         _ _ _ _ empty_heap empty_heap tt tt Hae Hpre.
     have Hpoint :
-      `|IndCpadGame.success_probability max_queries A -
-        IndCpaSecurity.IndCpaGame.success_probability
+      `|IndCpadGame.winning_probability max_queries A -
+        IndCpaSecurity.IndCpaGame.winning_probability
           (ind_cpa_reduction A max_queries)| <= 2 * ε.
       apply: (@le_trans _ _
         (2 * total_variation
@@ -1824,22 +1826,16 @@ Module NoiseFloodingSecure
             (dmargin fst
               (Pr_code
                 (ind_cpa_reduction_game_code A max_queries tt) empty_heap))))).
-        rewrite /IndCpadGame.success_probability
-          /IndCpaSecurity.IndCpaGame.success_probability
+        rewrite /IndCpadGame.winning_probability
+          /IndCpaSecurity.IndCpaGame.winning_probability
           /IndCpadGame.game_out /IndCpaSecurity.IndCpaGame.game_out
           /ind_cpad_game_code /ind_cpa_reduction_game_code /Pr_op.
         exact: total_variation_complete_point_bound2.
       lra.
-    rewrite /IndCpadGame.winning_probability
-      /IndCpaSecurity.IndCpaGame.winning_probability.
-    set pL := IndCpadGame.success_probability max_queries A.
-    set pR := IndCpaSecurity.IndCpaGame.success_probability
+    set pL := IndCpadGame.winning_probability max_queries A.
+    set pR := IndCpaSecurity.IndCpaGame.winning_probability
       (ind_cpa_reduction A max_queries).
-    have Htri : `|pL - 1 / 2| <= `|pL - pR| + `|pR - 1 / 2|.
-      have H := ler_distD pR pL (1 / 2).
-      exact: H.
-    apply: (@le_trans _ _ (`|pL - pR| + `|pR - 1 / 2|)).
-      exact: Htri.
+    have Hdir : pL - pR <= `|pL - pR| := ler_norm (pL - pR).
     lra.
   Qed.
 
@@ -1918,7 +1914,7 @@ Module NoiseFloodingSecure
       A max_queries A_valid Hprefix_vector).
   Qed.
 
-  Theorem ind_cpa_reduction_bound_ready_vector_bound
+  Lemma ind_cpa_reduction_bound_ready_vector_bound
       (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
@@ -1935,20 +1931,25 @@ Module NoiseFloodingSecure
     lra.
   Qed.
 
-  Theorem is_secure_ready_vector_bound (A : nom_package) max_queries :
+  Lemma is_secure_ready_vector_bound (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
     decrypt_prefix_ready_vector_bound_cert max_queries ->
     IndCpadGame.winning_probability max_queries A <=
     security_bound A max_queries.
   Proof.
     move=> A_valid Hprefix_vector.
+    have Hreduction := ind_cpa_reduction_bound_ready_vector_bound
+      A max_queries A_valid Hprefix_vector.
+    have Hind_cpa := IndCpaSecurity.is_secure
+      (ind_cpa_reduction A max_queries)
+      (ind_cpa_reduction_valid A max_queries A_valid).
     rewrite /security_bound.
-    exact: (ind_cpa_reduction_bound_ready_vector_bound
-      A max_queries A_valid Hprefix_vector).
+    lra.
   Qed.
 
-  (* Main reduction theorem: IND-CPAD advantage is bounded by the advantage of
-     the constructed IND-CPA adversary, plus the noise-flooding loss. *)
+  (* Main security theorem: the IND-CPAD adversary's probability of guessing
+     the challenge bit is bounded by the assumed IND-CPA winning-probability
+     bound for the constructed reduction, plus the noise-flooding loss. *)
   Theorem is_secure (A : nom_package) max_queries :
     Package IndCpaDSim.IndCpadAdv_import IndCpaDSim.IndCpadAdv_export A ->
     IndCpadGame.winning_probability max_queries A <=

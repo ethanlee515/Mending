@@ -96,11 +96,8 @@ Module IndCpa(Import S: ApproxFheScheme).
   Definition game_out (Adv : nom_package) : distr R bool :=
     dfst (Pr_op (IndCpaGame Adv) (main, ('unit, 'bool)) tt empty_heap).
 
-  Definition success_probability (Adv : nom_package) :=
-    game_out Adv true.
-
-  Definition winning_probability (Adv : nom_package) :=
-    `|success_probability Adv - 1 / 2|.
+  Definition winning_probability (A : nom_package) :=
+    game_out A true.
 End IndCpa.
 
 Module Type IsIndCpa(Import Scheme: ApproxFheScheme).
