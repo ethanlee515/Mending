@@ -2,8 +2,7 @@
 
 Mending is a Rocq/SSProve formalization of the noise-flooding countermeasure
 for approximate homomorphic encryption.  The formalization is motivated by the
-LM attack on approximate FHE and the Li-Micciancio-style noise-flooding
-defense:
+LM attack on approximate FHE and the LMSS noise-flooding defense:
 
 * ["Gaussian Sampling over the Integers: Efficient, Generic, Constant-Time"](https://ia.cr/2017/259)
 * ["Securing Approximate Homomorphic Encryption Using Differential Privacy"](https://ia.cr/2022/816)
@@ -25,6 +24,40 @@ nonzero hybrid loss is the compiler/Micciancio-Walter replacement of the
 first `q` decrypt calls, with completed-output additive error
 `sqrt(q * epsilon_nf / 2)`; the final winning-probability bound uses this
 compile distance directly.
+
+## Claim Status
+
+The checked result is the **good-execution core of a conditional reduction**,
+not a concrete CKKS verification.  It assumes:
+
+* an abstract approximate-FHE scheme with deterministic base decryption;
+* support-level correctness (bad key, encryption, and evaluation outputs have
+  probability zero);
+* an origin-centered local integer-vector chart for the plaintext metric;
+* a supplied IND-CPA security theorem and a positive flooding multiplier.
+
+No concrete scheme currently instantiates those assumptions.  For an
+imperfectly correct scheme, define an execution-wide event <code>Bad_corr</code>
+covering the key, encryption, and evaluation outputs excluded by the current
+support invariant.  One standard up-to-bad game transition adds
+<code>Pr[Bad_corr]</code> to the checked bound while reusing the
+good-execution argument.  An instantiation must supply this aggregate bound,
+or derive it from per-operation failure probabilities together with
+appropriate encryption and evaluation call counts.  Thus nonzero correctness
+is a modular one-hop extension, although that wrapper is not yet mechanized.
+
+The repository also does not yet prove the chart laws for a CKKS plaintext
+representation.  Probabilistic-polynomial-time preservation is, as in
+SSProve's usual computational interpretation, a conventional metatheoretic
+audit rather than a judgment in its package semantics.  The explicit reduction
+runs the adversary once, forwards its calls, maintains tables, and performs the
+specified Gaussian sampling; this work does not attempt to add a cost semantics
+to SSProve.
+
+Within that boundary, Rocq checks the adaptive game transformation, the
+single-call discrete-Gaussian KL argument, the trace-compiled replacement of
+the first <code>q</code> decrypt calls, all exact package bridges, and the
+final IND-CPAD-to-IND-CPA inequality.
 
 ## Setup
 
@@ -83,7 +116,13 @@ make -C Pythagorean-RHL
 ```
 
 This requires a standard LaTeX setup with XeLaTeX, `latexmk`, and `pygmentize`
-for minted code blocks.
+for minted code blocks.  The output uses the anonymous, two-column IEEE/CSF
+format; the current main body ends on page 9, followed by the AI-use
+acknowledgment, bibliography, and well-marked appendices.
+
+In the development environment used for the manuscript, a forced rebuild of
+<code>Final.vo</code> with Rocq 9.0.1 took 472.54 seconds wall time.  This is a
+reproduction aid, not a performance claim.
 
 ## Repository Map
 
@@ -133,9 +172,11 @@ Probability and analysis:
 
 Paper draft:
 
-* `Pythagorean-RHL/` contains the accompanying paper draft.  Section 4
-  describes the program logic, and the noise-flooding section summarizes the
-  hybrid proof around the instantiated `Secure.is_secure` theorem.
+* `Pythagorean-RHL/` contains the accompanying paper draft.  Section 4 presents
+  the completed-output additive and Pythagorean judgments, representative
+  checked rules, and the generic local-to-adaptive compiler theorem.  The
+  noise-flooding section instantiates that theorem inside the hybrid proof
+  leading to `Secure.is_secure`.
 
 ## Theorem Boundary
 
@@ -154,9 +195,27 @@ It should not mention the old finite-codomain workaround or the removed
 optional chart axioms such as `isoK`, `inv_isoK`, `isometry_radius`, and
 `iso_correct`.
 
-The remaining `interchange_psum` assumption is inherited through current
-SSProve/MathComp program semantics, not through the local KL chain,
-maximal-coupling construction, or finite-codomain workaround.
+The remaining `interchange_psum` name is inherited through current
+SSProve/MathComp program semantics, not introduced by the local KL chain,
+maximal-coupling construction, or security reduction.  This repository proves
+the exact statement as `interchange_psum_proved` in
+`theories/LibExtras/MathcompExtras/RealSumExtras.v`.  Its own
+`Print Assumptions` output contains only the usual extensionality and choice
+principles, not `realsum.__admitted__interchange_psum`.
+
+The replacement has been submitted upstream as
+[MathComp Analysis PR #2007](https://github.com/math-comp/analysis/pull/2007).
+Until a MathComp Analysis release adopts the proof and the existing upstream
+call sites, the installed SSProve dependency graph will continue to display the
+old assumption name.  That is a dependency-integration residue rather than an
+outstanding mathematical proof obligation in Mending.
+
+Reviewers can check the replacement directly with:
+
+```coq
+From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
+Print Assumptions interchange_psum_proved.
+```
 
 ## Metric and Correctness Interface
 
