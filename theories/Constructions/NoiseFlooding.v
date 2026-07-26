@@ -257,7 +257,7 @@ Qed.
 
 Definition noise_flooding_dg_stdev
     (gaussian_width_multiplier : R) (error_bound : nat) : R :=
-  (error_bound * error_bound + 1)%:~R * gaussian_width_multiplier.
+  (maxn 1 error_bound)%:~R * gaussian_width_multiplier.
 
 Module Type NoiseFloodingParams.
 Parameter gaussian_width_multiplier : R.

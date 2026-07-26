@@ -64,6 +64,7 @@ Module NoiseFloodingSecureGaussianBasics
     rewrite /noise_flooding_dg_stdev.
     apply: mulr_gt0; last exact: gt0_gaussian_width_multiplier.
     rewrite ltr0z.
+    have Hmax : (1 <= maxn 1 error_bound)%N := leq_maxl 1 error_bound.
     lia.
   Qed.
 
@@ -87,21 +88,21 @@ Module NoiseFloodingSecureGaussianBasics
     move=> Hdelta.
     rewrite /noise_flooding_dg_stdev.
     set e : R := error_bound%:R.
-    set a : R := (error_bound * error_bound + 1)%:~R.
+    set a : R := (maxn 1 error_bound)%:~R.
     set g := gaussian_width_multiplier.
     have Hg : 0 < g by rewrite /g; exact: gt0_gaussian_width_multiplier.
     have He_ge0 : 0 <= e by rewrite /e ler0n.
     have He_le_a : e <= a.
       rewrite /e /a.
       change (error_bound%:R <=
-        (error_bound * error_bound + 1)%:R :> R).
+        (maxn 1 error_bound)%:R :> R).
       rewrite ler_nat.
-      nia.
+      exact: leq_maxr.
     have Ha_ge1 : 1 <= a.
       rewrite /a.
-      change ((1%N)%:R <= (error_bound * error_bound + 1)%:R :> R).
+      change ((1%N)%:R <= (maxn 1 error_bound)%:R :> R).
       rewrite ler_nat.
-      nia.
+      exact: leq_maxl.
     have Ha_pos : 0 < a by lra.
     have Hdelta_a : delta ^+ 2 <= a ^+ 2.
       apply: (le_trans Hdelta).
