@@ -1,0 +1,35 @@
+opam-version: "2.0"
+name: "mending"
+version: "dev"
+synopsis: "Machine-checked noise-flooding security artifact"
+description: """
+Rocq/SSProve formalization of the noise-flooding countermeasure for
+approximate homomorphic encryption.
+"""
+maintainer: "Mending artifact authors"
+authors: "Mending artifact authors"
+license: "MIT"
+homepage: "https://github.com/ethanlee515/Mending"
+bug-reports: "https://github.com/ethanlee515/Mending/issues"
+dev-repo: "git+https://github.com/ethanlee515/Mending.git"
+
+depends: [
+  "rocq-core" {= "9.0.1"}
+  "rocq-stdlib" {= "9.0.0"}
+  "rocq-ssprove" {= "dev"}
+  "coq-mathcomp-analysis" {= "1.16.0"}
+  "coq-mathcomp-experimental-reals" {= "1.16.0"}
+  "coq-mathcomp-algebra-tactics" {= "1.2.7"}
+]
+
+pin-depends: [
+  [
+    "rocq-ssprove.dev"
+    "git+https://github.com/SSProve/ssprove.git#c6d7d4bc3a0a671c92899aa49dfcfb065d1bdbbd"
+  ]
+]
+
+build: [
+  ["rocq" "makefile" "-f" "_RocqProject" "-o" "Makefile.rocq"]
+  [make "-f" "Makefile.rocq" "-j%{jobs}%"]
+]

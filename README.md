@@ -62,29 +62,28 @@ final IND-CPAD-to-IND-CPA inequality.
 ## Setup
 
 This repository is intended for users who already have some Rocq/opam
-experience.  The development needs SSProve and MathComp, plus the MathComp
-algebra tactics package used by the Gaussian arithmetic proofs.
-We expect a reasonably recent Rocq installation; the current development has
-been checked with Rocq 9.
+experience.  The submission snapshot has been checked with Rocq 9.0.1,
+MathComp Analysis 1.16.0, MathComp algebra tactics 1.2.7, and the SSProve
+development version at commit
+`c6d7d4bc3a0a671c92899aa49dfcfb065d1bdbbd`.
 
-If you already have a Rocq switch with the following packages, no special
-repository-local setup is intended:
-
-```text
-rocq-ssprove
-coq-mathcomp-algebra-tactics
-```
-
-One typical opam setup is:
+The repository-local [`mending.opam`](mending.opam) records those versions and
+pins the exact SSProve commit.  From a fresh opam switch, install the
+dependencies and check the complete artifact with:
 
 ```bash
 opam repo add rocq-released https://rocq-prover.org/opam/released
 opam update
-opam install rocq-prover rocq-ssprove coq-mathcomp-algebra-tactics
+opam pin add . --no-action
+opam install mending
 ```
 
-Depending on the opam repositories enabled in your switch, some package names
-may still use the transitional `coq-` prefix.
+For example, a completely fresh switch can be created first with
+`opam switch create mending 5.4.1`, followed by
+`eval "$(opam env --switch=mending)"`.  On memory-constrained machines,
+`opam install mending --jobs=4` avoids opam using every visible CPU.
+The released SSProve package still uses the transitional name `coq-ssprove`;
+the pinned development package used here is named `rocq-ssprove`.
 
 ## Usage
 
@@ -92,13 +91,13 @@ Generate the Rocq makefile and build the development:
 
 ```bash
 rocq makefile -f _RocqProject -o Makefile.rocq
-make -f Makefile.rocq
+make -f Makefile.rocq -j4
 ```
 
-To check only the main security theorem:
+To reproduce the manuscript's Rocq source-count table:
 
 ```bash
-make -f Makefile.rocq theories/Security/NoiseFloodingSecurity/Final.vo
+scripts/artifact-stats.sh
 ```
 
 To inspect theorem assumptions, instantiate `NoiseFloodingSecure` with a
@@ -117,11 +116,12 @@ make -C Pythagorean-RHL
 
 This requires a standard LaTeX setup with XeLaTeX, `latexmk`, and `pygmentize`
 for minted code blocks.  The output uses the anonymous, two-column IEEE/CSF
-format; the current main body ends on page 9, followed by the AI-use
-acknowledgment, bibliography, and well-marked appendices.
+format.  In the current 19-page PDF, the main text, ethics statement, AI-use
+acknowledgment, and references occupy pages 1--11; the well-marked appendices
+begin on page 11.
 
-In the development environment used for the manuscript, a forced rebuild of
-<code>Final.vo</code> with Rocq 9.0.1 took 472.54 seconds wall time.  This is a
+In a fresh switch on the authors' machine, a clean build of the complete
+artifact took about six minutes using four parallel jobs.  This is a
 reproduction aid, not a performance claim.
 
 ## Repository Map
@@ -203,14 +203,14 @@ the exact statement as `interchange_psum_proved` in
 `Print Assumptions` output contains only the usual extensionality and choice
 principles, not `realsum.__admitted__interchange_psum`.
 
-The replacement has been submitted upstream as
-[MathComp Analysis PR #2007](https://github.com/math-comp/analysis/pull/2007).
+The replacement, together with proofs of `psumB` and `interchange_sup`, has
+been merged upstream for the planned MathComp Analysis 1.17.0 release.
 Until a MathComp Analysis release adopts the proof and the existing upstream
 call sites, the installed SSProve dependency graph will continue to display the
 old assumption name.  That is a dependency-integration residue rather than an
 outstanding mathematical proof obligation in Mending.
 
-Reviewers can check the replacement directly with:
+Reviewers can check the local replacement directly with:
 
 ```coq
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
