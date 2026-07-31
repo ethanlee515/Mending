@@ -9,15 +9,9 @@ LM attack on approximate FHE and the LMSS noise-flooding defense:
 
 The current development proves the main noise-flooding reduction theorem for
 an abstract approximate FHE scheme with an origin-centered local
-integer-vector metric interface.  After applying the security functor, the
-main theorem is conventionally referred to as:
-
-```coq
-Secure.is_secure
-```
-
-The theorem lives in `theories/Security/NoiseFloodingSecurity/Final.v`, in the
-functor `NoiseFloodingSecure`.  It bounds the IND-CPAD adversary's probability
+integer-vector metric interface.  The theorem `is_secure` lives in
+`theories/Security/NoiseFloodingSecurity/Final.v`, in the functor
+`NoiseFloodingSecure`.  It bounds the IND-CPAD adversary's probability
 of guessing the hidden challenge bit by the supplied IND-CPA security bound
 for a concrete reduction plus the verified noise-flooding loss.  The only
 nonzero hybrid loss is the compiler/Micciancio-Walter replacement of the
@@ -25,10 +19,9 @@ first `q` decrypt calls, with completed-output additive error
 `sqrt(q * epsilon_nf / 2)`; the final winning-probability bound uses this
 compile distance directly.
 
-## Claim Status
+## Verified Result
 
-The checked result is the **good-execution core of a conditional reduction**,
-not a concrete CKKS verification.  It assumes:
+The checked result is a conditional reduction, parameterized by:
 
 * an abstract approximate-FHE scheme with deterministic base decryption;
 * support-level correctness (bad key, encryption, and evaluation outputs have
@@ -36,25 +29,7 @@ not a concrete CKKS verification.  It assumes:
 * an origin-centered local integer-vector chart for the plaintext metric;
 * a supplied IND-CPA security theorem and a positive flooding multiplier.
 
-No concrete scheme currently instantiates those assumptions.  For an
-imperfectly correct scheme, define an execution-wide event <code>Bad_corr</code>
-covering the key, encryption, and evaluation outputs excluded by the current
-support invariant.  One standard up-to-bad game transition adds
-<code>Pr[Bad_corr]</code> to the checked bound while reusing the
-good-execution argument.  An instantiation must supply this aggregate bound,
-or derive it from per-operation failure probabilities together with
-appropriate encryption and evaluation call counts.  Thus nonzero correctness
-is a modular one-hop extension, although that wrapper is not yet mechanized.
-
-The repository also does not yet prove the chart laws for a CKKS plaintext
-representation.  Probabilistic-polynomial-time preservation is, as in
-SSProve's usual computational interpretation, a conventional metatheoretic
-audit rather than a judgment in its package semantics.  The explicit reduction
-runs the adversary once, forwards its calls, maintains tables, and performs the
-specified Gaussian sampling; this work does not attempt to add a cost semantics
-to SSProve.
-
-Within that boundary, Rocq checks the adaptive game transformation, the
+Over this interface, Rocq checks the adaptive game transformation, the
 single-call discrete-Gaussian KL argument, the trace-compiled replacement of
 the first <code>q</code> decrypt calls, all exact package bridges, and the
 final IND-CPAD-to-IND-CPA inequality.
@@ -94,31 +69,18 @@ rocq makefile -f _RocqProject -o Makefile.rocq
 make -f Makefile.rocq -j4
 ```
 
-To reproduce the manuscript's Rocq source-count table:
-
-```bash
-scripts/artifact-stats.sh
-```
-
-To inspect theorem assumptions, instantiate `NoiseFloodingSecure` with a
-scheme, metric interface, correctness proof, IND-CPA security proof, and
-noise-flooding parameters, then use Rocq's usual command:
+To inspect the theorem assumptions in their definition context, open
+[`theories/Security/NoiseFloodingSecurity/Final.v`](theories/Security/NoiseFloodingSecurity/Final.v)
+and temporarily add the following command immediately before the final
+`End NoiseFloodingSecure.`:
 
 ```coq
-Print Assumptions Secure.is_secure.
+Print Assumptions is_secure.
 ```
 
-The paper draft builds separately:
-
-```bash
-make -C Pythagorean-RHL
-```
-
-This requires a standard LaTeX setup with XeLaTeX, `latexmk`, and `pygmentize`
-for minted code blocks.  The output uses the anonymous, two-column IEEE/CSF
-format.  In the current 19-page PDF, the main text, ethics statement, AI-use
-acknowledgment, and references occupy pages 1--11; the well-marked appendices
-begin on page 11.
+Then process the file in a Rocq editor or rebuild it to display the audit.
+Keeping the command inside the functor avoids introducing a setup-dependent
+probe module merely to give the instantiated theorem a name.
 
 In a fresh switch on the authors' machine, a clean build of the complete
 artifact took about six minutes using four parallel jobs.  This is a
@@ -170,18 +132,10 @@ Probability and analysis:
   contain the completed-output and trace-sequencing infrastructure.
 * `theories/LibExtras/` contains local MathComp and SSProve helper lemmas.
 
-Paper draft:
+## Assumption Audit
 
-* `Pythagorean-RHL/` contains the accompanying paper draft.  Section 4 presents
-  the completed-output additive and Pythagorean judgments, representative
-  checked rules, and the generic local-to-adaptive compiler theorem.  The
-  noise-flooding section instantiates that theorem inside the hybrid proof
-  leading to `Secure.is_secure`.
-
-## Theorem Boundary
-
-At the current milestone, `Print Assumptions` for an instantiated
-`Secure.is_secure` is expected to mention:
+Running `Print Assumptions is_secure` inside `NoiseFloodingSecure` is expected
+to mention:
 
 * foundational real-number and classical axioms from the underlying libraries;
 * the current SSProve/MathComp real-summation residue
@@ -191,24 +145,10 @@ At the current milestone, `Print Assumptions` for an instantiated
 * the assumed IND-CPA security theorem for the underlying scheme;
 * the abstract metric/chart assumptions from `ApproxFheMetric`.
 
-It should not mention the old finite-codomain workaround or the removed
-optional chart axioms such as `isoK`, `inv_isoK`, `isometry_radius`, and
-`iso_correct`.
-
-The remaining `interchange_psum` name is inherited through current
-SSProve/MathComp program semantics, not introduced by the local KL chain,
-maximal-coupling construction, or security reduction.  This repository proves
-the exact statement as `interchange_psum_proved` in
-`theories/LibExtras/MathcompExtras/RealSumExtras.v`.  Its own
-`Print Assumptions` output contains only the usual extensionality and choice
-principles, not `realsum.__admitted__interchange_psum`.
-
-The replacement, together with proofs of `psumB` and `interchange_sup`, has
-been merged upstream for the planned MathComp Analysis 1.17.0 release.
-Until a MathComp Analysis release adopts the proof and the existing upstream
-call sites, the installed SSProve dependency graph will continue to display the
-old assumption name.  That is a dependency-integration residue rather than an
-outstanding mathematical proof obligation in Mending.
+The `interchange_psum` entry is inherited through the installed
+SSProve/MathComp program semantics.  This repository also proves that statement
+as `interchange_psum_proved` in
+`theories/LibExtras/MathcompExtras/RealSumExtras.v`.
 
 Reviewers can check the local replacement directly with:
 
