@@ -1,5 +1,13 @@
 # Mending: Verifying Noise-Flooding Security
 
+This repository is the formal artifact for **Verified Pythagorean Composition
+for Adaptive Cryptographic Games: Noise Flooding in Homomorphic Encryption**,
+accepted at **CSF 2027**. We are preparing the camera-ready artifact and paper.
+The manuscript lives in the [Pythagorean-RHL](Pythagorean-RHL/) Git submodule;
+see its [README](Pythagorean-RHL/README.md) for conference and arXiv builds.
+Both formats include named authors, affiliations, artifact links, and funding.
+There is no anonymous/camera-ready switch.
+
 Mending is a Rocq/SSProve formalization of the noise-flooding countermeasure
 for approximate homomorphic encryption.  The formalization is motivated by the
 LM attack on approximate FHE and the LMSS noise-flooding defense:
@@ -112,6 +120,34 @@ For example, a completely fresh switch can be created first with
 `opam install mending --jobs=4` avoids opam using every visible CPU.
 The released SSProve package still uses the transitional name `coq-ssprove`;
 the pinned development package used here is named `rocq-ssprove`.
+
+## Dependency Upgrade Blocker
+
+The dependency upgrade is deferred during CSF 2027 camera-ready preparation.
+Keep the checked upstream stack pinned in `mending.opam`; do not use an
+unmerged pull-request snapshot or a local package repository for the artifact.
+
+MathComp Analysis 1.18.0 includes our merged proof of `interchange_psum`
+([math-comp/analysis#2007](https://github.com/math-comp/analysis/pull/2007)).
+Adopting it requires MathComp 2.6 and a compatible SSProve dependency stack.
+As checked on October 9, 2026, the relevant
+[SSProve compatibility PR #124](https://github.com/SSProve/ssprove/pull/124)
+is still unmerged, and its word/Extructures dependency bounds also need updating.
+This blocks moving the artifact to the newer public stack. The current
+Analysis 1.16.0 stack still exposes the inherited admitted summation assumption;
+our local proof alone does not remove it from SSProve's semantics.
+
+Revisit the upgrade when compatible upstream support is available. If the
+camera-ready deadline makes that impractical, the authors may choose to
+maintain a documented SSProve fork instead; that decision and work are deferred.
+After any upgrade, rebuild the complete artifact and rerun
+`Print Assumptions is_secure` before changing the paper's trusted-base claims.
+
+Contributor context: preserve the public, named-author paper configuration and
+keep dependency and trusted-base descriptions synchronized across both
+repositories. The manuscript submodule has its own history. During camera-ready
+preparation, provide commands for long dependency rebuilds so the user can run
+them outside the agent session. No dependency rebuild is needed for this deferral.
 
 ## Usage
 
