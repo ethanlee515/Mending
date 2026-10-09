@@ -34,6 +34,59 @@ single-call discrete-Gaussian KL argument, the trace-compiled replacement of
 the first <code>q</code> decrypt calls, all exact package bridges, and the
 final IND-CPAD-to-IND-CPA inequality.
 
+## Specification Audit Size
+
+The formal-interface selection in [Appendix E](Pythagorean-RHL/appendix-formal-interface-excerpts.tex)
+contains **724 physical Rocq source lines**, including **259 lines of miscellaneous
+helpers**. The first table matches the slide summary; the second breaks down
+its helper row with exact source ranges. Blank and comment lines count;
+typeset wrapping does not. The second table’s total is already included in
+the first.
+
+This selection includes local specification dependencies and the main theorem
+statement. It stops at Rocq, MathComp, and SSProve primitives on the trust side,
+and excludes checked proof bodies and proof-only intermediate games. Running-time
+analysis inspects the counted reduction and its primitives separately.
+
+Regenerate the tables below from the appendix's disjoint listing ranges with:
+
+```bash
+make -C Pythagorean-RHL refresh-formal-excerpts
+python3 Pythagorean-RHL/scripts/count-interface-excerpts.py --detailed
+```
+
+<!-- BEGIN GENERATED SPECIFICATION AUDIT -->
+| Specification | Source lines |
+|---|---:|
+| Scheme / charts / correctness | 83 |
+| Gaussian / sampler bridge | 56 |
+| Security games | 175 |
+| Flooded construction | 45 |
+| Concrete reduction | 95 |
+| Loss / reduction validity | 11 |
+| Misc. helpers | 259 |
+| **Total** | **724** |
+
+39 non-overlapping excerpts across 16 source files.
+
+Miscellaneous helpers (source ranges are inclusive, relative to `theories/`):
+
+| Helper group | Source | Ranges | Source lines |
+|---|---|---|---:|
+| Scheme labels and package wrapper | [ApproxFHE.v](theories/Schemes/ApproxFHE.v) | 19–23, 52–98 | 52 |
+| Vector norm, zero, subtraction, and distance | [IntVec.v](theories/Schemes/Utils/IntVec.v) | 9–13, 47–48, 87–88 | 9 |
+| Safe table indexing (`nth_valid`) | [ListExtras.v](theories/LibExtras/MathcompExtras/ListExtras.v) | 6–12 | 7 |
+| SSProve vector type (`chVec`) | [ChoiceVector.v](theories/LibExtras/SSProveExtras/ChoiceVector.v) | 15–19 | 5 |
+| IND-CPA labels, locations, and interfaces | [Indcpa.v](theories/Schemes/Indcpa.v) | 16–51 | 36 |
+| IND-CPAD labels, locations, and interfaces | [Indcpad.v](theories/Schemes/Indcpad.v) | 18–64, 134–136 | 50 |
+| Simulator interfaces, vector conversions, and location wrapper | [IndcpadSimulator.v](theories/Security/IndcpadSimulator.v) | 35–98, 320–321 | 66 |
+| KL divergence definition | [Core.v](theories/Probability/KL/Core.v) | 19–20 | 2 |
+| Theorem parameters, reduction/bound wrappers, and main theorem | [Final.v](theories/Security/NoiseFloodingSecurity/Final.v) | 41–47, 522–533, 1953–1956 | 23 |
+| Game and simulator module aliases | [GaussianBasics.v](theories/Security/NoiseFloodingSecurity/GaussianBasics.v) | 256–257 | 2 |
+| Noise-flooding security result interface | [Prelude.v](theories/Security/NoiseFloodingSecurity/Prelude.v) | 46–52 | 7 |
+| **Total misc. helpers** | | | **259** |
+<!-- END GENERATED SPECIFICATION AUDIT -->
+
 ## Setup
 
 This repository is intended for users who already have some Rocq/opam
