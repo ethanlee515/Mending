@@ -1,9 +1,9 @@
 From Stdlib Require Import Utf8 Unicode.Utf8 BinInt Lia.
 From extructures Require Import ord fset fmap fperm.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr realsum ssrZ lra.
+From mathcomp Require Import boot order algebra reals distr realsum ssrZ arithmetic_tactic.
 Set Warnings "notation-overridden,ambiguous-paths".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic ssrZ zify.
 From SSProve.Crypt Require Import Axioms ChoiceAsOrd Couplings Package Prelude
   StateTransformingLaxMorph choice_type fmap_extra SubDistr.
 From SSProve Require Import NominalPrelude.
@@ -37,6 +37,7 @@ Local Open Scope HoareNotations.
 Local Open Scope PythNotations.
 
 From Mending.Security.NoiseFloodingSecurity Require Import Prelude DecryptCompiler.
+Set SsrOldRewriteGoalsOrder.
 
 Module NoiseFloodingSecureGameReduction
   (Import Scheme : ApproxFheScheme)
@@ -1037,10 +1038,10 @@ Module NoiseFloodingSecureGameReduction
         /ind_cpad_reduction_challenge_init_outL
         /ind_cpad_challenge_init_code.
       rewrite dmarginE Pr_code_sample.
-      rewrite __deprecated__dlet_dlet.
+      rewrite dlet_dlet.
       apply: eq_in_dlet=> // b _ y'.
       rewrite Pr_code_sample.
-      rewrite __deprecated__dlet_dlet.
+      rewrite dlet_dlet.
       apply: eq_in_dlet=> // keys _ y''.
       case: keys=> [[pk evk] sk].
       by rewrite dlet_unit /challenge_initialized_heap !Pr_code_put Pr_code_ret.
@@ -1051,10 +1052,10 @@ Module NoiseFloodingSecureGameReduction
         /ind_cpad_reduction_challenge_init_outR
         /ind_cpa_reduction_challenge_init_code.
       rewrite dmarginE Pr_code_sample.
-      rewrite __deprecated__dlet_dlet.
+      rewrite dlet_dlet.
       apply: eq_in_dlet=> // b _ y'.
       rewrite Pr_code_sample.
-      rewrite __deprecated__dlet_dlet.
+      rewrite dlet_dlet.
       apply: eq_in_dlet=> // keys _ y''.
       case: keys=> [[pk evk] sk].
       by rewrite dlet_unit /reduction_initialized_heap !Pr_code_put Pr_code_ret.
@@ -1584,7 +1585,7 @@ Module NoiseFloodingSecureGameReduction
         rewrite (complete_bind (dmargin outL D) KL z).
         apply: complete_distr_ext=> y.
         rewrite /KL /outL /D Pr_code_sample dmarginE.
-        rewrite __deprecated__dlet_dlet.
+        rewrite dlet_dlet.
         apply: eq_in_dlet=> // a _ y'.
         by rewrite dlet_unit.
       + move=> z.
@@ -1592,7 +1593,7 @@ Module NoiseFloodingSecureGameReduction
         rewrite (complete_bind (dmargin outR D) KR z).
         apply: complete_distr_ext=> y.
         rewrite /KR /outR /D Pr_code_sample dmarginE.
-        rewrite __deprecated__dlet_dlet.
+        rewrite dlet_dlet.
         apply: eq_in_dlet=> // a _ y'.
         by rewrite dlet_unit.
     - move=> Hpre outs Houts.

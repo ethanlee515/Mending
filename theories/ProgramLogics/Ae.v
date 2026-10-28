@@ -1,9 +1,9 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 From mathcomp Require Import reals distr.
-From mathcomp Require Import realseq realsum exp lra.
+From mathcomp Require Import realseq realsum exp arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 From Mending.NextMessage Require Import Trace.
@@ -15,6 +15,7 @@ From SSProve.Crypt Require Import Axioms StateTransfThetaDens.
 From SSProve.Crypt.nominal Require Import Pr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
   pkg_notation.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory Order.POrderTheory.
 
@@ -105,7 +106,7 @@ Lemma dmargin_comp
   dmargin f (dmargin g D) =1 dmargin (fun x => f (g x)) D.
 Proof.
 move=> z.
-rewrite dmarginE dmargin_dlet_partition.
+rewrite dmarginE dmargin_dlet.
 apply: eq_in_dlet=> // x _ z'.
 by rewrite dmargin_dunit.
 Qed.
@@ -574,20 +575,20 @@ move=> Hd HK.
 have [HdL HdR] := coupling_margins Hd.
 apply: coupling_of_margins; split.
 - move=> z.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   transitivity ((\dlet_(xy <- d) KL xy.1) z).
   + apply: eq_in_dlet=> // xy _ z'.
     have [HKL _] := coupling_margins (HK xy).
     by rewrite -HKL.
-  + rewrite -(dlet_dmargin_partition d fst KL z).
+  + rewrite -(dlet_dmargin d fst KL z).
     by apply: eq_in_dlet=> // x _ z'; rewrite HdL.
 - move=> z.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   transitivity ((\dlet_(xy <- d) KR xy.2) z).
   + apply: eq_in_dlet=> // xy _ z'.
     have [_ HKR] := coupling_margins (HK xy).
     by rewrite -HKR.
-  + rewrite -(dlet_dmargin_partition d snd KR z).
+  + rewrite -(dlet_dmargin d snd KR z).
     by apply: eq_in_dlet=> // y _ z'; rewrite HdR.
 Qed.
 

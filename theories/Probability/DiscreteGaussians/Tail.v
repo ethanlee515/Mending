@@ -1,16 +1,17 @@
 From Stdlib Require Import Utf8 Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import ssreflect ssrbool eqtype ssrnat seq choice bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrbool eqtype ssrnat seq choice bigop order algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 Set Warnings "-notation-incompatible-prefix".
 From mathcomp Require Import xfinmap.
 Set Warnings "notation-incompatible-prefix".
-From mathcomp Require Import lra.
+From mathcomp Require Import arithmetic_tactic.
 Import GRing.Theory Num.Theory Order.Theory.
 
 From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian DiscreteGaussianKL.
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras DistrExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Local Open Scope ring_scope.
 
@@ -63,7 +64,7 @@ Lemma summable_mirrored_geometric_tail (s : R) (k : nat) :
 Proof.
 move=> gt0_s.
 apply: (mirror_summable (fun n : nat => ((k <= n)%N)%:R * geom_above s n)).
-apply: (le_summable (F2 := geom_above s)).
+apply: (le_summable (g := geom_above s)).
 - move=> n; apply/andP; split.
   + rewrite mulr_ge0 ?ler0n //.
     rewrite /geom_above.
@@ -116,7 +117,7 @@ Lemma summable_geometric_tail (r : R) (k : nat) :
   summable (fun n : nat => ((k <= n)%N)%:R * geometric 1 r n).
 Proof.
 move=> r01.
-apply: (le_summable (F2 := geometric 1 r)).
+apply: (le_summable (g := geometric 1 r)).
 - move=> n; apply/andP; split.
   + rewrite mulr_ge0 ?ler0n //.
     apply: ge0_geo.

@@ -3,8 +3,8 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals distr ssrZ realseq realsum lra.
+From mathcomp Require Import boot order algebra.
+From mathcomp Require Import reals distr ssrZ realseq realsum arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
@@ -16,6 +16,7 @@ From SSProve Require Import pkg_core_definition pkg_advantage pkg_composition
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras.
 From Mending.Probability Require Import Ae.
+Set SsrOldRewriteGoalsOrder.
 
 Import PackageNotation.
 Import pkg_heap.

@@ -1,16 +1,17 @@
 From Stdlib Require Import Utf8 Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import ssreflect ssrbool eqtype ssrnat seq choice fintype bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrbool eqtype ssrnat seq choice fintype bigop order algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 Set Warnings "-notation-incompatible-prefix".
 From mathcomp Require Import xfinmap.
 Set Warnings "notation-incompatible-prefix".
-From mathcomp Require Import lra.
+From mathcomp Require Import arithmetic_tactic.
 Import GRing.Theory Num.Theory Order.Theory.
 From Stdlib Require Import Ring.
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic ssrZ zify.
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Local Open Scope fset_scope.
 Local Open Scope ring_scope.
@@ -174,7 +175,7 @@ Lemma summable_gaussian (s : R) :
   s > 0 -> summable (T := int) (gaussian s).
 Proof.
 move => gt0_s.
-apply: (le_summable (T := int) (F2 := fun x => geom_above s (absz x))).
+apply: (le_summable (T := int) (g := fun x => geom_above s (absz x))).
 - move => x.
   apply/andP; split.
   + exact: ge0_gaussian.

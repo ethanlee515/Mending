@@ -9,7 +9,7 @@ From Stdlib Require Import BinInt.
 
 
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr realsum.
+From mathcomp Require Import boot order algebra reals distr realsum.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import Adv.
@@ -32,6 +32,7 @@ Local Open Scope seq_scope.
 Local Open Scope fset_scope.
 
 From Mending.Constructions Require Import NoiseFlooding.
+Set SsrOldRewriteGoalsOrder.
 
 Module IndCpadSimulator (Import S: ApproxFheScheme)
   (Import Metric: ApproxFheMetric(S))

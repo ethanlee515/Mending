@@ -1,9 +1,9 @@
 From Stdlib Require Import Utf8 Unicode.Utf8 BinInt Lia.
 From extructures Require Import ord fset fmap fperm.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr realsum ssrZ lra.
+From mathcomp Require Import boot order algebra reals distr realsum ssrZ arithmetic_tactic.
 Set Warnings "notation-overridden,ambiguous-paths".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic field_tactic ssrZ zify.
 From SSProve.Crypt Require Import Axioms ChoiceAsOrd Couplings Package Prelude
   StateTransformingLaxMorph choice_type fmap_extra SubDistr.
 From SSProve Require Import NominalPrelude.
@@ -37,6 +37,7 @@ Local Open Scope HoareNotations.
 Local Open Scope PythNotations.
 
 From Mending.Security.NoiseFloodingSecurity Require Import Prelude.
+Set SsrOldRewriteGoalsOrder.
 
 Module NoiseFloodingSecureGaussianBasics
   (Import Scheme : ApproxFheScheme)
@@ -113,8 +114,7 @@ Module NoiseFloodingSecureGaussianBasics
       rewrite !expr2.
       have -> :
           1 / (2 * (g * g)) * (2 * (a * g * (a * g))) = a * a.
-        field.
-        nra.
+        field by nra.
       exact: lexx.
     apply: mulr_gt0; first lra.
     by rewrite expr2 mulr_gt0 // mulr_gt0.
@@ -246,7 +246,7 @@ Module NoiseFloodingSecureGaussianBasics
       ((dmargin (fun v => inverse_isometry center v)
         (dmargin (fun noise => ivec_add noise center_vec)
           (n_dg dim stdev))) y).
-    - rewrite !dmarginE __deprecated__dlet_dlet.
+    - rewrite !dmarginE dlet_dlet.
       apply: eq_in_dlet=> // noise _ z.
       by rewrite dlet_unit.
     apply: dmargin_ext.
@@ -281,7 +281,7 @@ Module NoiseFloodingSecureGaussianBasics
           inverse_isometry m (ivec_add noise_vec center_vec))
         (dmargin (@IndCpaDSim.toIntVec dim)
           (discrete_gaussians (IndCpaDSim.zeroChVec dim) stdev))) y).
-    - rewrite !dmarginE __deprecated__dlet_dlet.
+    - rewrite !dmarginE dlet_dlet.
       apply: eq_in_dlet=> // noise _ z.
       by rewrite dlet_unit.
     transitivity
@@ -295,7 +295,7 @@ Module NoiseFloodingSecureGaussianBasics
       ((dmargin (fun v => inverse_isometry m v)
         (dmargin (fun noise_vec => ivec_add noise_vec center_vec)
           (n_dg dim stdev))) y).
-    - rewrite !dmarginE __deprecated__dlet_dlet.
+    - rewrite !dmarginE dlet_dlet.
       apply: eq_in_dlet=> // noise_vec _ z.
       by rewrite dlet_unit.
     apply: dmargin_ext.
@@ -361,7 +361,7 @@ Module NoiseFloodingSecureGaussianBasics
           Pr_code (ret (Some x_mem.1)) x_mem.2) out).
     - apply: eq_in_dlet=> //.
       exact: sampleRawE.
-    rewrite dmarginE __deprecated__dlet_dlet.
+    rewrite dmarginE dlet_dlet.
     apply: eq_in_dlet=> // x _ out'.
     by rewrite dlet_unit Pr_code_ret.
   Qed.
@@ -552,10 +552,9 @@ Module NoiseFloodingSecureGaussianBasics
         dim%:R * coord_eps =
           dim%:R / (2 * gaussian_width_multiplier ^+ 2).
       rewrite /coord_eps.
-      field.
       have Hg : 0 < gaussian_width_multiplier :=
         gt0_gaussian_width_multiplier.
-      nra.
+      field by nra.
     rewrite -Hbudget.
     pose zero := (ivec_zero : dim.-tuple int).
     pose shift := isometry centerL centerR.

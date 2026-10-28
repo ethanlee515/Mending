@@ -1,15 +1,16 @@
 (* Pointwise coordinate-chain facts for KL over tuples. *)
 
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals realsum exp distr.
-From mathcomp Require Import lra.
+From mathcomp Require Import boot order algebra.
+From mathcomp Require Import reals realsum functions numfun exp distr.
+From mathcomp Require Import arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic field_tactic ssrZ zify.
 
 From Mending.Probability.KL Require Import Core.
 From Mending.Probability Require Import ConditionalCoordinate.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory.
 
@@ -53,23 +54,21 @@ exact: Hxy.
 Qed.
 
 Lemma fposD_le (x y : R) :
-  fpos (fun _ : unit => x + y) tt <=
-  fpos (fun _ : unit => x) tt + fpos (fun _ : unit => y) tt.
+  funrpos (fun _ : unit => x + y) tt <=
+  funrpos (fun _ : unit => x) tt + funrpos (fun _ : unit => y) tt.
 Proof.
-rewrite /fpos /= !ger0_norm ?le_max ?lexx //.
-rewrite ge_max.
-apply/andP; split; first by rewrite addr_ge0 ?le_max ?lexx.
-have Hx : x <= Num.max 0 x by rewrite le_max lexx orbT.
-have Hy : y <= Num.max 0 y by rewrite le_max lexx orbT.
-exact: (le_trans (lerD Hx Hy) (lexx _)).
+rewrite /funrpos /= ge_max.
+apply/andP; split.
+- apply: lerD; by rewrite le_max lexx.
+- by rewrite addr_ge0 ?le_max ?lexx ?orbT.
 Qed.
 
 Lemma fpos_sum_le {I : finType} (F : I -> R) :
-  fpos (fun _ : unit => \sum_i F i) tt <=
-  \sum_i fpos (fun _ : unit => F i) tt.
+  funrpos (fun _ : unit => \sum_i F i) tt <=
+  \sum_i funrpos (fun _ : unit => F i) tt.
 Proof.
 elim: (index_enum I)=> [|i s IH].
-  by rewrite !big_nil /fpos /= max_l ?normr0.
+  by rewrite !big_nil /funrpos /= maxxx.
 rewrite !big_cons.
 apply: (le_trans (fposD_le (F i) (\sum_(j <- s) F j))).
 exact: lerD.
@@ -77,49 +76,39 @@ Qed.
 
 Lemma psum_fpos_le_fpos_sum_plus_fneg {T : choiceType} (F : T -> R) :
   summable F ->
-  psum (fpos F) <=
-  `|fpos (fun _ : unit => sum F) tt| + psum (fneg F).
+  psum (funrpos F) <=
+  `|funrpos (fun _ : unit => sum F) tt| + psum (funrneg F).
 Proof.
+
 move=> Hsumm.
 rewrite /sum.
-set p := psum (fpos F).
-set q := psum (fneg F).
-have Hp : 0 <= p by exact: ge0_psum.
-have Hq : 0 <= q by exact: ge0_psum.
-rewrite /fpos /=.
-case Hle : (p - q <= 0).
-  rewrite max_l // !normr0 add0r.
-  have Hle' : p - q <= 0 by rewrite Hle.
-  have -> : p = p - q + q by rewrite subrK.
-  rewrite -[leRHS]add0r.
-  apply: lerD; first exact: Hle'.
-  exact: lexx.
-have Hgt : 0 < p - q by rewrite ltNge Hle.
-rewrite max_r; last exact: ltW Hgt.
-have Hnorm : `|p - q| = p - q by rewrite ger0_norm ?ltW.
-rewrite Hnorm Hnorm.
-by rewrite subrK.
+set p := psum (funrpos F).
+set q := psum (funrneg F).
+have Hmax : p - q <= Num.max (p - q) 0 by rewrite le_max lexx.
+have Hmax0 : 0 <= Num.max (p - q) 0 by rewrite le_max lexx orbT.
+rewrite /funrpos /= (ger0_norm Hmax0).
+lra.
 Qed.
 
 Lemma scaled_kl_integrand_fneg_psum_le
     {T : choiceType} (P Q : {distr T / R}) (c : R) :
   0 <= c ->
   absolute_continuous P Q ->
-  psum (fneg (fun x => c * (P x * ln (P x / Q x)))) <= c.
+  psum (funrneg (fun x => c * (P x * ln (P x / Q x)))) <= c.
 Proof.
 move=> Hc Hac.
-rewrite (eq_psum (F2 := fun x => c * fneg
+rewrite (eq_psum (F2 := fun x => c * funrneg
   (fun x => P x * ln (P x / Q x)) x)); last first.
   move=> x.
-  have := fnegZ (fun x => P x * ln (P x / Q x)) Hc x.
+  have := funrnegZ (fun x => P x * ln (P x / Q x)) Hc x.
   by rewrite /=.
 rewrite psumZ //.
 rewrite -[leRHS]mulr1.
 apply: ler_wpM2l; first exact: Hc.
 apply: (le_trans _ (le1_mu Q)).
 apply: le_psum; last exact: summable_mu.
-move=> x; apply/andP; split; first exact: ge0_fneg.
-rewrite /fneg.
+move=> x; apply/andP; split; first exact: funrneg_ge0.
+rewrite /funrneg.
 exact: (kl_integrand_fneg_le_q (P x) (Q x)
   (ge0_mu P x) (ge0_mu Q x) (Hac x)).
 Qed.
@@ -128,13 +117,13 @@ Lemma scaled_kl_integrand_fpos_psum_le
     {T : choiceType} (P Q : {distr T / R}) (c : R) :
   0 <= c ->
   finite_kl P Q ->
-  psum (fpos (fun x => c * (P x * ln (P x / Q x)))) <=
-  `|fpos (fun _ : unit => c * δ_KL P Q) tt| + c.
+  psum (funrpos (fun x => c * (P x * ln (P x / Q x)))) <=
+  `|funrpos (fun _ : unit => c * δ_KL P Q) tt| + c.
 Proof.
 move=> Hc [Hac Hsumm].
 pose S := fun x => P x * ln (P x / Q x).
 have Hsumm_c : summable (fun x => c * S x).
-  apply: (eq_summable (S1 := c \*o S)).
+  apply: (eq_summable (f := c \*o S)).
     by move=> x.
   exact: summableZ.
 apply: (le_trans (psum_fpos_le_fpos_sum_plus_fneg
@@ -170,71 +159,48 @@ Lemma finite_sum_fpos_scaled_le {T : choiceType}
     (J : seq T) (p : pred T) (F : T -> R) (r l : R) :
   (forall x, 0 <= F x) ->
   \sum_(x <- J | p x) F x <= r ->
-  \sum_(x <- J | p x) `|fpos (fun _ : unit => F x * l) tt| <=
-  `|fpos (fun _ : unit => r * l) tt|.
+  \sum_(x <- J | p x) `|funrpos (fun _ : unit => F x * l) tt| <=
+  `|funrpos (fun _ : unit => r * l) tt|.
 Proof.
 move=> HF Hsum.
 have Hsum_ge0 : 0 <= \sum_(x <- J | p x) F x.
   by apply: sumr_ge0=> x _; exact: HF.
 have Hr : 0 <= r := le_trans Hsum_ge0 Hsum.
-rewrite /fpos /=.
-case Hl : (l <= 0).
-  have Hle0 : l <= 0 by rewrite Hl.
-  have Hrle0 : r * l <= 0 := mulr_ge0_le0 Hr Hle0.
-  rewrite (max_l Hrle0) normr0.
-  rewrite big1 // => x _.
-  have Hxle0 : F x * l <= 0 := mulr_ge0_le0 (HF x) Hle0.
-  by rewrite (max_l Hxle0) !normr0.
-have Hlt : 0 < l by rewrite ltNge Hl.
-have Hlge0 : 0 <= l := ltW Hlt.
-have Hrge0 : 0 <= r * l := mulr_ge0 Hr Hlge0.
-rewrite (max_r Hrge0) !ger0_norm ?mulr_ge0 //.
-rewrite (eq_bigr (fun x => F x * l)); last first.
+pose c := funrpos (fun _ : unit => l) tt.
+have Hc : 0 <= c by exact: funrpos_ge0.
+have -> : `|funrpos (fun _ : unit => r * l) tt| = r * c.
+  rewrite ger0_norm ?funrpos_ge0 //.
+  exact: (funrposZ (fun _ : unit => l) Hr tt).
+rewrite (eq_bigr (fun x => F x * c)); last first.
   move=> x _.
-  have Hxge0 : 0 <= F x * l := mulr_ge0 (HF x) Hlge0.
-  by rewrite (max_r Hxge0) !ger0_norm.
+  rewrite ger0_norm ?funrpos_ge0 //.
+  exact: (funrposZ (fun _ : unit => l) (HF x) tt).
 rewrite -big_distrl.
-exact: ler_wpM2r.
+exact: (ler_wpM2r Hc Hsum).
 Qed.
 
 Lemma finite_sum_fneg_scaled_le {T : choiceType}
     (J : seq T) (p : pred T) (F : T -> R) (r l : R) :
   (forall x, 0 <= F x) ->
   \sum_(x <- J | p x) F x <= r ->
-  \sum_(x <- J | p x) `|fneg (fun _ : unit => F x * l) tt| <=
-  `|fneg (fun _ : unit => r * l) tt|.
+  \sum_(x <- J | p x) `|funrneg (fun _ : unit => F x * l) tt| <=
+  `|funrneg (fun _ : unit => r * l) tt|.
 Proof.
 move=> HF Hsum.
 have Hsum_ge0 : 0 <= \sum_(x <- J | p x) F x.
   by apply: sumr_ge0=> x _; exact: HF.
 have Hr : 0 <= r := le_trans Hsum_ge0 Hsum.
-rewrite /fneg /=.
-case Hl : (0 <= l).
-  have Hlge0 : 0 <= l by rewrite Hl.
-  have Hrge0 : 0 <= r * l := mulr_ge0 Hr Hlge0.
-  rewrite (min_l Hrge0) normr0.
-  rewrite big1 // => x _.
-  have Hxge0 : 0 <= F x * l := mulr_ge0 (HF x) Hlge0.
-  by rewrite (min_l Hxge0) !normr0.
-have Hlt : l < 0 by rewrite ltNge Hl.
-have Hle0 : l <= 0 := ltW Hlt.
-have Hrle0 : r * l <= 0 := mulr_ge0_le0 Hr Hle0.
-rewrite (min_r Hrle0).
-rewrite ger0_norm ?normr_ge0.
-rewrite ler0_norm //.
-rewrite (eq_bigr (fun x => `|F x * l|)); last first.
+pose c := funrneg (fun _ : unit => l) tt.
+have Hc : 0 <= c by exact: funrneg_ge0.
+have -> : `|funrneg (fun _ : unit => r * l) tt| = r * c.
+  rewrite ger0_norm ?funrneg_ge0 //.
+  exact: (funrnegZ (fun _ : unit => l) Hr tt).
+rewrite (eq_bigr (fun x => F x * c)); last first.
   move=> x _.
-  have Hxle0 : F x * l <= 0 := mulr_ge0_le0 (HF x) Hle0.
-  by rewrite (min_r Hxle0) ger0_norm ?normr_ge0.
-rewrite (eq_bigr (fun x => F x * (- l))); last first.
-  move=> x _.
-  have Hxle0 : F x * l <= 0 := mulr_ge0_le0 (HF x) Hle0.
-  by rewrite ler0_norm // -mulrN.
+  rewrite ger0_norm ?funrneg_ge0 //.
+  exact: (funrnegZ (fun _ : unit => l) (HF x) tt).
 rewrite -big_distrl.
-have Hnl : 0 <= - l by lra.
-apply: (le_trans (ler_wpM2r Hnl Hsum)).
-by rewrite mulrN.
-by [].
+exact: (ler_wpM2r Hc Hsum).
 Qed.
 
 Lemma finite_sum_partition_by_image {T U : choiceType}
@@ -286,8 +252,7 @@ rewrite -lnM; last first.
   rewrite qualifE.
   exact: divr_gt0.
 congr ln.
-field.
-by rewrite !gt_eqF.
+field by rewrite !gt_eqF.
 Qed.
 
 Lemma ln_ratio_telescoping (n : nat) (p q : nat -> R) :
@@ -318,11 +283,11 @@ Lemma finite_sum_coordinate_log_contribution_partition_prefix
     (i : 'I_n) (J : seq (n.-tuple A)) :
   uniq J ->
   \sum_(x <- J)
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
     \sum_(x <- J | tuple_prefix_eq a x)
-      `|fpos
+      `|funrpos
         (fun x => P x * coordinate_log_contribution P Q x i) x|.
 Proof.
 move=> Huniq.
@@ -331,14 +296,14 @@ rewrite [leLHS]big_seq_cond.
 rewrite [leRHS](eq_bigr (fun a =>
     \sum_(x <- J)
       (if tuple_prefix_eq a x then
-        `|fpos
+        `|funrpos
           (fun x => P x * coordinate_log_contribution P Q x i) x|
        else 0))); last first.
   by move=> a _; rewrite big_mkcond.
 rewrite [leRHS]exchange_big.
 rewrite [leRHS]big_seq_cond.
 apply: ler_sum=> x /andP[HxJ _].
-set t := `|fpos _ _|.
+set t := `|funrpos _ _|.
 pose a0 := tuple_prefix i (tnth x).
 have Ha0 : a0 \in undup [seq tuple_prefix i (tnth x) | x <- J].
   rewrite mem_undup.
@@ -554,7 +519,7 @@ rewrite /conditional_coordinate.
 rewrite (pr_pred1
   (dmargin (fun omega : n.-tuple A => tnth omega i)
     (dcond P (fun omega : n.-tuple A => tuple_prefix_eq a omega))) b).
-  rewrite pr_dmargin_pred1_clean pr_dcond /prc.
+  rewrite pr_dmargin pr_dcond /prc.
 set p0 := \P_[P] [eta tuple_prefix_eq a].
 set q0 := \P_[P]
   [predI [pred x0 | tnth x0 i \in pred1 b] & [eta tuple_prefix_eq a]].
@@ -591,8 +556,7 @@ case: ltnP=> Hi.
     exfalso.
     have Hnot : ~~ (i < n)%N by rewrite -leqNgt.
     by move: (ltn_ord i); rewrite (negbTE Hnot).
-  field.
-  by rewrite gt_eqF.
+  field by rewrite gt_eqF.
 exfalso.
 have Hnot : ~~ (i < n)%N by rewrite -leqNgt.
 by move: (ltn_ord i); rewrite (negbTE Hnot).
@@ -707,17 +671,17 @@ Lemma finite_sum_coordinate_log_contribution_partition_coordinate
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) :
   uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x)
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(b <- undup [seq tnth x i | x <- J])
     \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b))
-      `|fpos
+      `|funrpos
         (fun x => P x * coordinate_log_contribution P Q x i) x|.
 Proof.
 move=> _.
 exact: (finite_sum_partition_by_image
   J (fun x => tnth x i) (fun x => tuple_prefix_eq a x)
-  (fun x => `|fpos
+  (fun x => `|funrpos
     (fun x => P x * coordinate_log_contribution P Q x i) x|)
   (fun x => normr_ge0 _)).
 Qed.
@@ -754,9 +718,9 @@ Lemma finite_sum_prefix_coordinate_fiber_log_bound
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) (b : A) :
   uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b))
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
-  `|fpos
+  `|funrpos
     (fun b : A =>
       \P_[P] (fun x => tuple_prefix_eq a x) *
       (conditional_coordinate P a b *
@@ -767,10 +731,10 @@ move=> Huniq.
 set l := ln (conditional_coordinate P a b / conditional_coordinate Q a b).
 set r := \P_[P] (fun x => tuple_prefix_eq a x) *
   conditional_coordinate P a b.
-rewrite (eq_bigr (fun x => `|fpos (fun _ : unit => P x * l) tt|));
+rewrite (eq_bigr (fun x => `|funrpos (fun _ : unit => P x * l) tt|));
   last first.
   move=> x /andP[Hprefix /eqP Hb].
-  rewrite /fpos /= /l.
+  rewrite /funrpos /= /l.
   rewrite (coordinate_log_contribution_prefix P Q i a x Hprefix).
   by rewrite Hb.
 apply: (le_trans
@@ -788,10 +752,10 @@ Lemma finite_sum_coordinate_log_contribution_prefix_coordinate_group_bound
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) :
   uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x)
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(b <- undup [seq tnth x i | x <- J])
-    `|fpos
+    `|funrpos
       (fun b : A =>
         \P_[P] (fun x => tuple_prefix_eq a x) *
         (conditional_coordinate P a b *
@@ -812,9 +776,9 @@ Lemma finite_sum_coordinate_log_contribution_prefix_bound
   uniq J ->
   finite_kl (conditional_coordinate P a) (conditional_coordinate Q a) ->
   \sum_(x <- J | tuple_prefix_eq a x)
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
-  psum (fpos
+  psum (funrpos
     (fun b : A =>
       \P_[P] (fun x => tuple_prefix_eq a x) *
       (conditional_coordinate P a b *
@@ -826,11 +790,11 @@ apply: (le_trans
   (finite_sum_coordinate_log_contribution_prefix_coordinate_group_bound
     P Q i J a Huniq)).
 apply: gerfinseq_psum; first exact: undup_uniq.
-apply: summable_fpos.
+apply: summable_funrpos.
 pose S := fun b : A =>
   conditional_coordinate P a b *
   ln (conditional_coordinate P a b / conditional_coordinate Q a b).
-apply: (eq_summable (S1 :=
+apply: (eq_summable (f :=
   \P_[P] (fun x => tuple_prefix_eq a x) \*o S)).
   by move=> b.
 exact: (@summableZ R A S
@@ -846,10 +810,10 @@ Lemma finite_sum_coordinate_log_contribution_group_bound
     finite_kl (conditional_coordinate P a) (conditional_coordinate Q a)) ->
   uniq J ->
   \sum_(x <- J)
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-    psum (fpos
+    psum (funrpos
       (fun b : A =>
         \P_[P] (fun x => tuple_prefix_eq a x) *
         (conditional_coordinate P a b *
@@ -870,13 +834,13 @@ Lemma prefix_coordinate_scaled_fpos_psum_bound
   finite_kl
     (conditional_coordinate P a)
     (conditional_coordinate Q a) ->
-  psum (fpos
+  psum (funrpos
     (fun b : A =>
       \P_[P] (fun x => tuple_prefix_eq a x) *
       (conditional_coordinate P a b *
        ln (conditional_coordinate P a b /
            conditional_coordinate Q a b)))) <=
-  `|fpos
+  `|funrpos
     (fun a =>
       \P_[P] (fun x => tuple_prefix_eq a x) *
       δ_KL (conditional_coordinate P a)
@@ -949,10 +913,10 @@ Lemma finite_sum_fpos_coordinate_log_contribution_bound
       (conditional_coordinate Q a)) ->
   uniq J ->
   \sum_(x <- J)
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   (\sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-      `|fpos
+      `|funrpos
         (fun a =>
           \P_[P] (fun x => tuple_prefix_eq a x) *
           δ_KL (conditional_coordinate P a)
@@ -978,24 +942,24 @@ Lemma finite_sum_fpos_kl_chain_terms_from_pointwise
     \sum_(i < n) P x * coordinate_log_contribution P Q x i) ->
   forall J : seq (n.-tuple A),
     \sum_(x <- J)
-      `|fpos (fun x => P x * ln (P x / Q x)) x| <=
+      `|funrpos (fun x => P x * ln (P x / Q x)) x| <=
     \sum_(i < n)
       \sum_(x <- J)
-        `|fpos
+        `|funrpos
           (fun x => P x * coordinate_log_contribution P Q x i) x|.
 Proof.
 move=> Hpoint J.
 rewrite exchange_big.
 apply: ler_sum=> x _.
-rewrite ger0_norm ?ge0_fpos.
+rewrite ger0_norm ?funrpos_ge0.
 rewrite (eq_bigr (fun i =>
-  fpos (fun x => P x * coordinate_log_contribution P Q x i) x));
-  last by move=> i _; rewrite ger0_norm ?ge0_fpos.
-rewrite /fpos Hpoint /=.
-change (fpos (fun _ : unit =>
+  funrpos (fun x => P x * coordinate_log_contribution P Q x i) x));
+  last by move=> i _; rewrite ger0_norm ?funrpos_ge0.
+rewrite /funrpos Hpoint /=.
+change (funrpos (fun _ : unit =>
           \sum_(i < n) P x * coordinate_log_contribution P Q x i) tt <=
         \sum_(i < n)
-          fpos
+          funrpos
             (fun _ : unit =>
               P x * coordinate_log_contribution P Q x i) tt).
 exact: fpos_sum_le.
@@ -1018,10 +982,10 @@ Lemma finite_sum_fpos_kl_chain_decomp_from_pointwise
   forall J : seq (n.-tuple A),
     uniq J ->
     \sum_(x <- J)
-      `|fpos (fun x => P x * ln (P x / Q x)) x| <=
+      `|funrpos (fun x => P x * ln (P x / Q x)) x| <=
     \sum_(i < n)
       ((\sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-          `|fpos
+          `|funrpos
             (fun a =>
               \P_[P] (fun x => tuple_prefix_eq a x) *
               δ_KL (conditional_coordinate P a)
@@ -1042,10 +1006,10 @@ Lemma summable_finite_ord_sum
 Proof.
 move=> Hsumm.
 elim: m F Hsumm=> [|m IH] F Hsumm.
-  apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+  apply: (eq_summable (f := fun _ : T => 0)); last exact: summable0.
   by move=> x; rewrite big_ord0.
 apply: (eq_summable
-  (S1 := fun x : T =>
+  (f := fun x : T =>
     F ord0 x + \sum_(i < m) F (lift ord0 i) x)).
   by move=> x; rewrite big_ord_recl.
 apply: summableD.
@@ -1091,10 +1055,10 @@ Lemma finite_sum_fpos_kl_chain_decomp
   forall J : seq (n.-tuple A),
     uniq J ->
     \sum_(x <- J)
-      `|fpos (fun x => P x * ln (P x / Q x)) x| <=
+      `|funrpos (fun x => P x * ln (P x / Q x)) x| <=
     \sum_(i < n)
       ((\sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-          `|fpos
+          `|funrpos
             (fun a =>
               \P_[P] (fun x => tuple_prefix_eq a x) *
               δ_KL (conditional_coordinate P a)
@@ -1140,34 +1104,34 @@ Proof.
 move=> Hsumm.
 pose F := fun x : T => P x * h (f x).
 pose G := fun y : U => dmargin f P y * h y.
-have HposF x : fpos F x = P x * fpos h (f x).
+have HposF x : funrpos F x = P x * funrpos h (f x).
   rewrite /F.
-  have := fposZ h (ge0_mu P x) (f x).
+  have := funrposZ h (ge0_mu P x) (f x).
   by [].
-have HnegF x : fneg F x = P x * fneg h (f x).
+have HnegF x : funrneg F x = P x * funrneg h (f x).
   rewrite /F.
-  have := fnegZ h (ge0_mu P x) (f x).
+  have := funrnegZ h (ge0_mu P x) (f x).
   by [].
-have HposG y : fpos G y = dmargin f P y * fpos h y.
+have HposG y : funrpos G y = dmargin f P y * funrpos h y.
   rewrite /G.
-  have := fposZ h (ge0_mu (dmargin f P) y) y.
+  have := funrposZ h (ge0_mu (dmargin f P) y) y.
   by [].
-have HnegG y : fneg G y = dmargin f P y * fneg h y.
+have HnegG y : funrneg G y = dmargin f P y * funrneg h y.
   rewrite /G.
-  have := fnegZ h (ge0_mu (dmargin f P) y) y.
+  have := funrnegZ h (ge0_mu (dmargin f P) y) y.
   by [].
-have Hpos_summable : summable (fun x : T => P x * fpos h (f x)).
-  apply: (eq_summable (S1 := fpos F)); first by move=> x; rewrite HposF.
-  exact: summable_fpos.
-have Hneg_summable : summable (fun x : T => P x * fneg h (f x)).
-  apply: (eq_summable (S1 := fneg F)); first by move=> x; rewrite HnegF.
-  exact: summable_fneg.
+have Hpos_summable : summable (fun x : T => P x * funrpos h (f x)).
+  apply: (eq_summable (f := funrpos F)); first by move=> x; rewrite HposF.
+  exact: summable_funrpos.
+have Hneg_summable : summable (fun x : T => P x * funrneg h (f x)).
+  apply: (eq_summable (f := funrneg F)); first by move=> x; rewrite HnegF.
+  exact: summable_funrneg.
 apply: summable_from_fpos_fneg.
-- apply: (eq_summable (S1 := fun y : U =>
-    psum (fun x : T => (f x == y)%:R * (P x * fpos h (f x))))).
+- apply: (eq_summable (f := fun y : U =>
+    psum (fun x : T => (f x == y)%:R * (P x * funrpos h (f x))))).
     move=> y.
     rewrite HposG dmargin_psumE.
-    rewrite [psum _ * fpos h y]mulrC -psumZ; last exact: ge0_fpos.
+    rewrite [psum _ * funrpos h y]mulrC -psumZ; last exact: funrpos_ge0.
     apply: eq_psum=> x.
     case Hfy : (f x == y).
       have Hfy_bool := Hfy.
@@ -1178,14 +1142,14 @@ apply: summable_from_fpos_fneg.
     rewrite /= Hfy.
     have -> : false%:R = (0 : R) by [].
     by rewrite !mul0r !mulr0.
-  apply: (summable_fiber_psum f (fun x : T => P x * fpos h (f x))).
-  + by move=> x; rewrite mulr_ge0 ?ge0_mu ?ge0_fpos.
+  apply: (summable_fiber_psum f (fun x : T => P x * funrpos h (f x))).
+  + by move=> x; rewrite mulr_ge0 ?ge0_mu ?funrpos_ge0.
   + exact: Hpos_summable.
-- apply: (eq_summable (S1 := fun y : U =>
-    psum (fun x : T => (f x == y)%:R * (P x * fneg h (f x))))).
+- apply: (eq_summable (f := fun y : U =>
+    psum (fun x : T => (f x == y)%:R * (P x * funrneg h (f x))))).
     move=> y.
     rewrite HnegG dmargin_psumE.
-    rewrite [psum _ * fneg h y]mulrC -psumZ; last exact: ge0_fneg.
+    rewrite [psum _ * funrneg h y]mulrC -psumZ; last exact: funrneg_ge0.
     apply: eq_psum=> x.
     case Hfy : (f x == y).
       have Hfy_bool := Hfy.
@@ -1196,8 +1160,8 @@ apply: summable_from_fpos_fneg.
     rewrite /= Hfy.
     have -> : false%:R = (0 : R) by [].
     by rewrite !mul0r !mulr0.
-  apply: (summable_fiber_psum f (fun x : T => P x * fneg h (f x))).
-  + by move=> x; rewrite mulr_ge0 ?ge0_mu ?ge0_fneg.
+  apply: (summable_fiber_psum f (fun x : T => P x * funrneg h (f x))).
+  + by move=> x; rewrite mulr_ge0 ?ge0_mu ?funrneg_ge0.
   + exact: Hneg_summable.
 Qed.
 
@@ -1210,28 +1174,28 @@ Proof.
 move=> Hsumm.
 pose F := fun x : T => P x * h (f x).
 pose G := fun y : U => dmargin f P y * h y.
-have HposF x : fpos F x = P x * fpos h (f x).
+have HposF x : funrpos F x = P x * funrpos h (f x).
   rewrite /F.
-  have := fposZ h (ge0_mu P x) (f x).
+  have := funrposZ h (ge0_mu P x) (f x).
   by [].
-have HnegF x : fneg F x = P x * fneg h (f x).
+have HnegF x : funrneg F x = P x * funrneg h (f x).
   rewrite /F.
-  have := fnegZ h (ge0_mu P x) (f x).
+  have := funrnegZ h (ge0_mu P x) (f x).
   by [].
-have HposG y : fpos G y = dmargin f P y * fpos h y.
+have HposG y : funrpos G y = dmargin f P y * funrpos h y.
   rewrite /G.
-  have := fposZ h (ge0_mu (dmargin f P) y) y.
+  have := funrposZ h (ge0_mu (dmargin f P) y) y.
   by [].
-have HnegG y : fneg G y = dmargin f P y * fneg h y.
+have HnegG y : funrneg G y = dmargin f P y * funrneg h y.
   rewrite /G.
-  have := fnegZ h (ge0_mu (dmargin f P) y) y.
+  have := funrnegZ h (ge0_mu (dmargin f P) y) y.
   by [].
-have Hpos_summable : summable (fun x : T => P x * fpos h (f x)).
-  apply: (eq_summable (S1 := fpos F)); first by move=> x; rewrite HposF.
-  exact: summable_fpos.
-have Hneg_summable : summable (fun x : T => P x * fneg h (f x)).
-  apply: (eq_summable (S1 := fneg F)); first by move=> x; rewrite HnegF.
-  exact: summable_fneg.
+have Hpos_summable : summable (fun x : T => P x * funrpos h (f x)).
+  apply: (eq_summable (f := funrpos F)); first by move=> x; rewrite HposF.
+  exact: summable_funrpos.
+have Hneg_summable : summable (fun x : T => P x * funrneg h (f x)).
+  apply: (eq_summable (f := funrneg F)); first by move=> x; rewrite HnegF.
+  exact: summable_funrneg.
 rewrite /sum.
 rewrite (eq_psum HposF) (eq_psum HnegF).
 rewrite (eq_psum HposG) (eq_psum HnegG).
@@ -1240,7 +1204,7 @@ rewrite (partition_psum f Hneg_summable).
 congr (_ - _).
 - apply: eq_psum=> y.
   rewrite dmargin_psumE.
-  rewrite [psum _ * fpos h y]mulrC -psumZ; last exact: ge0_fpos.
+  rewrite [psum _ * funrpos h y]mulrC -psumZ; last exact: funrpos_ge0.
   apply: eq_psum=> x.
   case Hfy : (f x == y).
     move/eqP: Hfy=> Hfy.
@@ -1249,7 +1213,7 @@ congr (_ - _).
   by rewrite /= Hfy mulr0 mul0r mulr0.
 - apply: eq_psum=> y.
   rewrite dmargin_psumE.
-  rewrite [psum _ * fneg h y]mulrC -psumZ; last exact: ge0_fneg.
+  rewrite [psum _ * funrneg h y]mulrC -psumZ; last exact: funrneg_ge0.
   apply: eq_psum=> x.
   case Hfy : (f x == y).
     move/eqP: Hfy=> Hfy.
@@ -1290,7 +1254,7 @@ Lemma summable_pair_fst_rows_nonneg
 Proof.
 move=> HS Hsumm.
 apply: (eq_summable
-  (S1 := fun x : T =>
+  (f := fun x : T =>
     psum (fun xy : T * U => (xy.1 == x)%:R * S xy))).
   move=> x.
   by rewrite psum_pair_fst_fiber.
@@ -1304,16 +1268,16 @@ Lemma sum_pair_fst_rows
   sum F = sum (fun x : T => sum (fun y : U => F (x, y))).
 Proof.
 move=> Hsumm Hrow.
-pose A := fun x : T => psum (fun y : U => fpos F (x, y)).
-pose B := fun x : T => psum (fun y : U => fneg F (x, y)).
+pose A := fun x : T => psum (fun y : U => funrpos F (x, y)).
+pose B := fun x : T => psum (fun y : U => funrneg F (x, y)).
 have HA : summable A.
   apply: summable_pair_fst_rows_nonneg.
-  - move=> xy; exact: ge0_fpos.
-  - exact: summable_fpos.
+  - move=> xy; exact: funrpos_ge0.
+  - exact: summable_funrpos.
 have HB : summable B.
   apply: summable_pair_fst_rows_nonneg.
-  - move=> xy; exact: ge0_fneg.
-  - exact: summable_fneg.
+  - move=> xy; exact: funrneg_ge0.
+  - exact: summable_funrneg.
 rewrite (eq_sum (F2 := A \+ (fun x : T => - B x))); last first.
   move=> x.
   by rewrite /A /B /sum.
@@ -1322,18 +1286,18 @@ rewrite sumN.
 have HsumA : sum A = psum A by rewrite -psum_sum // => x; exact: ge0_psum.
 have HsumB : sum B = psum B by rewrite -psum_sum // => x; exact: ge0_psum.
 rewrite HsumA HsumB.
-have HAeq : psum A = psum (fpos F).
+have HAeq : psum A = psum (funrpos F).
   rewrite /A.
-  rewrite (partition_psum (S := fpos F) (fun xy : T * U => xy.1));
-    last exact: summable_fpos.
+  rewrite (partition_psum (S := funrpos F) (fun xy : T * U => xy.1));
+    last exact: summable_funrpos.
   apply/eq_psum=> x.
-  by rewrite (psum_pair_fst_fiberR (fpos F) x (fun xy => ge0_fpos F xy)).
-have HBeq : psum B = psum (fneg F).
+  by rewrite (psum_pair_fst_fiberR (funrpos F) x (fun xy => funrpos_ge0 F xy)).
+have HBeq : psum B = psum (funrneg F).
   rewrite /B.
-  rewrite (partition_psum (S := fneg F) (fun xy : T * U => xy.1));
-    last exact: summable_fneg.
+  rewrite (partition_psum (S := funrneg F) (fun xy : T * U => xy.1));
+    last exact: summable_funrneg.
   apply/eq_psum=> x.
-  by rewrite (psum_pair_fst_fiberR (fneg F) x (fun xy => ge0_fneg F xy)).
+  by rewrite (psum_pair_fst_fiberR (funrneg F) x (fun xy => funrneg_ge0 F xy)).
 rewrite HAeq HBeq.
 by rewrite /sum.
 Qed.
@@ -1345,17 +1309,17 @@ Lemma summable_pair_fst_row_sums
   summable (fun x : T => sum (fun y : U => F (x, y))).
 Proof.
 move=> Hsumm _.
-pose A := fun x : T => psum (fun y : U => fpos F (x, y)).
-pose B := fun x : T => psum (fun y : U => fneg F (x, y)).
+pose A := fun x : T => psum (fun y : U => funrpos F (x, y)).
+pose B := fun x : T => psum (fun y : U => funrneg F (x, y)).
 have HA : summable A.
   apply: summable_pair_fst_rows_nonneg.
-  - move=> xy; exact: ge0_fpos.
-  - exact: summable_fpos.
+  - move=> xy; exact: funrpos_ge0.
+  - exact: summable_funrpos.
 have HB : summable B.
   apply: summable_pair_fst_rows_nonneg.
-  - move=> xy; exact: ge0_fneg.
-  - exact: summable_fneg.
-apply: (eq_summable (S1 := fun x : T => A x - B x)).
+  - move=> xy; exact: funrneg_ge0.
+  - exact: summable_funrneg.
+apply: (eq_summable (f := fun x : T => A x - B x)).
   by move=> x; rewrite /A /B /sum.
 apply: summableD; first exact: HA.
 exact: summableN.
@@ -1415,7 +1379,7 @@ pose hpair (ab : i.-tuple A * A) :=
 have Hsumm_fpair :
     summable (fun x : n.-tuple A => P x * hpair (fpair x)).
   apply: (eq_summable
-    (S1 := fun x : n.-tuple A => P x * coordinate_log_contribution P Q x i)).
+    (f := fun x : n.-tuple A => P x * coordinate_log_contribution P Q x i)).
     by move=> x; rewrite /fpair /hpair /coordinate_log_contribution.
   exact: Hsumm.
 pose F := fun ab : i.-tuple A * A =>
@@ -1425,12 +1389,12 @@ pose F := fun ab : i.-tuple A * A =>
        conditional_coordinate Q ab.1 ab.2)).
 have Hsumm_pair : summable F.
   apply: (eq_summable
-    (S1 := fun ab : i.-tuple A * A => dmargin fpair P ab * hpair ab)).
+    (f := fun ab : i.-tuple A * A => dmargin fpair P ab * hpair ab)).
     case=> a b.
     by rewrite /F /hpair /fpair dmargin_prefix_coordinateE mulrA.
   exact: (summable_dmargin_comp P fpair hpair Hsumm_fpair).
 apply: (eq_summable
-  (S1 := fun a : i.-tuple A => sum (fun b : A => F (a, b)))).
+  (f := fun a : i.-tuple A => sum (fun b : A => F (a, b)))).
   move=> a.
   rewrite (eq_sum
     (F2 := fun b : A =>
@@ -1446,7 +1410,7 @@ apply: summable_pair_fst_row_sums.
   exact: Hsumm_pair.
 move=> a.
 apply: (eq_summable
-  (S1 := \P_[P] (fun x => tuple_prefix_eq a x) \*o
+  (f := \P_[P] (fun x => tuple_prefix_eq a x) \*o
     (fun b : A =>
       conditional_coordinate P a b *
       ln (conditional_coordinate P a b /
@@ -1489,7 +1453,7 @@ pose H := fun a : i.-tuple A =>
        (conditional_coordinate Q a).
 have Hpref_summable : summable pref_mass.
   apply: (eq_summable
-    (S1 := dmargin (fun x : n.-tuple A => tuple_prefix i (tnth x)) P)).
+    (f := dmargin (fun x : n.-tuple A => tuple_prefix i (tnth x)) P)).
     by move=> a; rewrite dmargin_tuple_prefixE.
   exact: summable_mu.
 have Hpref_psum : psum pref_mass <= 1.
@@ -1519,11 +1483,11 @@ Lemma finite_sum_fneg_coordinate_log_contribution_partition_prefix
     (i : 'I_n) (J : seq (n.-tuple A)) :
   uniq J ->
   \sum_(x <- J)
-    `|fneg
+    `|funrneg
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
     \sum_(x <- J | tuple_prefix_eq a x)
-      `|fneg
+      `|funrneg
         (fun x => P x * coordinate_log_contribution P Q x i) x|.
 Proof.
 move=> Huniq.
@@ -1532,14 +1496,14 @@ rewrite [leLHS]big_seq_cond.
 rewrite [leRHS](eq_bigr (fun a =>
     \sum_(x <- J)
       (if tuple_prefix_eq a x then
-        `|fneg
+        `|funrneg
           (fun x => P x * coordinate_log_contribution P Q x i) x|
        else 0))); last first.
   by move=> a _; rewrite big_mkcond.
 rewrite [leRHS]exchange_big.
 rewrite [leRHS]big_seq_cond.
 apply: ler_sum=> x /andP[HxJ _].
-set t := `|fneg _ _|.
+set t := `|funrneg _ _|.
 pose a0 := tuple_prefix i (tnth x).
 have Ha0 : a0 \in undup [seq tuple_prefix i (tnth x) | x <- J].
   rewrite mem_undup.
@@ -1563,17 +1527,17 @@ Lemma finite_sum_fneg_coordinate_log_contribution_partition_coordinate
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) :
   uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x)
-    `|fneg
+    `|funrneg
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(b <- undup [seq tnth x i | x <- J])
     \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b))
-      `|fneg
+      `|funrneg
         (fun x => P x * coordinate_log_contribution P Q x i) x|.
 Proof.
 move=> _.
 exact: (finite_sum_partition_by_image
   J (fun x => tnth x i) (fun x => tuple_prefix_eq a x)
-  (fun x => `|fneg
+  (fun x => `|funrneg
     (fun x => P x * coordinate_log_contribution P Q x i) x|)
   (fun x => normr_ge0 _)).
 Qed.
@@ -1584,9 +1548,9 @@ Lemma finite_sum_prefix_coordinate_fiber_log_fneg_bound
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) (b : A) :
   uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x && (tnth x i == b))
-    `|fneg
+    `|funrneg
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
-  `|fneg
+  `|funrneg
     (fun b : A =>
       \P_[P] (fun x => tuple_prefix_eq a x) *
       (conditional_coordinate P a b *
@@ -1597,10 +1561,10 @@ move=> Huniq.
 set l := ln (conditional_coordinate P a b / conditional_coordinate Q a b).
 set r := \P_[P] (fun x => tuple_prefix_eq a x) *
   conditional_coordinate P a b.
-rewrite (eq_bigr (fun x => `|fneg (fun _ : unit => P x * l) tt|));
+rewrite (eq_bigr (fun x => `|funrneg (fun _ : unit => P x * l) tt|));
   last first.
   move=> x /andP[Hprefix /eqP Hb].
-  rewrite /fneg /= /l.
+  rewrite /funrneg /= /l.
   rewrite (coordinate_log_contribution_prefix P Q i a x Hprefix).
   by rewrite Hb.
 apply: (le_trans
@@ -1618,10 +1582,10 @@ Lemma finite_sum_fneg_coordinate_log_contribution_prefix_coordinate_group_bound
     (i : 'I_n) (J : seq (n.-tuple A)) (a : i.-tuple A) :
   uniq J ->
   \sum_(x <- J | tuple_prefix_eq a x)
-    `|fneg
+    `|funrneg
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(b <- undup [seq tnth x i | x <- J])
-    `|fneg
+    `|funrneg
       (fun b : A =>
         \P_[P] (fun x => tuple_prefix_eq a x) *
         (conditional_coordinate P a b *
@@ -1643,9 +1607,9 @@ Lemma finite_sum_fneg_coordinate_log_contribution_prefix_bound
   absolute_continuous
     (conditional_coordinate P a) (conditional_coordinate Q a) ->
   \sum_(x <- J | tuple_prefix_eq a x)
-    `|fneg
+    `|funrneg
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
-  psum (fneg
+  psum (funrneg
     (fun b : A =>
       \P_[P] (fun x => tuple_prefix_eq a x) *
       (conditional_coordinate P a b *
@@ -1657,14 +1621,14 @@ apply: (le_trans
   (finite_sum_fneg_coordinate_log_contribution_prefix_coordinate_group_bound
     P Q i J a Huniq)).
 apply: gerfinseq_psum; first exact: undup_uniq.
-apply: (eq_summable (S1 :=
+apply: (eq_summable (f :=
   \P_[P] (fun x => tuple_prefix_eq a x) \*o
-  fneg (fun b : A =>
+  funrneg (fun b : A =>
     conditional_coordinate P a b *
     ln (conditional_coordinate P a b /
         conditional_coordinate Q a b)))).
   move=> b.
-  have := fnegZ
+  have := funrnegZ
     (fun b : A =>
       conditional_coordinate P a b *
       ln (conditional_coordinate P a b /
@@ -1685,10 +1649,10 @@ Lemma finite_sum_fneg_coordinate_log_contribution_group_bound
       (conditional_coordinate P a) (conditional_coordinate Q a)) ->
   uniq J ->
   \sum_(x <- J)
-    `|fneg
+    `|funrneg
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-    psum (fneg
+    psum (funrneg
       (fun b : A =>
         \P_[P] (fun x => tuple_prefix_eq a x) *
         (conditional_coordinate P a b *
@@ -1712,7 +1676,7 @@ Lemma finite_sum_fneg_coordinate_log_contribution_bound
               (conditional_coordinate Q a)) ->
   uniq J ->
   \sum_(x <- J)
-    `|fneg
+    `|funrneg
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   1.
 Proof.
@@ -1756,7 +1720,7 @@ pose hpair (ab : i.-tuple A * A) :=
 have Hsumm_fpair :
     summable (fun x : n.-tuple A => P x * hpair (fpair x)).
   apply: (eq_summable
-    (S1 := fun x : n.-tuple A => P x * coordinate_log_contribution P Q x i)).
+    (f := fun x : n.-tuple A => P x * coordinate_log_contribution P Q x i)).
     by move=> x; rewrite /fpair /hpair /coordinate_log_contribution.
   exact: Hsumm.
 rewrite (eq_sum
@@ -1770,7 +1734,7 @@ pose F := fun ab : i.-tuple A * A =>
        conditional_coordinate Q ab.1 ab.2)).
 have Hsumm_pair : summable F.
   apply: (eq_summable
-    (S1 := fun ab : i.-tuple A * A => dmargin fpair P ab * hpair ab)).
+    (f := fun ab : i.-tuple A * A => dmargin fpair P ab * hpair ab)).
     case=> a b.
     by rewrite /F /hpair /fpair dmargin_prefix_coordinateE mulrA.
   exact: (summable_dmargin_comp P fpair hpair Hsumm_fpair).
@@ -1780,7 +1744,7 @@ rewrite (eq_sum (F2 := F)); last first.
 rewrite (sum_pair_fst_rows F Hsumm_pair); last first.
   move=> a.
   apply: (eq_summable
-    (S1 := \P_[P] (fun x => tuple_prefix_eq a x) \*o
+    (f := \P_[P] (fun x => tuple_prefix_eq a x) \*o
       (fun b : A =>
         conditional_coordinate P a b *
         ln (conditional_coordinate P a b /
@@ -1845,7 +1809,7 @@ Lemma prefix_coordinate_kl_contribution_bound
          (conditional_coordinate Q a) <=
       tnth eps i) ->
   \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-    `|fpos
+    `|funrpos
       (fun a =>
         \P_[P] (fun x => tuple_prefix_eq a x) *
         δ_KL (conditional_coordinate P a)
@@ -1858,34 +1822,19 @@ pose pref_mass (a : i.-tuple A) :=
 pose klc (a : i.-tuple A) :=
   δ_KL (conditional_coordinate P a) (conditional_coordinate Q a).
 have Hpoint a :
-    `|fpos (fun a => pref_mass a * klc a) a| <=
+    `|funrpos (fun a => pref_mass a * klc a) a| <=
     tnth eps i * pref_mass a.
-  rewrite /fpos.
-  case Hle0: (pref_mass a * klc a <= 0).
-    rewrite max_l // normr0.
-    have Hprod : 0 <= tnth eps i * pref_mass a.
-      apply: mulr_ge0; first exact: Heps_i.
-      exact: ge0_pr.
-    by rewrite normr0.
-  have Hgt0 : 0 < pref_mass a * klc a.
-    by rewrite ltNge Hle0.
-  have Hge0 : 0 <= pref_mass a * klc a := ltW Hgt0.
-  rewrite max_r; last by [].
-  set e :=
-    \P_[P] (fun x => tuple_prefix_eq a x) *
-    δ_KL (conditional_coordinate P a) (conditional_coordinate Q a).
-  have Hge0e : 0 <= e.
-    rewrite /e.
-    exact: Hge0.
-  rewrite normr_id.
-  apply: (norm_le_of_ge0_le e (tnth eps i * pref_mass a));
-    first exact: Hge0e.
-  rewrite /e [tnth eps i * _]mulrC.
-  apply: ler_wpM2l; first exact: ge0_pr.
-  by have [_ Hle] := Hcond a.
+  rewrite ger0_norm ?funrpos_ge0 //.
+  rewrite /funrpos /= ge_max.
+  apply/andP; split.
+  - rewrite [tnth eps i * _]mulrC.
+    apply: ler_wpM2l; first exact: ge0_pr.
+    by have [_ Hle] := Hcond a.
+  - apply: mulr_ge0; first exact: Heps_i.
+    exact: ge0_pr.
 have Hsumpoint :
     \sum_(a <- undup [seq tuple_prefix i (tnth x) | x <- J])
-      `|fpos
+      `|funrpos
         (fun a =>
           \P_[P] (fun x => tuple_prefix_eq a x) *
           δ_KL (conditional_coordinate P a)
@@ -1919,7 +1868,7 @@ Lemma finite_sum_fpos_coordinate_log_contribution_bound_eps
       tnth eps i) ->
   uniq J ->
   \sum_(x <- J)
-    `|fpos
+    `|funrpos
       (fun x => P x * coordinate_log_contribution P Q x i) x| <=
   tnth eps i + 1.
 Proof.
@@ -2086,7 +2035,7 @@ Lemma finite_sum_fpos_kl_from_coordinate_bounded_kl
   forall J : seq (n.-tuple A),
     uniq J ->
     \sum_(x <- J)
-      `|fpos (fun x => P x * ln (P x / Q x)) x| <=
+      `|funrpos (fun x => P x * ln (P x / Q x)) x| <=
     (\sum_(i < n) tnth eps i) + n%:R.
 Proof.
 move=> Heps HP HQ Hcond J Huniq.
@@ -2120,7 +2069,7 @@ Lemma summable_fpos_kl_from_coordinate_bounded_kl
     δ_KL (conditional_coordinate P a)
          (conditional_coordinate Q a) <=
       tnth eps i) ->
-  summable (fpos (fun x => P x * ln (P x / Q x))).
+  summable (funrpos (fun x => P x * ln (P x / Q x))).
 Proof.
 move=> Heps HP HQ Hcond.
 apply/summable_seqP.

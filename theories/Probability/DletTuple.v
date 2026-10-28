@@ -3,14 +3,15 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 From mathcomp Require Import reals distr ssrZ realseq realsum.
-From mathcomp Require Import lra.
+From mathcomp Require Import arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From Mending.Probability.KL Require Import Core.
 From Mending.Probability Require Import ConditionalCoordinate.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras
   TupleExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory.
 Local Open Scope ring_scope.
@@ -20,46 +21,6 @@ Section DletTuple.
 Context {R : realType}.
 
 (* === Prefix Coordinates Of Concatenated Dlets === *)
-
-(* The prefix-lift probability wrapper below is the remaining direct Tonelli
-   user in this file.  Keep the deprecated bind-probability theorem explicit
-   until it is replaced by a named countable partition/Fubini proof. *)
-
-Lemma pr_dmargin_cat_fixed_prefix
-  {ℓ1 ℓ2 : nat}
-  {A : choiceType}
-  (omega1 : (ℓ1.+1).-tuple A)
-  (K0 : {distr ((ℓ2.+1).-tuple A) / R})
-  (p : pred ((ℓ1.+1 + ℓ2.+1).-tuple A)) :
-  \P_[dmargin (fun omega2 => cat_tuple omega1 omega2) K0] p =
-  \P_[K0] (fun omega2 => p (cat_tuple omega1 omega2)).
-Proof.
-rewrite /pr.
-pose f := fun omega2 : (ℓ2.+1).-tuple A => cat_tuple omega1 omega2.
-pose S := fun omega : (ℓ1.+1 + ℓ2.+1).-tuple A =>
-  (p omega)%:R * dmargin f K0 omega.
-pose Img : pred ((ℓ1.+1 + ℓ2.+1).-tuple A) :=
-  fun omega => cat_tuple omega1 (catTupleSuffix omega) == omega.
-rewrite (@reindex_psum_onto R ((ℓ1.+1 + ℓ2.+1).-tuple A)
-  ((ℓ2.+1).-tuple A) S Img f
-  (fun omega => Some (catTupleSuffix omega))).
-- apply/eq_psum=> omega2.
-  rewrite /S /f.
-  rewrite (dmargin_injectiveE f K0); last exact: cat_tuple_fixed_prefix_injective.
-  by [].
-- move=> omega HS.
-  have Hmargin : dmargin f K0 omega != 0.
-    move: HS.
-    rewrite /S mulf_eq0 negb_or=> /andP[_ Hmargin].
-    exact: Hmargin.
-  have [omega2 _ Homega] := dmargin_dinsupp_preimage K0 f omega Hmargin.
-  apply/eqP.
-  by rewrite -Homega /f catTupleSuffix_cat.
-- move=> omega Himg.
-  by rewrite /= /f (eqP Himg).
-- move=> omega2 _.
-  by rewrite /= /f catTupleSuffix_cat.
-Qed.
 
 Lemma pr_eq_from_fibers
   {T U : choiceType}
@@ -166,7 +127,7 @@ move=> Hp.
 change (
   \P_[dmargin (fun omega2 => cat_tuple omega1' omega2) (K0 omega1')] p =
   if omega1' == omega1 then \P_[K0 omega1] q else 0).
-rewrite pr_dmargin_cat_fixed_prefix.
+rewrite pr_dmargin.
 case Homega1' : (omega1' == omega1).
   move/eqP: Homega1'=> ->.
   apply/eq_pr=> omega2.
@@ -486,153 +447,6 @@ change ((ℓ1 + ℓ2.+1 - ℓ1.+1)%N = ℓ2).
 by rewrite subnS addnC addnK.
 Qed.
 
-(* Pushes a final-coordinate marginal through a bind by partitioning fibers. *)
-Lemma dlet_dmargin_final
-  {n : nat}
-  {A U : choiceType}
-  (P : {distr ((n.+1).-tuple A) / R})
-  (K : A -> {distr U / R}) :
-  \dlet_(x <- dmargin (fun omega => tnth omega ord_max) P) K x
-  =1
-  \dlet_(omega <- P) K (tnth omega ord_max).
-Proof.
-move=> z.
-rewrite !dletE.
-pose f := fun omega : (n.+1).-tuple A => tnth omega ord_max.
-pose S := fun omega : (n.+1).-tuple A => P omega * K (f omega) z.
-have HSge omega : 0 <= S omega.
-  by rewrite /S mulr_ge0 ?ge0_mu.
-have HSsumm : summable S.
-  apply: (le_summable (F2 := P)); last exact: summable_mu.
-  move=> omega; apply/andP; split; first exact: HSge.
-  rewrite /S -[X in _ <= X]mulr1.
-  apply: ler_wpM2l; first exact: ge0_mu.
-  apply: (le_trans _ (le1_mu (K (f omega)))).
-  have Hsingle :
-      K (f omega) z =
-        \sum_(j <- [:: z]) `|K (f omega) j|.
-    by rewrite big_seq1 ger0_norm ?ge0_mu.
-  rewrite Hsingle.
-  exact: (gerfinseq_psum (S := K (f omega)) (r := [:: z])
-    _ (summable_mu (K (f omega)))).
-transitivity
-  (psum (fun x : A =>
-    psum (fun omega : (n.+1).-tuple A =>
-      (f omega == x)%:R * P omega * K x z))).
-  apply/eq_psum=> x.
-  rewrite dmargin_psumE.
-  rewrite [psum _ * K x z]mulrC -psumZ; last exact: ge0_mu.
-  apply/eq_psum=> omega.
-  by rewrite mulrC.
-transitivity
-  (psum (fun x : A =>
-    psum (fun omega : (n.+1).-tuple A => S omega * (f omega == x)%:R))).
-  apply/eq_psum=> x.
-  apply/eq_psum=> omega.
-  rewrite /S.
-  case Hfx: (f omega == x).
-  - move/eqP: Hfx=> Hfx_eq.
-    rewrite Hfx_eq.
-    change true%:R with (1 : R).
-    by rewrite !mul1r mulr1.
-  - change false%:R with (0 : R).
-    by rewrite !mul0r mulr0.
-rewrite -(@partition_psum R ((n.+1).-tuple A) A f S HSsumm).
-by [].
-Qed.
-
-Lemma psum_pair_fst_fiberR
-    {T U : choiceType} (S : T * U -> R) (x : T) :
-  (forall xy, 0 <= S xy) ->
-  psum (fun xy : T * U => S xy * (xy.1 == x)%:R) =
-  psum (fun y : U => S (x, y)).
-Proof.
-move=> HS.
-rewrite (@reindex_psum_onto R (T * U)%type U
-  (fun xy : T * U => S xy * (xy.1 == x)%:R)
-  [pred xy : T * U | xy.1 == x]
-  (fun y : U => (x, y))
-  (fun xy : T * U => if xy.1 == x then Some xy.2 else None)).
-- apply/eq_psum=> y.
-  by rewrite eqxx mulr1.
-- move=> xy Hxy.
-  case Hxyx : (xy.1 == x); first by [].
-  by move: Hxy; rewrite Hxyx mulr0 eqxx.
-- case=> x' y /= Hx'.
-  move: Hx'; rewrite /= => /eqP Hx'.
-  change (x' = x) in Hx'.
-  by rewrite Hx' eqxx.
-- by move=> y _; rewrite eqxx.
-Qed.
-
-Lemma psum_pair_snd_fiberR
-    {T U : choiceType} (S : T * U -> R) (y : U) :
-  (forall xy, 0 <= S xy) ->
-  psum (fun xy : T * U => S xy * (xy.2 == y)%:R) =
-  psum (fun x : T => S (x, y)).
-Proof.
-move=> HS.
-rewrite (@reindex_psum_onto R (T * U)%type T
-  (fun xy : T * U => S xy * (xy.2 == y)%:R)
-  [pred xy : T * U | xy.2 == y]
-  (fun x : T => (x, y))
-  (fun xy : T * U => if xy.2 == y then Some xy.1 else None)).
-- apply/eq_psum=> x.
-  by rewrite eqxx mulr1.
-- move=> xy Hxy.
-  case Hxyy : (xy.2 == y); first by [].
-  by move: Hxy; rewrite Hxyy mulr0 eqxx.
-- case=> x y' /= Hy'.
-  move: Hy'; rewrite /= => /eqP Hy'.
-  change (y' = y) in Hy'.
-  by rewrite Hy' eqxx.
-- by move=> x _; rewrite eqxx.
-Qed.
-
-Lemma dmargin_dlet_partition
-    {T U V : choiceType}
-    (P : {distr T / R})
-    (K : T -> {distr U / R})
-    (g : U -> V) :
-  dmargin g (\dlet_(x <- P) K x) =1
-  \dlet_(x <- P) dmargin g (K x).
-Proof.
-move=> z.
-rewrite dmargin_psumE dletE.
-pose S := fun xy : T * U =>
-  K xy.1 xy.2 * P xy.1 * (g xy.2 == z)%:R.
-have HSge xy : 0 <= S xy.
-  by rewrite /S !mulr_ge0 ?ge0_mu ?ler0n.
-have HSsumm : summable S.
-  apply: (le_summable
-    (F2 := fun xy : T * U => K xy.1 xy.2 * P xy.1)).
-    move=> [x y]; apply/andP; split; first exact: HSge.
-    rewrite /S -[X in _ <= X]mulr1.
-    apply: ler_wpM2l.
-      by rewrite mulr_ge0 ?ge0_mu.
-    by case: (g y == z); rewrite ?ler01 ?ler0n.
-  apply: (@summable_kernel_weighted_pair_nonneg R T U P K).
-  - move=> x; exact: ge0_mu.
-  - exact: summable_mu.
-transitivity (psum S).
-  rewrite (partition_psum (S := S) (fun xy : T * U => xy.2)) //.
-  apply/eq_psum=> y.
-  rewrite (psum_pair_snd_fiberR S y HSge).
-  rewrite dletE.
-  rewrite -psumZ; last by case: (g y == z); rewrite ?ler01 ?ler0n.
-  apply/eq_psum=> x.
-  change ((g y == z)%:R * (P x * K x y) = S (x, y)).
-  by rewrite /S /= mulrC [P x * K x y]mulrC.
-rewrite (partition_psum (S := S) (fun xy : T * U => xy.1)) //.
-apply/eq_psum=> x.
-rewrite (psum_pair_fst_fiberR S x HSge).
-rewrite dmargin_psumE.
-rewrite -psumZ; last exact: ge0_mu.
-apply/eq_psum=> y.
-change (S (x, y) = P x * ((g y == z)%:R * K x y)).
-by rewrite /S [(g y == z)%:R * K x y]mulrC mulrA [P x * K x y]mulrC.
-Qed.
-
 (* Pushes the final-coordinate margin of a concatenated trace through the inner dlet. *)
 Lemma dmargin_dlet_cat_final
   {ℓ1 ℓ2 : nat}
@@ -648,9 +462,9 @@ Lemma dmargin_dlet_cat_final
     dmargin (fun omega2 => tnth omega2 ord_max) (K0 omega1).
 Proof.
 move=> z.
-rewrite dmargin_dlet_partition.
+rewrite dmargin_dlet.
 apply: eq_in_dlet=> // omega1 _ z1.
-rewrite dmargin_dlet_partition.
+rewrite dmargin_dlet.
 apply: eq_in_dlet=> // omega2 _ z2.
 rewrite dmargin_dunit.
 by rewrite cat_tuple_tnth_ord_max_suffix.

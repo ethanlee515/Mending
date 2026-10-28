@@ -1,6 +1,7 @@
 From Stdlib Require Import Utf8 List Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
+Set SsrOldRewriteGoalsOrder.
 Set Warnings "notation-overridden,ambiguous-paths".
 
 Fixpoint nth_valid {A} (lst : list A) (n : nat)

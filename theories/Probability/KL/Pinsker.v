@@ -1,12 +1,13 @@
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra all_reals distr.
+From mathcomp Require Import boot order algebra all_reals distr.
 From mathcomp Require Import boolp classical_sets functions.
-From mathcomp Require Import realseq realsum exp lra topology normedtype derive realfun.
+From mathcomp Require Import realseq realsum exp arithmetic_tactic topology normedtype derive realfun.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic field_tactic ssrZ zify.
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
 From Mending.Probability.KL Require Import Core.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory.
 Import numFieldNormedType.Exports.
@@ -59,8 +60,7 @@ rewrite deriv_div_const.
 have Hxq : 0 < x / q by rewrite divr_gt0.
 rewrite derive1E.
 have [_ ->] := is_derive1_ln Hxq.
-field.
-by rewrite !lt0r_neq0.
+field by rewrite !lt0r_neq0.
 Qed.
 
 Lemma derivable_onem (x : R) :
@@ -159,8 +159,7 @@ rewrite deriv_onem_div_const.
 have Hpos : 0 < (1 - x) / (1 - q) by rewrite divr_gt0; lra.
 rewrite derive1E.
 have [_ ->] := is_derive1_ln Hpos.
-field.
-by rewrite !subr_eq0; lra.
+field by rewrite !subr_eq0; lra.
 Qed.
 
 Definition binary_kl (p q : R) :=
@@ -198,8 +197,7 @@ rewrite derive1E deriveM; last 2 first.
 rewrite deriveB ?derive_cst ?derive_id //.
 rewrite -derive1E deriv_ln_onem_div_const //.
 rewrite /GRing.scale /=.
-field.
-by rewrite !subr_eq0; lra.
+field by rewrite !subr_eq0; lra.
 Qed.
 
 Lemma derivable_binary_kl (q x : R) :
@@ -319,8 +317,7 @@ have Hden : 0 < x * (1 - x) by rewrite mulr_gt0.
 rewrite (_ : x^-1 + (1 - x)^-1 - 4 =
   ((2 * x - 1)^+2) / (x * (1 - x))).
   by rewrite divr_ge0 ?sqr_ge0 ?ltW.
-field.
-by rewrite !gt_eqF.
+field by rewrite !gt_eqF.
 Qed.
 
 Lemma bern_gap_deriv_expr_nondecreasing (q : R) :
@@ -410,7 +407,7 @@ Lemma summable_mu_tv_sign {T : choiceType}
   summable (fun x => M x * tv_sign P Q x).
 Proof.
 apply/summable_abs.
-apply: (eq_summable (S1 := M)); last exact: summable_mu.
+apply: (eq_summable (f := M)); last exact: summable_mu.
 move=> x /=.
 rewrite normrM tv_sign_norm (ger0_norm (ge0_mu M x)).
 by rewrite mulr1.
@@ -560,14 +557,14 @@ have Hsm_pC : summable pC by rewrite /pC; exact: summable_pr.
 have Hsm_qC : summable qC by rewrite /qC; exact: summable_pr.
 have Hsm_iA : summable iA.
   apply: (eq_summable
-    (S1 := fun x : T => (A x)%:R * i x)).
+    (f := fun x : T => (A x)%:R * i x)).
     move=> x.
     rewrite /iA /i /pA /qA.
     by case: (A x); rewrite ?mul1r ?mul0r.
   exact: summable_condl.
 have Hsm_iC : summable iC.
   apply: (eq_summable
-    (S1 := fun x : T => (predC A x)%:R * i x)).
+    (f := fun x : T => (predC A x)%:R * i x)).
     move=> x.
     rewrite /iC /i /pC /qC.
     by case: (predC A x); rewrite ?mul1r ?mul0r.
@@ -782,8 +779,7 @@ have Hden : 0 < 1 - x by lra.
 rewrite (_ : (1 - x)^-1 - 4 * x =
   ((2 * x - 1)^+2) / (1 - x)).
   by rewrite divr_ge0 ?sqr_ge0 ?ltW.
-field.
-by rewrite subr_eq0; lra.
+field by rewrite subr_eq0; lra.
 Qed.
 
 Lemma ln_onem_quad_gap_nondecreasing :

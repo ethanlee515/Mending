@@ -1,10 +1,11 @@
 From Stdlib Require Import Utf8.
 From extructures Require Import ffun fperm.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot.
+From mathcomp Require Import boot.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import NominalPrelude.
+Set SsrOldRewriteGoalsOrder.
 
 Import PackageNotation.
 

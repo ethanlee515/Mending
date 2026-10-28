@@ -1,12 +1,13 @@
 (* Distribution facts for additive-error couplings. *)
 
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 From mathcomp Require Import reals distr.
-From mathcomp Require Import realseq realsum exp lra.
+From mathcomp Require Import realseq realsum exp arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory Order.POrderTheory.
 
@@ -203,7 +204,7 @@ rewrite (psum_option_split (fun x : option T =>
 - rewrite /complete_bind_kernel dunit1E eqxx mulr1 completeE /=.
   rewrite (eq_psum
     (F2 := fun x : T => D x - D x * dweight (K x))).
-    rewrite (@psum_sub_bounded_nonneg R T D
+    rewrite (@psumB R T D
       (fun x => D x * dweight (K x))).
     + rewrite -pr_predT -dweight_dlet.
       lra.
@@ -331,7 +332,7 @@ Lemma shared_complete_sample_coupling_margin_l
 Proof.
 move=> z.
 rewrite /shared_complete_sample_coupling.
-rewrite dmargin_dlet_partition.
+rewrite dmargin_dlet.
 transitivity ((\dlet_(x <- complete D) dunit (omap f x)) z).
 - apply: eq_in_dlet=> // x _ z'.
   case: x=> [x|].
@@ -348,7 +349,7 @@ Lemma shared_complete_sample_coupling_margin_r
 Proof.
 move=> z.
 rewrite /shared_complete_sample_coupling.
-rewrite dmargin_dlet_partition.
+rewrite dmargin_dlet.
 transitivity ((\dlet_(x <- complete D) dunit (omap g x)) z).
 - apply: eq_in_dlet=> // x _ z'.
   case: x=> [x|].
@@ -397,10 +398,10 @@ Lemma product_coupling_margin_l
   dmargin fst (product_coupling P Q) =1 P.
 Proof.
 move=> HQ x0.
-rewrite /product_coupling dmargin_dlet_partition.
+rewrite /product_coupling dmargin_dlet.
 transitivity ((\dlet_(x <- P) dunit x) x0).
 - apply: eq_in_dlet=> // x _ z.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   transitivity ((\dlet_(y <- Q) dunit x) z).
   + apply: eq_in_dlet=> // y _ z'.
     exact: dmargin_dunit_fst_pair.
@@ -416,10 +417,10 @@ Lemma product_coupling_margin_r
   dmargin snd (product_coupling P Q) =1 Q.
 Proof.
 move=> HP y0.
-rewrite /product_coupling dmargin_dlet_partition.
+rewrite /product_coupling dmargin_dlet.
 transitivity ((\dlet_(x <- P) Q) y0).
 - apply: eq_in_dlet=> // x _ z.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   transitivity ((\dlet_(y <- Q) dunit y) z).
   + apply: eq_in_dlet=> // y _ z'.
     exact: dmargin_dunit_snd_pair.
@@ -501,7 +502,7 @@ Proof.
 move=> Heps Heps' Hgood HK.
 case: (leP ε' 1)=> Heps'le1.
 - have Hc : 0 <= 1 - ε' by lra.
-  rewrite __deprecated__pr_dlet.
+  rewrite pr_dlet.
   have Hpoint :
       (fun x => (good x)%:R * (1 - ε')) <=1
       (fun x => \P_[K x] post).
@@ -701,7 +702,7 @@ Proof.
 rewrite !pr_predT.
 rewrite (eq_psum (F2 := fun x => P x - overlap_distr P Q x)); last first.
   by move=> x; rewrite residual_distrE.
-rewrite (@psum_sub_bounded_nonneg R T P (overlap_distr P Q)).
+rewrite (@psumB R T P (overlap_distr P Q)).
 - by [].
 - move=> x.
   apply/andP; split; first exact: ge0_mu.
@@ -820,10 +821,10 @@ Lemma residual_product_margin_l {T : choiceType}
   dmargin fst (residual_product P Q) =1 residual_distr P Q.
 Proof.
 move=> HQpos z.
-rewrite /residual_product dmargin_dlet_partition.
+rewrite /residual_product dmargin_dlet.
 transitivity ((\dlet_(x <- residual_distr P Q) dunit x) z).
   apply: eq_in_dlet=> // x _ z'.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   transitivity ((\dlet_(y <- normalize_distr (residual_distr Q P)) dunit x) z').
     apply: eq_in_dlet=> // y _ w.
     exact: dmargin_dunit_fst_pair.
@@ -838,12 +839,12 @@ Lemma residual_product_margin_r {T : choiceType}
   dmargin snd (residual_product P Q) =1 residual_distr Q P.
 Proof.
 move=> Hweights HQpos z.
-rewrite /residual_product dmargin_dlet_partition.
+rewrite /residual_product dmargin_dlet.
 transitivity
   ((\dlet_(x <- residual_distr P Q)
       normalize_distr (residual_distr Q P)) z).
   apply: eq_in_dlet=> // x _ z'.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   transitivity
     ((\dlet_(y <- normalize_distr (residual_distr Q P)) dunit y) z').
     apply: eq_in_dlet=> // y _ w.
@@ -867,7 +868,7 @@ Lemma diagonal_overlap_margin_l {T : choiceType}
   dmargin fst (diagonal_overlap P Q) =1 overlap_distr P Q.
 Proof.
 move=> x.
-rewrite /diagonal_overlap dmargin_dlet_partition.
+rewrite /diagonal_overlap dmargin_dlet.
 transitivity ((\dlet_(y <- overlap_distr P Q) dunit y) x).
   apply: eq_in_dlet=> // y _ z.
   exact: dmargin_dunit_fst_pair.
@@ -879,7 +880,7 @@ Lemma diagonal_overlap_margin_r {T : choiceType}
   dmargin snd (diagonal_overlap P Q) =1 overlap_distr P Q.
 Proof.
 move=> x.
-rewrite /diagonal_overlap dmargin_dlet_partition.
+rewrite /diagonal_overlap dmargin_dlet.
 transitivity ((\dlet_(y <- overlap_distr P Q) dunit y) x).
   apply: eq_in_dlet=> // y _ z.
   exact: dmargin_dunit_snd_pair.
@@ -1393,7 +1394,7 @@ Lemma tagged_by_margin_l {T U : choiceType} (f : T -> U)
   dmargin fst (tagged_by f P) =1 dmargin f P.
 Proof.
 move=> u.
-rewrite /tagged_by dmarginE __deprecated__dlet_dlet.
+rewrite /tagged_by dmarginE dlet_dlet.
 transitivity ((\dlet_(x <- P) dunit (f x)) u).
 - apply: eq_in_dlet=> // x _ z.
   by rewrite dlet_unit.
@@ -1531,13 +1532,13 @@ Lemma lift_projected_coupling_margin_l
 Proof.
 move=> HdL HdR HQ x0.
 rewrite /lift_projected_coupling.
-rewrite __deprecated__dmargin_dlet.
+rewrite dmargin_dlet.
 transitivity ((\dlet_(uv <- d) conditional_fiber f P uv.1) x0).
 - apply: eq_in_dlet=> // uv Huv z.
-  rewrite __deprecated__dmargin_dlet.
+  rewrite dmargin_dlet.
   transitivity ((\dlet_(x <- conditional_fiber f P uv.1) dunit x) z).
   + apply: eq_in_dlet=> // x _ z'.
-    rewrite __deprecated__dmargin_dlet.
+    rewrite dmargin_dlet.
     transitivity ((\dlet_(y <- conditional_fiber f Q uv.2) dunit x) z').
     * apply: eq_in_dlet=> // y _ w.
       exact: dmargin_dunit_pair_fst.
@@ -1553,7 +1554,7 @@ transitivity ((\dlet_(uv <- d) conditional_fiber f P uv.1) x0).
       by rewrite mul1r.
   + by rewrite dlet_dunit_id.
 - transitivity ((\dlet_(u <- dmargin fst d) conditional_fiber f P u) x0).
-  + rewrite __deprecated__dlet_dmargin.
+  + rewrite dlet_dmargin.
     by [].
   + transitivity ((\dlet_(u <- dmargin f P) conditional_fiber f P u) x0).
     * rewrite !dletE.
@@ -1572,14 +1573,14 @@ Lemma lift_projected_coupling_margin_r
 Proof.
 move=> HdL HdR HP y0.
 rewrite /lift_projected_coupling.
-rewrite __deprecated__dmargin_dlet.
+rewrite dmargin_dlet.
 transitivity ((\dlet_(uv <- d) conditional_fiber f Q uv.2) y0).
 - apply: eq_in_dlet=> // uv Huv z.
-  rewrite __deprecated__dmargin_dlet.
+  rewrite dmargin_dlet.
   transitivity ((\dlet_(x <- conditional_fiber f P uv.1)
       conditional_fiber f Q uv.2) z).
   + apply: eq_in_dlet=> // x _ z'.
-    rewrite __deprecated__dmargin_dlet.
+    rewrite dmargin_dlet.
     transitivity ((\dlet_(y <- conditional_fiber f Q uv.2) dunit y) z').
     * apply: eq_in_dlet=> // y _ w.
       exact: dmargin_dunit_pair_snd.
@@ -1595,7 +1596,7 @@ transitivity ((\dlet_(uv <- d) conditional_fiber f Q uv.2) y0).
     rewrite (conditional_fiber_mass1_on_support f P uv.1 HP Hpv_pos).
     by rewrite mul1r.
 - transitivity ((\dlet_(u <- dmargin snd d) conditional_fiber f Q u) y0).
-  + rewrite __deprecated__dlet_dmargin.
+  + rewrite dlet_dmargin.
     by [].
   + transitivity ((\dlet_(u <- dmargin f Q) conditional_fiber f Q u) y0).
     * rewrite !dletE.
@@ -1692,7 +1693,7 @@ move=> HdL HdR HP HQ.
 pose F : U * U -> R := fun uv => lift_projected_inner_event_prob f P Q uv.
 pose I : U * U -> R :=
   fun uv => if uv \in dinsupp d then (uv.1 == uv.2)%:R else 0.
-rewrite /lift_projected_coupling __deprecated__pr_dlet.
+rewrite /lift_projected_coupling pr_dlet.
 rewrite [X in X <= _]pr_exp.
 rewrite (eq_exp (mu := d) (f1 := fun uv => (uv.1 == uv.2)%:R)
   (f2 := I)); last first.

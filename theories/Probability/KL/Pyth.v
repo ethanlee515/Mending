@@ -1,14 +1,15 @@
 (* Distribution facts for Pythagorean errors. *)
 
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 From mathcomp Require Import reals realsum exp distr.
-From mathcomp Require Import lra.
+From mathcomp Require Import arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.Probability.KL Require Import Core Pinsker ChainPointwise.
 From Mending.Probability Require Import ConditionalCoordinate DletTuple.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory.
 

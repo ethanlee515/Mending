@@ -1,18 +1,19 @@
 From Stdlib Require Import Utf8 Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice bigop order algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 Set Warnings "-notation-incompatible-prefix".
 From mathcomp Require Import xfinmap.
 Set Warnings "notation-incompatible-prefix".
-From mathcomp Require Import lra.
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import arithmetic_tactic.
+From mathcomp Require Import ring_tactic field_tactic ssrZ zify.
 Import GRing.Theory Num.Theory Order.Theory.
 
 From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian DiscreteGaussianMoment.
 From Mending.Probability.KL Require Import Core.
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras DistrExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Local Open Scope ring_scope.
 
@@ -171,8 +172,7 @@ have -> :
     gaussian s (x - mu) / sum (gaussian s) /
       (gaussian s (x - nu) / sum (gaussian s)) =
     gaussian s (x - mu) / gaussian s (x - nu).
-- field.
-  by apply/andP; split; apply/eqP; lra.
+- field by apply/eqP; lra.
 rewrite ln_div ?gt0_g_mu ?gt0_g_nu //.
 rewrite /gaussian !expRK /quadratic_gap !rmorphB /=.
 lra.
@@ -198,7 +198,7 @@ split.
 - pose c := (1 / (2 * s ^ 2)) * ((mu - nu)%:~R) ^+ 2.
   pose d := (1 / (2 * s ^ 2)) * 2 * (mu - nu)%:~R.
   apply: (eq_summable
-    (S1 := (fun x : int => c * discrete_gaussian mu s x) \+
+    (f := (fun x : int => c * discrete_gaussian mu s x) \+
            (fun x : int =>
               (d * centered_difference mu x) * discrete_gaussian mu s x))).
   + move=> x /=.

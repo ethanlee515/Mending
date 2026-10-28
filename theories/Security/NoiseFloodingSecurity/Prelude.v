@@ -1,9 +1,9 @@
 From Stdlib Require Import Utf8 Unicode.Utf8 BinInt Lia.
 From extructures Require Import ord fset fmap fperm.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr realsum ssrZ lra.
+From mathcomp Require Import boot order algebra reals distr realsum ssrZ arithmetic_tactic.
 Set Warnings "notation-overridden,ambiguous-paths".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic ssrZ zify.
 From SSProve.Crypt Require Import Axioms ChoiceAsOrd Couplings Package Prelude
   StateTransformingLaxMorph choice_type fmap_extra SubDistr.
 From SSProve Require Import NominalPrelude.
@@ -24,6 +24,7 @@ From Mending.LibExtras.MathcompExtras Require Import DistrExtras ListExtras
   TupleExtras.
 From Mending.LibExtras.SSProveExtras Require Import ChoiceVector
   DiscreteGaussian NominalExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import PackageNotation.
 Import GRing.Theory Num.Theory Order.Theory Order.POrderTheory.

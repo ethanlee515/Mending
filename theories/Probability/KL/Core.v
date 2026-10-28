@@ -1,11 +1,12 @@
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format,-notation-incompatible-prefix".
-From mathcomp Require Import all_boot all_order all_algebra all_reals distr boolp.
-From mathcomp Require Import realseq realsum exp interval_inference convex xfinmap.
-From mathcomp Require Import lra.
+From mathcomp Require Import boot order algebra all_reals distr boolp.
+From mathcomp Require Import realseq realsum functions numfun exp interval_inference convex xfinmap.
+From mathcomp Require Import arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format,notation-incompatible-prefix".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic ssrZ zify.
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory.
 
@@ -42,7 +43,7 @@ Lemma finite_kl_refl {T : choiceType} (P : {distr T / R}) :
   finite_kl P P.
 Proof.
 split; first by move=> x ->.
-apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+apply: (eq_summable (f := fun _ : T => 0)); last exact: summable0.
 move=> x.
 case Px0: (P x == 0).
   by rewrite (eqP Px0) mul0r.
@@ -64,7 +65,7 @@ split.
   rewrite -HP.
   apply: Hac.
   by rewrite HQ.
-- apply: (eq_summable (S1 := fun x => P x * ln (P x / Q x))).
+- apply: (eq_summable (f := fun x => P x * ln (P x / Q x))).
     by move=> x; rewrite -HP -HQ.
   exact: Hsumm.
 Qed.
@@ -76,7 +77,7 @@ Proof.
 move=> HP.
 split.
 - by move=> x _; rewrite HP dnullE.
-- apply: (eq_summable (S1 := fun _ : T => 0)); last exact: summable0.
+- apply: (eq_summable (f := fun _ : T => 0)); last exact: summable0.
   by move=> x; rewrite HP dnullE mul0r.
 Qed.
 
@@ -166,25 +167,22 @@ Lemma kl_integrand_fneg_le_q (p q : R) :
   0 <= p ->
   0 <= q ->
   (q = 0 -> p = 0) ->
-  `|Num.min 0 (p * ln (p / q))| <= q.
+  Num.max (- (p * ln (p / q))) 0 <= q.
 Proof.
 move=> Hp Hq Hac.
 have Hlower := kl_integrand_geNq p q Hp Hq Hac.
-case: (leP 0 (p * ln (p / q)))=> Hkl.
-  by rewrite normr0.
-rewrite ltr0_norm //.
-by rewrite -lerN2 opprK.
+rewrite ge_max; apply/andP; split; lra.
 Qed.
 
 Lemma summable_fneg_kl_integrand {T : choiceType}
     (P Q : {distr T / R}) :
   absolute_continuous P Q ->
-  summable (fneg (fun x => P x * ln (P x / Q x))).
+  summable (funrneg (fun x => P x * ln (P x / Q x))).
 Proof.
 move=> Hac.
-apply: (le_summable (F2 := Q)); last exact: summable_mu.
-move=> x; apply/andP; split; first exact: ge0_fneg.
-rewrite /fneg.
+apply: (le_summable (g := Q)); last exact: summable_mu.
+move=> x; apply/andP; split; first exact: funrneg_ge0.
+rewrite /funrneg.
 exact: (kl_integrand_fneg_le_q (P x) (Q x)
   (ge0_mu P x) (ge0_mu Q x) (Hac x)).
 Qed.
@@ -217,13 +215,13 @@ rewrite (@psum_bigop R T U (fun y x => (f x == y)%:R * S x) predT J).
 Qed.
 
 Lemma summable_from_fpos_fneg {T : choiceType} (F : T -> R) :
-  summable (fpos F) ->
-  summable (fneg F) ->
+  summable (funrpos F) ->
+  summable (funrneg F) ->
   summable F.
 Proof.
 move=> Hpos Hneg.
-apply: (eq_summable (S1 := fun x => fpos F x - fneg F x)).
-  by move=> x; rewrite fposBfneg.
+apply: (eq_summable (f := fun x => funrpos F x - funrneg F x)).
+  by move=> x; have := congr1 (fun f => f x) (funrposBneg F); rewrite !fctE.
 apply: summableD; first exact: Hpos.
 exact: summableN.
 Qed.
@@ -362,7 +360,7 @@ split.
       exact: ge0_psum.
   apply/summable_abs.
   apply: (le_summable
-    (F2 := fun y => psum (fun x : T => (f x == y)%:R * `|F x|))).
+    (g := fun y => psum (fun x : T => (f x == y)%:R * `|F x|))).
   - move=> y; apply/andP; split; first exact: normr_ge0.
     exact: Hbound.
   apply: summable_fiber_psum.
@@ -406,25 +404,25 @@ have G_notin_image y : ~~ (y \in Img) -> G y = 0.
     case: Hy; apply/asboolP.
     by exists x.
   by rewrite /G Hd mul0r.
-have fposG_support y : fpos G y != 0 -> y \in Img.
+have fposG_support y : funrpos G y != 0 -> y \in Img.
   apply: contraR=> Hy.
-  have -> : fpos G y = 0.
-    by rewrite /fpos (G_notin_image y Hy) maxxx normr0.
+  have -> : funrpos G y = 0.
+    by rewrite /funrpos (G_notin_image y Hy) maxxx.
   by rewrite eqxx.
-have fnegG_support y : fneg G y != 0 -> y \in Img.
+have fnegG_support y : funrneg G y != 0 -> y \in Img.
   apply: contraR=> Hy.
-  have -> : fneg G y = 0.
-    by rewrite /fneg (G_notin_image y Hy) minxx normr0.
+  have -> : funrneg G y = 0.
+    by rewrite /funrneg (G_notin_image y Hy) oppr0 maxxx.
   by rewrite eqxx.
 have reindex_fpos :
-    psum (fpos G) = psum (fun x : T => fpos G (f x)).
-  apply: (@reindex_psum_onto R U T (fpos G) Img f inv).
+    psum (funrpos G) = psum (fun x : T => funrpos G (f x)).
+  apply: (@reindex_psum_onto R U T (funrpos G) Img f inv).
   - exact: fposG_support.
   - exact: invK.
   - by move=> x _; rewrite inv_fK.
 have reindex_fneg :
-    psum (fneg G) = psum (fun x : T => fneg G (f x)).
-  apply: (@reindex_psum_onto R U T (fneg G) Img f inv).
+    psum (funrneg G) = psum (fun x : T => funrneg G (f x)).
+  apply: (@reindex_psum_onto R U T (funrneg G) Img f inv).
   - exact: fnegG_support.
   - exact: invK.
   - by move=> x _; rewrite inv_fK.
@@ -435,8 +433,8 @@ rewrite (eq_sum (F2 := G)); last by move=> y; rewrite /G mulrC.
 rewrite (eq_sum (F2 := F)); last by move=> x; rewrite /F mulrC.
 rewrite /sum reindex_fpos reindex_fneg.
 congr (_ - _).
-- by apply/eq_psum=> x; rewrite /fpos GF.
-- by apply/eq_psum=> x; rewrite /fneg GF.
+- by apply/eq_psum=> x; rewrite /funrpos GF.
+- by apply/eq_psum=> x; rewrite /funrneg GF.
 Qed.
 
 Lemma ln_lower_exp_ratio_core (r h : R) :
@@ -550,7 +548,7 @@ pose F := fun x : T => p x * h - q x * (sequences.expR h - 1).
 pose G := fun x : T => p x * ln (p x / q x) - p x + q x.
 have HFsm : summable F.
   apply: (eq_summable
-    (S1 := (fun x : T => h * p x) \+
+    (f := (fun x : T => h * p x) \+
       (fun x : T => - ((sequences.expR h - 1) * q x)))).
     by move=> x; rewrite /F /=; ring.
   apply: summableD.
@@ -559,7 +557,7 @@ have HFsm : summable F.
     apply: summableZ; exact: Hqsm.
 have HGsm : summable G.
   apply: (eq_summable
-    (S1 := (fun x : T => p x * ln (p x / q x)) \+
+    (f := (fun x : T => p x * ln (p x / q x)) \+
       ((fun x : T => - p x) \+ q))).
     by move=> x; rewrite /G /=; ring.
   apply: summableD; first exact: Hkl.

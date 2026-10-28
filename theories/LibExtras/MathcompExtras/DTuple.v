@@ -1,9 +1,10 @@
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr.
+From mathcomp Require Import boot order algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import realsum.
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory.
 

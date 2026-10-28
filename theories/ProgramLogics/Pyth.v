@@ -3,8 +3,8 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals distr ssrZ realseq realsum exp lra.
+From mathcomp Require Import boot order algebra.
+From mathcomp Require Import reals distr ssrZ realseq realsum exp arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
@@ -21,6 +21,7 @@ From Mending.Probability.DiscreteGaussians Require Import
   DiscreteGaussian DiscreteGaussianKL.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare.
+Set SsrOldRewriteGoalsOrder.
 Local Open Scope AeNotations.
 Local Open Scope HoareNotations.
 
@@ -104,7 +105,7 @@ Lemma dmargin_comp
   dmargin f (dmargin g D) =1 dmargin (fun x => f (g x)) D.
 Proof.
 move=> z.
-rewrite [dmargin f _]dmarginE dmargin_dlet_partition.
+rewrite [dmargin f _]dmarginE dmargin_dlet.
 transitivity ((\dlet_(x <- D) dunit (f (g x))) z).
 - apply: eq_in_dlet=> // x _ z'.
   by rewrite dmargin_dunit.
@@ -404,12 +405,12 @@ apply: (pythDist_ext
   (cat_tuple [tuple eps] [tuple eps | i < n.+1])).
 - move=> y.
   rewrite (dg_tuple_cons_cat cL tailL stdev y).
-  rewrite dmarginE __deprecated__dlet_dlet.
+  rewrite dmarginE dlet_dlet.
   apply: eq_in_dlet=> // x _ z.
   by rewrite dlet_unit /singleton_pyth_trace.
 - move=> y.
   rewrite (dg_tuple_cons_cat cR tailR stdev y).
-  rewrite dmarginE __deprecated__dlet_dlet.
+  rewrite dmarginE dlet_dlet.
   apply: eq_in_dlet=> // x _ z.
   by rewrite dlet_unit /singleton_pyth_trace.
 exact: (pythDist_dlet_cat_const _ _ _ _ _ _ Hhead Htail).
@@ -509,13 +510,13 @@ split.
   exact: complete_dweight.
 split.
   move=> z.
-  rewrite /P __deprecated__dmargin_dlet.
+  rewrite /P dmargin_dlet.
   rewrite -(dlet_dunit_id (complete_output_heap out) z).
   apply: eq_in_dlet=> // y _ z'.
   by rewrite dmargin_dunit /lift_final tnth_mktuple.
 split.
   move=> z.
-  rewrite /P __deprecated__dmargin_dlet.
+  rewrite /P dmargin_dlet.
   rewrite -(dlet_dunit_id (complete_output_heap out) z).
   apply: eq_in_dlet=> // y _ z'.
   by rewrite dmargin_dunit /lift_final tnth_mktuple.

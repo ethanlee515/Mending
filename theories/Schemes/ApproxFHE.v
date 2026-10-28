@@ -1,6 +1,6 @@
 From Stdlib Require Import Utf8 BinInt.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr.
+From mathcomp Require Import boot order algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From extructures Require Import ord fset fmap.
 From SSProve.Crypt Require Import Axioms Package Prelude.
@@ -9,6 +9,7 @@ From Mending.Schemes.Utils Require Import IntVec.
 From Mending.Probability.KL Require Import Core.
 From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras DTuple.
+Set SsrOldRewriteGoalsOrder.
 Import PackageNotation.
 Import Order.Theory.
 Local Open Scope package_scope.

@@ -1,12 +1,13 @@
 From Stdlib Require Import Utf8 Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import ssreflect ssrbool ssrnat eqtype seq choice fintype bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrbool ssrnat eqtype seq choice fintype bigop order algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 Set Warnings "-notation-incompatible-prefix".
-From mathcomp Require Import xfinmap reals realsum.
-From mathcomp Require Import lra.
+From mathcomp Require Import xfinmap reals realsum functions numfun.
+From mathcomp Require Import arithmetic_tactic.
 Set Warnings "notation-incompatible-prefix".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic ssrZ zify.
+Set SsrOldRewriteGoalsOrder.
 Import GRing.Theory Num.Theory Order.Theory.
 
 Local Open Scope ring_scope.
@@ -81,19 +82,19 @@ Proof.
 rewrite /sum.
 congr (_ - _).
 - have -> :
-    psum (fpos (fun x => F (x + center))) =
-    psum (fun x => fpos F (x + center)).
-    by apply/eq_psum=> x; rewrite /fpos.
-  rewrite -(reindex_psum (S := fpos F) (P := predT)
+    psum (funrpos (fun x => F (x + center))) =
+    psum (fun x => funrpos F (x + center)).
+    by apply/eq_psum=> x; rewrite /funrpos.
+  rewrite -(reindex_psum (S := funrpos F) (P := predT)
     (h := fun x => x + center)).
   + by [].
   + by move=> x _.
   exists (fun x => x - center) => x _; ring.
 - have -> :
-    psum (fneg (fun x => F (x + center))) =
-    psum (fun x => fneg F (x + center)).
-    by apply/eq_psum=> x; rewrite /fneg.
-  rewrite -(reindex_psum (S := fneg F) (P := predT)
+    psum (funrneg (fun x => F (x + center))) =
+    psum (fun x => funrneg F (x + center)).
+    by apply/eq_psum=> x; rewrite /funrneg.
+  rewrite -(reindex_psum (S := funrneg F) (P := predT)
     (h := fun x => x + center)).
   + by [].
   + by move=> x _.
@@ -114,19 +115,19 @@ Proof.
 rewrite /sum.
 congr (_ - _).
 - have -> :
-    psum (fpos (fun x => F (- x))) =
-    psum (fun x => fpos F (- x)).
-    by apply/eq_psum=> x; rewrite /fpos.
-  rewrite -(reindex_psum (S := fpos F) (P := predT)
+    psum (funrpos (fun x => F (- x))) =
+    psum (fun x => funrpos F (- x)).
+    by apply/eq_psum=> x; rewrite /funrpos.
+  rewrite -(reindex_psum (S := funrpos F) (P := predT)
     (h := fun x => - x)).
   + by [].
   + by move=> x _.
   exists (fun x => - x) => x _; ring.
 - have -> :
-    psum (fneg (fun x => F (- x))) =
-    psum (fun x => fneg F (- x)).
-    by apply/eq_psum=> x; rewrite /fneg.
-  rewrite -(reindex_psum (S := fneg F) (P := predT)
+    psum (funrneg (fun x => F (- x))) =
+    psum (fun x => funrneg F (- x)).
+    by apply/eq_psum=> x; rewrite /funrneg.
+  rewrite -(reindex_psum (S := funrneg F) (P := predT)
     (h := fun x => - x)).
   + by [].
   + by move=> x _.
@@ -181,7 +182,7 @@ Lemma summable_minl_nonneg
   summable (fun x => Num.min (F x) (G x)).
 Proof.
 move=> HF HG HsummF.
-apply: (le_summable (F2 := F)); last exact: HsummF.
+apply: (le_summable (g := F)); last exact: HsummF.
 move=> x.
 apply/andP; split.
 - exact: minr_ge0.
@@ -196,67 +197,11 @@ Lemma summable_minr_nonneg
   summable (fun x => Num.min (F x) (G x)).
 Proof.
 move=> HF HG HsummG.
-apply: (le_summable (F2 := G)); last exact: HsummG.
+apply: (le_summable (g := G)); last exact: HsummG.
 move=> x.
 apply/andP; split.
 - exact: minr_ge0.
 - exact: minr_ler.
-Qed.
-
-Lemma summable_pair_from_rows_psum
-    {T U : choiceType} (S : T -> U -> R) :
-  (forall x, summable (S x)) ->
-  summable (fun x => psum (S x)) ->
-  summable (fun xy : T * U => S (fst xy) (snd xy)).
-Proof.
-move=> Hrow Hrows.
-exists (psum (fun x => psum (S x)))=> J.
-rewrite (@big_fset_seq R 0 +%R (T * U)%type J
-  (fun xy : T * U => `|S (fst xy) (snd xy)|)).
-rewrite (@partition_big_imfset R 0 +%R _ _ fst J
-  (fun xy : T * U => `|S (fst xy) (snd xy)|)).
-pose X := [fset fst xy | xy in J]%fset.
-have HX := gerfin_psum X Hrows.
-rewrite (@big_fset_seq R 0 +%R T X
-  (fun x => `|psum (S x)|)) in HX.
-apply: (le_trans _ HX).
-apply: ler_sum=> x _.
-rewrite ger0_norm ?ge0_psum //.
-set F := [fset xy in J | fst xy == x]%fset.
-have Hfiber :
-    \sum_(xy <- J | fst xy == x) `|S (fst xy) (snd xy)| =
-    \sum_(xy <- F) `|S x (snd xy)|.
-  rewrite /F big_fset /=.
-  apply: eq_bigr=> xy /eqP Hx.
-  by rewrite Hx.
-rewrite Hfiber.
-have Huniq : uniq [seq snd xy | xy <- enum_fset F].
-  rewrite map_inj_in_uniq ?uniq_fset_keys //.
-  move=> [x1 y1] [x2 y2].
-  rewrite /F !in_fset /=.
-  move=> /andP[_ /eqP Hx1] /andP[_ /eqP Hx2] Hy.
-  congr (_, _).
-    move: Hx1 Hx2=> /= Hx1 Hx2.
-    by rewrite Hx1 Hx2.
-  exact: Hy.
-rewrite -(big_map snd predT (fun y => `|S x y|)).
-exact: (gerfinseq_psum Huniq (Hrow x)).
-Qed.
-
-Lemma interchange_psum_proved
-    {T U : choiceType} (S : T -> U -> R) :
-  (forall x, summable (S x)) ->
-  summable (fun x => psum (fun y => S x y)) ->
-  psum (fun x => psum (fun y => S x y)) =
-  psum (fun y => psum (fun x => S x y)).
-Proof.
-move=> Hrow Hrows.
-pose P := fun xy : T * U => S (fst xy) (snd xy).
-have HP : summable P.
-  exact: (summable_pair_from_rows_psum S Hrow Hrows).
-change (psum (fun x : T => psum (fun y : U => P (x, y))) =
-        psum (fun y : U => psum (fun x : T => P (x, y)))).
-by rewrite -(@psum_pair R T U P HP) (@psum_pair_swap R T U P HP).
 Qed.
 
 End RealSumExtras.

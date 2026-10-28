@@ -1,8 +1,9 @@
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order choice tuple.
+From mathcomp Require Import boot order choice tuple.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
+Set SsrOldRewriteGoalsOrder.
 Import PackageNotation.
 Local Open Scope form_scope.
 Local Open Scope package_scope.

@@ -2,12 +2,13 @@
 
 From Stdlib Require Import Unicode.Utf8.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 From mathcomp Require Import reals realsum distr.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 From Mending.Probability.KL Require Import Core.
+Set SsrOldRewriteGoalsOrder.
 
 Import GRing.Theory Num.Theory Order.Theory.
 Local Open Scope ring_scope.
@@ -49,7 +50,7 @@ Lemma conditional_coordinate_zero_prefix
 Proof.
 move=> Hzero x.
 rewrite pr_pred1 dnullE.
-rewrite /conditional_coordinate pr_dmargin_pred1_clean pr_dcond /prc Hzero.
+rewrite /conditional_coordinate pr_dmargin pr_dcond /prc Hzero.
 by rewrite invr0 mulr0.
 Qed.
 

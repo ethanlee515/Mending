@@ -17,15 +17,16 @@ depends: [
   "rocq-core" {= "9.0.1"}
   "rocq-stdlib" {= "9.0.0"}
   "rocq-ssprove" {= "dev"}
-  "coq-mathcomp-analysis" {= "1.16.0"}
-  "coq-mathcomp-experimental-reals" {= "1.16.0"}
-  "coq-mathcomp-algebra-tactics" {= "1.2.7"}
+  "rocq-mathcomp-algebra" {= "2.6.0"}
+  "rocq-mathcomp-analysis" {= "1.18.0"}
+  "rocq-mathcomp-experimental-reals" {= "1.18.0"}
+  "rocq-mathcomp-zify" {= "1.7.0+2.4+9.0"}
 ]
 
 pin-depends: [
   [
     "rocq-ssprove.dev"
-    "git+https://github.com/SSProve/ssprove.git#c6d7d4bc3a0a671c92899aa49dfcfb065d1bdbbd"
+    "git+https://github.com/SSProve/ssprove.git#main"
   ]
 ]
 

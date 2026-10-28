@@ -1,14 +1,15 @@
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths,-notation-incompatible-prefix".
-From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice tuple fintype bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrfun ssrbool eqtype ssrnat seq choice tuple fintype bigop order algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
-From mathcomp Require Import reals realsum exp sequences realseq distr xfinmap.
+From mathcomp Require Import reals realsum functions numfun exp sequences realseq distr xfinmap.
 Set Warnings "notation-incompatible-prefix".
-From mathcomp Require Import lra.
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import arithmetic_tactic.
+From mathcomp Require Import ring_tactic ssrZ zify.
 Import GRing.Theory Num.Theory Order.Theory.
 
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Open Scope ring_scope.
 
@@ -24,19 +25,10 @@ Lemma summable_abs_distr_diff {T : choiceType}
   summable (fun x => `|P x - Q x|).
 Proof.
 apply/summable_abs.
-apply: (eq_summable (S1 := fun x : T => P x + - Q x)).
+apply: (eq_summable (f := fun x : T => P x + - Q x)).
   by move=> x; ring.
 apply: summableD; first exact: summable_mu.
 exact: summableN; exact: summable_mu.
-Qed.
-
-Lemma fposDfneg_norm {T : choiceType} (F : T -> R) x :
-  fpos F x + fneg F x = `|F x|.
-Proof.
-rewrite /fpos /fneg.
-case: (ger0P (F x))=> H.
-  by rewrite normr0 addr0 ger0_norm.
-by rewrite normr0 add0r ltr0_norm.
 Qed.
 
 Lemma norm_sum_le_psum {T : choiceType} (F : T -> R) :
@@ -45,106 +37,26 @@ Lemma norm_sum_le_psum {T : choiceType} (F : T -> R) :
 Proof.
 move=> Hsumm.
 rewrite /sum.
-set p := psum (fpos F).
-set q := psum (fneg F).
+set p := psum (funrpos F).
+set q := psum (funrneg F).
 have Hp : 0 <= p by exact: ge0_psum.
 have Hq : 0 <= q by exact: ge0_psum.
 have Hpsum : psum F = p + q.
   rewrite -[LHS]psum_abs.
-  rewrite (eq_psum (F2 := fpos F \+ fneg F)); last first.
+  rewrite (eq_psum (F2 := funrpos F \+ funrneg F)); last first.
     move=> x /=.
-    exact/esym/fposDfneg_norm.
+    exact: esym (congr1 (fun f => f x) (funrposDneg F)).
   rewrite psumD.
   - by [].
-  - move=> x; exact: ge0_fpos.
-  - move=> x; exact: ge0_fneg.
-  - exact: (summable_fpos Hsumm).
-  - exact: (summable_fneg Hsumm).
+  - move=> x; exact: funrpos_ge0.
+  - move=> x; exact: funrneg_ge0.
+  - exact: (summable_funrpos Hsumm).
+  - exact: (summable_funrneg Hsumm).
 rewrite Hpsum.
 have Habs : `|p - q| <= p + q.
   have H := ler_normB p q.
   by rewrite (ger0_norm Hp) (ger0_norm Hq) in H.
 exact: Habs.
-Qed.
-
-Lemma dlet_pair_innerE {T U : choiceType}
-    (Q : {distr U / R}) (x0 x : T) (y : U) :
-  (\dlet_(y0 <- Q) dunit (x0, y0)) (x, y) =
-  (x0 == x)%:R * Q y.
-Proof.
-case Hx: (x0 == x).
-- rewrite mul1r -[Q y](dlet_dunit_id Q y) !dletE.
-  apply/eq_psum=> y0.
-  by rewrite !dunit1E xpair_eqE Hx.
-- rewrite mul0r dletE.
-  apply/psum_eq0=> y0.
-  by rewrite dunit1E xpair_eqE Hx mulr0.
-Qed.
-
-Lemma dlet_pair_inner_revE {T U : choiceType}
-    (P : {distr T / R}) (x : T) (y0 y : U) :
-  (\dlet_(x0 <- P) dunit (x0, y0)) (x, y) =
-  (y0 == y)%:R * P x.
-Proof.
-case Hy: (y0 == y).
-- rewrite mul1r -[P x](dlet_dunit_id P x) !dletE.
-  apply/eq_psum=> x0.
-  by rewrite !dunit1E xpair_eqE Hy andbT.
-- rewrite mul0r dletE.
-  apply/psum_eq0=> x0.
-  by rewrite dunit1E xpair_eqE Hy andbF mulr0.
-Qed.
-
-Lemma dlet_pred1_psum {T : choiceType}
-    (P : {distr T / R}) (x : T) :
-  psum (fun x0 : T => P x0 * (x0 == x)%:R) = P x.
-Proof.
-rewrite -[RHS](dlet_dunit_id P x) dletE.
-apply/eq_psum=> x0.
-by rewrite dunit1E.
-Qed.
-
-Lemma dlet_pairE {T U : choiceType}
-    (P : {distr T / R}) (Q : {distr U / R}) (xy : T * U) :
-  (\dlet_(x <- P) \dlet_(y <- Q) dunit (x, y)) xy =
-  P xy.1 * Q xy.2.
-Proof.
-case: xy=> x y.
-rewrite dletE.
-transitivity (psum (fun x0 : T => P x0 * ((x0 == x)%:R * Q y))).
-  apply/eq_psum=> x0.
-  by rewrite dlet_pair_innerE.
-transitivity (psum (fun x0 : T => Q y * (P x0 * (x0 == x)%:R))).
-  apply/eq_psum=> x0.
-  by rewrite mulrA mulrC.
-rewrite psumZ; last exact: ge0_mu.
-by rewrite dlet_pred1_psum mulrC.
-Qed.
-
-Lemma dlet_pair_revE {T U : choiceType}
-    (P : {distr T / R}) (Q : {distr U / R}) (xy : T * U) :
-  (\dlet_(y <- Q) \dlet_(x <- P) dunit (x, y)) xy =
-  P xy.1 * Q xy.2.
-Proof.
-case: xy=> x y.
-rewrite dletE.
-transitivity (psum (fun y0 : U => Q y0 * ((y0 == y)%:R * P x))).
-  apply/eq_psum=> y0.
-  by rewrite dlet_pair_inner_revE.
-transitivity (psum (fun y0 : U => P x * (Q y0 * (y0 == y)%:R))).
-  apply/eq_psum=> y0.
-  by rewrite mulrA mulrC.
-rewrite psumZ; last exact: ge0_mu.
-by rewrite dlet_pred1_psum.
-Qed.
-
-Lemma dlet_pairC {T U : choiceType}
-    (P : {distr T / R}) (Q : {distr U / R}) :
-  (\dlet_(x <- P) \dlet_(y <- Q) dunit (x, y)) =1
-  (\dlet_(y <- Q) \dlet_(x <- P) dunit (x, y)).
-Proof.
-move=> xy.
-by rewrite dlet_pairE dlet_pair_revE.
 Qed.
 
 (* -- Conditional distributions -- *)
@@ -349,55 +261,35 @@ Lemma sumD {T : choiceType} (F G : T -> R) :
 Proof.
 move=> smF smG.
 have smFG : summable (F \+ G) by exact: summableD.
-have smFp : summable (fpos F) by exact: summable_fpos.
-have smFn : summable (fneg F) by exact: summable_fneg.
-have smGp : summable (fpos G) by exact: summable_fpos.
-have smGn : summable (fneg G) by exact: summable_fneg.
-have smFGp : summable (fpos (F \+ G)) by exact: summable_fpos.
-have smFGn : summable (fneg (F \+ G)) by exact: summable_fneg.
+have smFp : summable (funrpos F) by exact: summable_funrpos.
+have smFn : summable (funrneg F) by exact: summable_funrneg.
+have smGp : summable (funrpos G) by exact: summable_funrpos.
+have smGn : summable (funrneg G) by exact: summable_funrneg.
+have smFGp : summable (funrpos (F \+ G)) by exact: summable_funrpos.
+have smFGn : summable (funrneg (F \+ G)) by exact: summable_funrneg.
 have H :
-    psum (fun x => fpos (F \+ G) x + (fneg F x + fneg G x)) =
-    psum (fun x => (fpos F x + fpos G x) + fneg (F \+ G) x).
+    psum (fun x => funrpos (F \+ G) x + (funrneg F x + funrneg G x)) =
+    psum (fun x => (funrpos F x + funrpos G x) + funrneg (F \+ G) x).
   apply/eq_psum=> x.
-  have := fposBfneg (F \+ G) x.
-  have := fposBfneg F x.
-  have := fposBfneg G x.
-  rewrite /=.
+  have := congr1 (fun f => f x) (funrposBneg (F \+ G)).
+  have := congr1 (fun f => f x) (funrposBneg F).
+  have := congr1 (fun f => f x) (funrposBneg G).
+  rewrite !fctE /=.
   lra.
-rewrite psumD in H; try solve [move=> x; rewrite addr_ge0 ?ge0_fpos ?ge0_fneg].
-  rewrite psumD in H; try solve [move=> x; rewrite addr_ge0 ?ge0_fpos ?ge0_fneg].
-    rewrite !psumD in H; try solve [move=> x; rewrite ?ge0_fpos ?ge0_fneg].
+rewrite psumD in H; try solve [move=> x; rewrite addr_ge0 ?funrpos_ge0 ?funrneg_ge0].
+  rewrite psumD in H; try solve [move=> x; rewrite addr_ge0 ?funrpos_ge0 ?funrneg_ge0].
+    rewrite !psumD in H; try solve [move=> x; rewrite ?funrpos_ge0 ?funrneg_ge0].
       rewrite /sum.
       lra.
-    all: try by move=> x; rewrite ?addr_ge0 ?ge0_fpos ?ge0_fneg.
+    all: try by move=> x; rewrite ?addr_ge0 ?funrpos_ge0 ?funrneg_ge0.
     all: try by apply: summableD.
     all: try done.
-  all: try by move=> x; rewrite ?addr_ge0 ?ge0_fpos ?ge0_fneg.
+  all: try by move=> x; rewrite ?addr_ge0 ?funrpos_ge0 ?funrneg_ge0.
   all: try by apply: summableD.
   all: try done.
-all: try by move=> x; rewrite ?addr_ge0 ?ge0_fpos ?ge0_fneg.
+all: try by move=> x; rewrite ?addr_ge0 ?funrpos_ge0 ?funrneg_ge0.
 all: try by apply: summableD.
 all: done.
-Qed.
-
-Lemma psum_sub_bounded_nonneg {T : choiceType} (F G : T -> R) :
-  (forall x, 0 <= G x <= F x) ->
-  summable F ->
-  psum (fun x => F x - G x) = psum F - psum G.
-Proof.
-move=> Hbound HsmF.
-have HGge x : 0 <= G x := (andP (Hbound x)).1.
-have HGF x : G x <= F x := (andP (Hbound x)).2.
-have HFge x : 0 <= F x := le_trans (HGge x) (HGF x).
-have Hdiffge x : 0 <= F x - G x by rewrite subr_ge0.
-have HsmG : summable G.
-  apply: (le_summable (F2 := F)); last exact: HsmF.
-  by move=> x; exact: Hbound.
-rewrite (psum_sum Hdiffge) (psum_sum HFge) (psum_sum HGge).
-rewrite (eq_sum (F2 := F \+ (fun x => - G x))); last first.
-  by move=> x; rewrite /=; ring.
-rewrite (@sumD T F (fun x => - G x) HsmF (summableN HsmG)).
-by rewrite sumN.
 Qed.
 
 Lemma total_variation_triangle {T : choiceType}
@@ -490,7 +382,7 @@ apply: ler_wpM2l; first by lra.
   pose fiber_abs := fun y : U => psum (fun x : T => (f x == y)%:R * S x).
   have Hfiber_summable y :
       summable (fun x : T => (f x == y)%:R * S x).
-    apply: (eq_summable (S1 := fun x : T =>
+    apply: (eq_summable (f := fun x : T =>
       (f x == y)%:R * P x + - ((f x == y)%:R * Q x))).
       move=> x.
       by rewrite /S mulrBr.
@@ -506,13 +398,13 @@ apply: ler_wpM2l; first by lra.
     exact: norm_sum_le_psum.
 have Habs_summable : summable (fun x : T => `|S x|).
   apply/summable_abs.
-  apply: (eq_summable (S1 := fun x : T => P x + - Q x)).
+  apply: (eq_summable (f := fun x : T => P x + - Q x)).
     by move=> x; rewrite /S.
   apply: summableD; first exact: summable_mu.
   exact: summableN; exact: summable_mu.
 have Hfiber_abs_summable : summable fiber_abs.
   rewrite /fiber_abs.
-  apply: (eq_summable (S1 := fun y : U =>
+  apply: (eq_summable (f := fun y : U =>
     psum (fun x : T => (f x == y)%:R * `|S x|))).
     move=> y.
     apply/eq_psum_abs=> x.
@@ -522,7 +414,7 @@ have Hfiber_abs_summable : summable fiber_abs.
   apply: summable_fiber_psum_nonneg; first by move=> x; exact: normr_ge0.
   exact: Habs_summable.
 apply: (le_trans (le_sum _ _ Hpoint)).
-  apply: (le_summable (F2 := fiber_abs)).
+  apply: (le_summable (g := fiber_abs)).
     move=> y; apply/andP; split; first exact: normr_ge0.
     exact: Hpoint.
   exact: Hfiber_abs_summable.
@@ -636,16 +528,6 @@ rewrite !dcondE.
 exact: (prc_ext P Q (pred1 x) p HP).
 Qed.
 
-Lemma pr_dmargin_pred1_clean {T U : choiceType}
-    (P : {distr T / R}) (f : T -> U) (y : U) :
-  \P_[dmargin f P] (pred1 y) =
-  \P_[P] (fun x => f x == y).
-Proof.
-rewrite -pr_pred1 dmargin_psumE /pr.
-apply/eq_psum=> x.
-by rewrite mulrC.
-Qed.
-
 Lemma dmargin_ext {T U : choiceType} (f : T -> U) (P Q : {distr T / R}) :
   P =1 Q ->
   dmargin f P =1 dmargin f Q.
@@ -737,300 +619,17 @@ rewrite (@reindex_psum_onto R (T * U)%type U
 - by move=> y _; rewrite eqxx.
 Qed.
 
-Lemma psum_pair_snd_fiberR
-    {T U : choiceType} (S : T * U -> R) (y : U) :
-  (forall xy, 0 <= S xy) ->
-  psum (fun xy : T * U => S xy * (xy.2 == y)%:R) =
-  psum (fun x : T => S (x, y)).
-Proof.
-move=> HS.
-rewrite (@reindex_psum_onto R (T * U)%type T
-  (fun xy : T * U => S xy * (xy.2 == y)%:R)
-  [pred xy : T * U | xy.2 == y]
-  (fun x : T => (x, y))
-  (fun xy : T * U => if xy.2 == y then Some xy.1 else None)).
-- apply/eq_psum=> x.
-  by rewrite eqxx mulr1.
-- move=> xy Hxy.
-  case Hxyy : (xy.2 == y); first by [].
-  by move: Hxy; rewrite Hxyy mulr0 eqxx.
-- case=> x y' /= Hy'.
-  move: Hy'; rewrite /= => /eqP Hy'.
-  change (y' = y) in Hy'.
-  by rewrite Hy' eqxx.
-- by move=> x _; rewrite eqxx.
-Qed.
-
-Lemma summable_kernel_weighted_pair_nonneg {T U : choiceType}
-    (S : T -> R) (K : T -> {distr U / R}) :
-  (forall x, 0 <= S x) ->
-  summable S ->
-  summable (fun xy : T * U => K xy.1 xy.2 * S xy.1).
-Proof.
-move=> HS smS.
-exists (psum S)=> J.
-rewrite (@big_fset_seq R 0 +%R (T * U)%type J
-  (fun xy : T * U => `|K xy.1 xy.2 * S xy.1|)).
-rewrite (@partition_big_imfset R 0 +%R _ _ fst J
-  (fun xy : T * U => `|K xy.1 xy.2 * S xy.1|)).
-pose X := [fset xy.1 | xy in J]%fset.
-have HX := gerfin_psum X smS.
-rewrite (@big_fset_seq R 0 +%R T X (fun x => `|S x|)) in HX.
-apply: (le_trans _ HX).
-apply: ler_sum=> x _.
-rewrite ger0_norm ?HS //.
-set F := [fset xy in J | xy.1 == x]%fset.
-have Hfiber :
-    \sum_(xy <- J | xy.1 == x) `|K xy.1 xy.2 * S xy.1| =
-    \sum_(xy <- F) K x xy.2 * S x.
-  rewrite /F big_fset /=.
-  apply: eq_bigr=> xy /eqP Hx.
-  by rewrite Hx ger0_norm ?mulr_ge0 ?ge0_mu ?HS.
-have Hmass : \sum_(xy <- F) K x xy.2 <= 1.
-  have Huniq : uniq [seq xy.2 | xy <- enum_fset F].
-    rewrite map_inj_in_uniq ?uniq_fset_keys //.
-    move=> [x1 y1] [x2 y2].
-    rewrite /F !in_fset /=.
-    move=> /andP[_ /eqP Hx1] /andP[_ /eqP Hx2] Hy.
-    congr (_, _).
-      move: Hx1 Hx2=> /= Hx1 Hx2.
-      by rewrite Hx1 Hx2.
-    exact: Hy.
-  rewrite -(big_map snd predT (fun y => K x y)).
-  apply: (le_trans _ (le1_mu (K x))).
-  apply: (le_trans _ (gerfinseq_psum Huniq (summable_mu (K x)))).
-  apply/ler_sum=> y _.
-  by rewrite ger0_norm ?ge0_mu.
-rewrite Hfiber.
-rewrite -(@big_fset_seq R 0 +%R (T * U)%type F
-  (fun xy => K x xy.2 * S x)).
-rewrite -mulr_suml.
-rewrite -(@big_fset_seq R 0 +%R (T * U)%type F
-  (fun xy => K x xy.2)) in Hmass.
-apply: (le_trans (ler_wpM2r (HS x) Hmass)).
-by rewrite mul1r.
-Qed.
-
-Lemma dmargin_dlet_partition
-    {T U V : choiceType}
-    (P : {distr T / R})
-    (K : T -> {distr U / R})
-    (g : U -> V) :
-  dmargin g (\dlet_(x <- P) K x) =1
-  \dlet_(x <- P) dmargin g (K x).
-Proof.
-move=> z.
-rewrite dmargin_psumE.
-transitivity (psum (fun y : U => psum (fun x : T =>
-  (g y == z)%:R * (P x * K x y)))).
-  apply/eq_psum=> y.
-  rewrite dletE.
-  rewrite -psumZ; last by case: (g y == z); rewrite ?ler01 ?ler0n.
-  apply/eq_psum=> x.
-  by [].
-pose S := fun xy : T * U =>
-  K xy.1 xy.2 * P xy.1 * (g xy.2 == z)%:R.
-have HSge xy : 0 <= S xy.
-  by rewrite /S !mulr_ge0 ?ge0_mu ?ler0n.
-have HSsumm : summable S.
-  apply: (le_summable
-    (F2 := fun xy : T * U => K xy.1 xy.2 * P xy.1)).
-    move=> [x y]; apply/andP; split; first exact: HSge.
-    rewrite /S -[X in _ <= X]mulr1.
-    apply: ler_wpM2l.
-      by rewrite mulr_ge0 ?ge0_mu.
-    by case: (g y == z); rewrite ?ler01 ?ler0n.
-  apply: summable_kernel_weighted_pair_nonneg.
-  - move=> x; exact: ge0_mu.
-  - exact: summable_mu.
-transitivity (psum S).
-  rewrite (partition_psum (S := S) (fun xy : T * U => xy.2)) //.
-  apply/eq_psum=> y.
-  rewrite (psum_pair_snd_fiberR S y HSge).
-  apply/eq_psum=> x.
-  by rewrite /S mulrC [P x * K x y]mulrC.
-rewrite (partition_psum (S := S) (fun xy : T * U => xy.1)) //.
-rewrite dletE.
-apply/eq_psum=> x.
-rewrite (psum_pair_fst_fiberR S x HSge).
-rewrite dmargin_psumE.
-rewrite -psumZ; last exact: ge0_mu.
-apply/eq_psum=> y.
-change (S (x, y) = P x * ((g y == z)%:R * K x y)).
-by rewrite /S [(g y == z)%:R * K x y]mulrC mulrA [P x * K x y]mulrC.
-Qed.
-
-Lemma dlet_dmargin_partition
-    {T U V : choiceType}
-    (P : {distr T / R}) (f : T -> U)
-    (K : U -> {distr V / R}) :
-  \dlet_(u <- dmargin f P) K u =1
-  \dlet_(x <- P) K (f x).
-Proof.
-move=> z.
-rewrite !dletE.
-pose S := fun x : T => P x * K (f x) z.
-have HSge x : 0 <= S x.
-  by rewrite /S mulr_ge0 ?ge0_mu.
-have HSsumm : summable S.
-  apply: (le_summable (F2 := P)); last exact: summable_mu.
-  move=> x; apply/andP; split; first exact: HSge.
-  rewrite /S -[X in _ <= X]mulr1.
-  apply: ler_wpM2l; first exact: ge0_mu.
-  apply: (le_trans _ (le1_mu (K (f x)))).
-  have Hsingle :
-      K (f x) z =
-        \sum_(j <- [:: z]) `|K (f x) j|.
-    by rewrite big_seq1 ger0_norm ?ge0_mu.
-  rewrite Hsingle.
-  exact: (gerfinseq_psum (S := K (f x)) (r := [:: z])
-    _ (summable_mu (K (f x)))).
-transitivity
-  (psum (fun u : U =>
-    psum (fun x : T => (f x == u)%:R * P x * K u z))).
-  apply/eq_psum=> u.
-  rewrite dmargin_psumE.
-  rewrite [psum _ * K u z]mulrC -psumZ; last exact: ge0_mu.
-  apply/eq_psum=> x.
-  by rewrite mulrC.
-transitivity
-  (psum (fun u : U =>
-    psum (fun x : T => S x * (f x == u)%:R))).
-  apply/eq_psum=> u.
-  apply/eq_psum=> x.
-  rewrite /S.
-  case Hfx: (f x == u).
-  - move/eqP: Hfx=> Hfx_eq.
-    rewrite Hfx_eq.
-    change true%:R with (1 : R).
-    by rewrite !mul1r mulr1.
-  - change false%:R with (0 : R).
-    by rewrite !mul0r mulr0.
-rewrite -(@partition_psum R T U f S HSsumm).
-by [].
-Qed.
-
-Lemma dlet_dlet_clean {T U V : choiceType}
-    (mu : {distr T / R}) (f1 : T -> {distr U / R})
-    (f2 : U -> {distr V / R}) :
-  (\dlet_(x <- \dlet_(y <- mu) f1 y) f2 x) =1
-  (\dlet_(y <- mu) \dlet_(x <- f1 y) f2 x).
-Proof.
-move=> z.
-pose S := fun xy : T * U => mu xy.1 * f1 xy.1 xy.2 * f2 xy.2 z.
-have HSge xy : 0 <= S xy.
-  by rewrite /S !mulr_ge0 ?ge0_mu.
-have HSsumm : summable S.
-  apply: (le_summable
-    (F2 := fun xy : T * U => f1 xy.1 xy.2 * mu xy.1)).
-    move=> [x y]; apply/andP; split; first exact: HSge.
-    rewrite /S [f1 x y * mu x]mulrC.
-    apply: ler_piMr.
-      by rewrite mulr_ge0 ?ge0_mu.
-    exact: le1_mu1.
-  apply: summable_kernel_weighted_pair_nonneg.
-  - move=> x; exact: ge0_mu.
-  - exact: summable_mu.
-rewrite dletE.
-transitivity (psum (fun y : U => psum (fun x : T => S (x, y)))).
-  apply/eq_psum=> y.
-  rewrite dletE.
-  rewrite -psumZr; last exact: ge0_mu.
-  apply/eq_psum=> x.
-  by rewrite /S /= mulrC.
-transitivity (psum S).
-  by rewrite (psum_pair_swap (S := S) HSsumm).
-rewrite (psum_pair (S := S) HSsumm).
-rewrite [RHS]dletE.
-apply/eq_psum=> x.
-rewrite dletE.
-rewrite -psumZ; last exact: ge0_mu.
-apply/eq_psum=> y.
-by rewrite /S /= mulrA.
-Qed.
-
-Lemma dlet_pair_bindE {T U V : choiceType}
-    (P : {distr T / R}) (Q : {distr U / R})
-    (F : T * U -> {distr V / R}) :
-  (\dlet_(xy <- \dlet_(x <- P) \dlet_(y <- Q) dunit (x, y)) F xy) =1
-  (\dlet_(x <- P) \dlet_(y <- Q) F (x, y)).
-Proof.
-move=> z.
-rewrite (@dlet_dlet_clean T (T * U)%type V P
-  (fun x => \dlet_(y <- Q) dunit (x, y)) F z).
-rewrite !dletE.
-apply/eq_psum=> x.
-congr (_ * _).
-rewrite (@dlet_dlet_clean U (T * U)%type V Q
-  (fun y => dunit (x, y)) F z).
-rewrite !dletE.
-apply/eq_psum=> y.
-by rewrite dlet_unit.
-Qed.
-
-Lemma dlet_pair_bind_revE {T U V : choiceType}
-    (P : {distr T / R}) (Q : {distr U / R})
-    (F : T * U -> {distr V / R}) :
-  (\dlet_(xy <- \dlet_(y <- Q) \dlet_(x <- P) dunit (x, y)) F xy) =1
-  (\dlet_(y <- Q) \dlet_(x <- P) F (x, y)).
-Proof.
-move=> z.
-rewrite (@dlet_dlet_clean U (T * U)%type V Q
-  (fun y => \dlet_(x <- P) dunit (x, y)) F z).
-rewrite !dletE.
-apply/eq_psum=> y.
-congr (_ * _).
-rewrite (@dlet_dlet_clean T (T * U)%type V P
-  (fun x => dunit (x, y)) F z).
-rewrite !dletE.
-apply/eq_psum=> x.
-by rewrite dlet_unit.
-Qed.
-
-Lemma dlet_commut_indep_clean {T U V : choiceType}
-    (P : {distr T / R}) (Q : {distr U / R})
-    (F : T -> U -> {distr V / R}) :
-  (\dlet_(x <- P) \dlet_(y <- Q) F x y) =1
-  (\dlet_(y <- Q) \dlet_(x <- P) F x y).
-Proof.
-move=> z.
-rewrite -(dlet_pair_bindE P Q (fun xy => F xy.1 xy.2) z).
-rewrite -(dlet_pair_bind_revE P Q (fun xy => F xy.1 xy.2) z).
-rewrite !dletE.
-apply/eq_psum=> xy.
-by rewrite (dlet_pairC P Q xy).
-Qed.
-
 Lemma dweight_dlet_sum {T U : choiceType}
     (D : {distr T / R}) (K : T -> {distr U / R}) :
   dweight (\dlet_(x <- D) K x) =
   psum (fun x => D x * dweight (K x)).
 Proof.
-rewrite !pr_predT.
-transitivity (psum (fun y : U => psum (fun x : T => D x * K x y))).
-  apply/eq_psum=> y.
-  exact: dletE.
-pose S := fun xy : T * U => K xy.1 xy.2 * D xy.1.
-have HSge xy : 0 <= S xy.
-  by rewrite /S mulr_ge0 ?ge0_mu.
-have HSsumm : summable S.
-  apply: summable_kernel_weighted_pair_nonneg.
-  - move=> x; exact: ge0_mu.
-  - exact: summable_mu.
-transitivity (psum S).
-  rewrite (partition_psum (S := S) (fun xy : T * U => xy.2)) //.
-  apply/eq_psum=> y.
-  rewrite (psum_pair_snd_fiberR S y HSge).
-  apply/eq_psum=> x.
-  by rewrite /S mulrC.
-rewrite (partition_psum (S := S) (fun xy : T * U => xy.1)) //.
+rewrite pr_dlet /esp.
+have Hnonneg x : 0 <= dweight (K x) * D x.
+  by rewrite mulr_ge0 ?ge0_pr ?ge0_mu.
+rewrite -(psum_sum Hnonneg).
 apply/eq_psum=> x.
-rewrite (psum_pair_fst_fiberR S x HSge).
-rewrite pr_predT.
-rewrite -psumZ; last exact: ge0_mu.
-apply/eq_psum=> y.
-change (S (x, y) = D x * K x y).
-by rewrite /S mulrC.
+by rewrite mulrC.
 Qed.
 
 Lemma dweight_dlet_lossless {T U : choiceType}

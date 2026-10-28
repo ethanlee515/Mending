@@ -1,9 +1,9 @@
 From Stdlib Require Import Utf8 Unicode.Utf8 BinInt Lia.
 From extructures Require Import ord fset fmap fperm.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr realsum ssrZ lra.
+From mathcomp Require Import boot order algebra reals distr realsum ssrZ arithmetic_tactic.
 Set Warnings "notation-overridden,ambiguous-paths".
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import ring_tactic ssrZ zify.
 From SSProve.Crypt Require Import Axioms ChoiceAsOrd Couplings Package Prelude
   StateTransformingLaxMorph choice_type fmap_extra SubDistr.
 From SSProve Require Import NominalPrelude.
@@ -37,6 +37,7 @@ Local Open Scope HoareNotations.
 Local Open Scope PythNotations.
 
 From Mending.Security.NoiseFloodingSecurity Require Import Prelude GameReduction.
+Set SsrOldRewriteGoalsOrder.
 
 Module NoiseFloodingSecure
   (Import Scheme : ApproxFheScheme)
@@ -226,7 +227,7 @@ Module NoiseFloodingSecure
         (IndCpadGame.IndCpadOracle max_queries) =
       ind_cpad_challenge_init_code tt).
     - f_equal.
-      apply functional_extensionality=> init.
+      apply boolp.funext=> init.
       rewrite /ind_cpad_compiled_real_guess_code.
       rewrite (@compile_calls_correct_code_link max_queries
         nat (chOption message) bool
@@ -975,9 +976,9 @@ Module NoiseFloodingSecure
     - rewrite /ind_cpa_reduction_direct_factored_game_code.
       rewrite Pr_code_bind.
       rewrite /ind_cpa_reduction_challenge_init_code.
-      rewrite Pr_code_sample __deprecated__dlet_dlet.
+      rewrite Pr_code_sample dlet_dlet.
       apply: eq_in_dlet=> // b _ out_b.
-      rewrite Pr_code_sample __deprecated__dlet_dlet.
+      rewrite Pr_code_sample dlet_dlet.
       apply: eq_in_dlet=> // keys _ out_keys.
       case: keys=> [[pk evk] sk].
       by rewrite !Pr_code_put Pr_code_ret dlet_unit /reduction_initialized_heap.
@@ -985,9 +986,9 @@ Module NoiseFloodingSecure
       rewrite ind_cpa_reduction_unfresh_factored_outer_linked_game_code_from_guess.
       rewrite Pr_code_bind.
       rewrite /ind_cpa_reduction_outer_challenge_init_code.
-      rewrite Pr_code_sample __deprecated__dlet_dlet.
+      rewrite Pr_code_sample dlet_dlet.
       apply: eq_in_dlet=> // b _ out_b.
-      rewrite Pr_code_sample __deprecated__dlet_dlet.
+      rewrite Pr_code_sample dlet_dlet.
       apply: eq_in_dlet=> // keys _ out_keys.
       case: keys=> [[pk evk] sk].
       rewrite !Pr_code_put Pr_code_ret dlet_unit.

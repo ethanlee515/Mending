@@ -4,6 +4,7 @@ From mathcomp Require Import ssreflect eqtype ssrnat seq choice.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From extructures Require Import ord fset fmap.
 From SSProve Require Import NominalPrelude.
+Set SsrOldRewriteGoalsOrder.
 
 Import PackageNotation.
 Local Open Scope package_scope.
@@ -398,13 +399,13 @@ Proof.
     exact: (fhas_empty _ H).
   - simpl.
     f_equal.
-    apply functional_extensionality => v.
+    apply boolp.funext => v.
     auto.
   - simpl.
     by rewrite IHHvalid.
   - simpl.
     f_equal.
-    apply functional_extensionality => v.
+    apply boolp.funext => v.
     auto.
 Qed.
 
@@ -499,7 +500,7 @@ Proof.
       rewrite (@code_link_resolve_closed X Y Lp M p fn x Hp Hfn).
       rewrite bind_assoc.
       f_equal.
-      apply functional_extensionality => y.
+      apply boolp.funext => y.
       rewrite -code_link_bind.
       have Hnext :
         continue_from_trace root
@@ -516,7 +517,7 @@ Proof.
       exact: (Hfactor (k y)
         (rcons (tp ++ lt) (call_entry (pickle y))) (Hk y) Hnext).
     + f_equal.
-      apply functional_extensionality => y.
+      apply boolp.funext => y.
       have Hnext :
         continue_from_trace root
           (tp ++ rcons lt (call_entry (pickle y))) =
@@ -531,7 +532,7 @@ Proof.
       }
       exact: (IH y tp (rcons lt (call_entry (pickle y))) Hnext).
   - f_equal.
-    apply functional_extensionality => y.
+    apply boolp.funext => y.
     have Hnext :
       continue_from_trace root
         (tp ++ rcons lt (get_entry (pickle y))) =
@@ -554,7 +555,7 @@ Proof.
     f_equal.
     exact: (IH tp (rcons lt put_entry) Hnext).
   - f_equal.
-    apply functional_extensionality => y.
+    apply boolp.funext => y.
     have Hnext :
       continue_from_trace root
         (tp ++ rcons lt (sample_entry (pickle y))) =

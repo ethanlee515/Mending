@@ -3,8 +3,8 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap fperm.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals distr ssrZ realseq realsum exp lra.
+From mathcomp Require Import boot order algebra.
+From mathcomp Require Import reals distr ssrZ realseq realsum exp arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
@@ -19,6 +19,7 @@ From Mending.LibExtras.MathcompExtras Require Import DistrExtras TupleExtras.
 From Mending.Probability Require Import Ae OutputHeap PythSeq.
 From Mending.Probability.KL Require Import Pyth.
 From Mending.ProgramLogics Require Import Ae Hoare Pyth.
+Set SsrOldRewriteGoalsOrder.
 Local Open Scope AeNotations.
 Local Open Scope HoareNotations.
 Local Open Scope PythNotations.
@@ -506,12 +507,12 @@ elim: prog=> [a|o x k IH|l k IH|l v k IH|op k IH]
   + by rewrite /prepend_suspended_trace /= unpack_pack_trace.
   + cbn.
     f_equal.
-    apply functional_extensionality=> y.
+    apply boolp.funext=> y.
     rewrite rcons_cat.
     exact: IH.
 - cbn.
   f_equal.
-  apply functional_extensionality=> y.
+  apply boolp.funext=> y.
   rewrite rcons_cat.
   exact: IH.
 - cbn.
@@ -520,7 +521,7 @@ elim: prog=> [a|o x k IH|l k IH|l v k IH|op k IH]
   exact: IH.
 - cbn.
   f_equal.
-  apply functional_extensionality=> y.
+  apply boolp.funext=> y.
   rewrite rcons_cat.
   exact: IH.
 Qed.
@@ -554,7 +555,7 @@ rewrite -(cats0 trace_prefix).
 rewrite runUntilNextCallAux_prepend_trace.
 rewrite bind_assoc.
 f_equal.
-apply functional_extensionality=> s.
+apply boolp.funext=> s.
 rewrite /= cats0.
 by rewrite compileCallsFromTraceStepCont_prepend_trace.
 Qed.
@@ -587,15 +588,15 @@ induction c in p |- *; cbn.
         code_link (Nominal.rename π (k b)) (Nominal.rename π p))).
   rewrite mcode_bind resolve_rename.
   f_equal.
-  apply functional_extensionality=> y.
+  apply boolp.funext=> y.
   exact: H.
 - f_equal.
-  apply functional_extensionality=> y.
+  apply boolp.funext=> y.
   exact: H.
 - f_equal.
   exact: IHc.
 - f_equal.
-  apply functional_extensionality=> y.
+  apply boolp.funext=> y.
   exact: H.
 Qed.
 
@@ -807,7 +808,7 @@ rewrite (@compile_calls_from_traceS_decompose q X Y A p fn root prog
   trace_prefix Htrace).
 rewrite !code_link_bind bind_assoc.
 f_equal.
-apply functional_extensionality=> s.
+apply boolp.funext=> s.
 rewrite -code_link_bind.
 case: s=> [[x|a] packed_local_trace] /=.
 - case: (call_from_package (X := X) (Y := Y) p fn x)=> [body|] //=.
@@ -937,7 +938,7 @@ transitivity (Pr_code (code_link
   f_equal.
   f_equal.
   f_equal.
-  apply functional_extensionality=> s.
+  apply boolp.funext=> s.
   case: s=> [[packed_x|a] packed_local_trace] /=.
   + case: (call_from_package (X := X) (Y := Y) p fn packed_x)=>
       [body|] /=.
@@ -965,12 +966,12 @@ elim: Hvalid=> [a|o x k Ho Hk IH|l k Hl Hk IH
 - exfalso.
   exact: (fhas_empty _ Ho).
 - f_equal.
-  apply functional_extensionality=> y.
+  apply boolp.funext=> y.
   exact: (IH y cont).
 - f_equal.
   exact: (IH cont).
 - f_equal.
-  apply functional_extensionality=> y.
+  apply boolp.funext=> y.
   exact: (IH y cont).
 Qed.
 
@@ -1002,7 +1003,7 @@ move=> Hvalid.
 rewrite codeLinkCompileCalls0.
 rewrite (codeLinkClosedPrefixBind A B L P_link prefix cont Hvalid).
 f_equal.
-apply functional_extensionality=> x.
+apply boolp.funext=> x.
 by rewrite codeLinkCompileCalls0.
 Qed.
 
@@ -2124,14 +2125,14 @@ Lemma diagonalCoupling
 Proof.
 apply: coupling_of_margins; split.
 - move=> x.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   rewrite (eq_dlet (m := D) (g := fun y => dunit y)); last first.
     move=> y.
     apply: distr_ext=> z.
     by rewrite dmargin_dunit.
   by rewrite dlet_dunit_id.
 - move=> x.
-  rewrite dmargin_dlet_partition.
+  rewrite dmargin_dlet.
   rewrite (eq_dlet (m := D) (g := fun y => dunit y)); last first.
     move=> y.
     apply: distr_ext=> z.

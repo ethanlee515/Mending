@@ -1,6 +1,7 @@
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 From mathcomp Require Import reals distr.
+Set SsrOldRewriteGoalsOrder.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 
 Import GRing.Theory Num.Theory Order.Theory.

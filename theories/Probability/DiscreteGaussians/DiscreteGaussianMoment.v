@@ -1,18 +1,19 @@
 From Stdlib Require Import Utf8 Lia.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import ssreflect ssrbool eqtype ssrnat seq choice bigop order all_algebra.
+From mathcomp Require Import ssreflect ssrbool eqtype ssrnat seq choice bigop order algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import reals realsum exp sequences realseq distr.
 Set Warnings "-notation-incompatible-prefix".
 From mathcomp Require Import xfinmap.
 Set Warnings "notation-incompatible-prefix".
-From mathcomp Require Import lra.
-From mathcomp.algebra_tactics Require Import ring.
+From mathcomp Require Import arithmetic_tactic.
+From mathcomp Require Import ring_tactic ssrZ zify.
 Import GRing.Theory Num.Theory Order.Theory.
 
 From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussian.
 From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Local Open Scope ring_scope.
 
@@ -131,7 +132,7 @@ Lemma summable_nat_mul_geometric (r : R) :
 Proof.
 move=> r01.
 apply: (le_summable
-  (F2 := fun n : nat =>
+  (g := fun n : nat =>
      linear_geometric_tail_scale r * geometric 1 (mid_step_ratio r) n)).
 - move=> n; apply/andP; split.
   + rewrite mulr_ge0 ?ler0n //.
@@ -184,7 +185,7 @@ Proof.
 move=> gt0_s.
 apply/summable_abs.
 apply: (le_summable
-  (F2 := fun x : int => (absz x)%:R * geom_above s (absz x))).
+  (g := fun x : int => (absz x)%:R * geom_above s (absz x))).
 - move=> x.
   apply/andP; split.
   + exact: normr_ge0.
@@ -199,7 +200,7 @@ Proof.
 move=> gt0_s.
 rewrite /has_esp.
 apply: (eq_summable
-  (S1 := (1 / sum (gaussian s)) \*o
+  (f := (1 / sum (gaussian s)) \*o
     (fun x : int => x%:~R * gaussian s x))).
 - move=> x /=.
   rewrite /centered_discrete_gaussian /gaussian_pdf.
@@ -217,7 +218,7 @@ move=> gt0_s.
 rewrite /has_esp.
 rewrite /discrete_gaussian.
 apply: (eq_summable
-  (S1 := fun x : int =>
+  (f := fun x : int =>
      (x - center)%:~R * centered_discrete_gaussian s (x - center))).
 - move=> x.
   by rewrite dmargin_add_intE.

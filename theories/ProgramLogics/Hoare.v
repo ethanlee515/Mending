@@ -1,9 +1,9 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 From mathcomp Require Import reals distr ssrZ realseq realsum.
-From mathcomp Require Import lra.
+From mathcomp Require Import arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
@@ -12,6 +12,7 @@ From SSProve.Crypt Require Import choice_type SubDistr.
 From SSProve.Crypt.nominal Require Import Pr.
 From SSProve Require Import pkg_core_definition pkg_advantage pkg_distr
   pkg_notation.
+Set SsrOldRewriteGoalsOrder.
 
 Declare Scope HoareNotations.
 Local Open Scope HoareNotations.

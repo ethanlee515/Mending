@@ -1,6 +1,6 @@
 From extructures Require Import ord fset fmap.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra reals distr.
+From mathcomp Require Import boot order algebra reals distr.
 Set Warnings "notation-overridden,ambiguous-paths".
 From SSProve.Crypt Require Import Axioms Package Prelude.
 From SSProve Require Import NominalPrelude.
@@ -8,6 +8,7 @@ From Mending.Schemes Require Import ApproxFHE.
 From Mending.LibExtras.MathcompExtras Require Import ListExtras.
 From mathcomp Require Import seq.
 From Mending.Schemes Require Import ApproxFHE.
+Set SsrOldRewriteGoalsOrder.
 
 Import PackageNotation.
 Local Open Scope package_scope.

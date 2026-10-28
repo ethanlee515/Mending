@@ -81,73 +81,85 @@ Miscellaneous helpers (source ranges are inclusive, relative to `theories/`):
 
 | Helper group | Source | Ranges | Source lines |
 |---|---|---|---:|
-| Scheme labels and package wrapper | [ApproxFHE.v](theories/Schemes/ApproxFHE.v) | 19–23, 52–98 | 52 |
-| Vector norm, zero, subtraction, and distance | [IntVec.v](theories/Schemes/Utils/IntVec.v) | 9–13, 47–48, 87–88 | 9 |
-| Safe table indexing (`nth_valid`) | [ListExtras.v](theories/LibExtras/MathcompExtras/ListExtras.v) | 6–12 | 7 |
-| SSProve vector type (`chVec`) | [ChoiceVector.v](theories/LibExtras/SSProveExtras/ChoiceVector.v) | 15–19 | 5 |
-| IND-CPA labels, locations, and interfaces | [Indcpa.v](theories/Schemes/Indcpa.v) | 16–51 | 36 |
-| IND-CPAD labels, locations, and interfaces | [Indcpad.v](theories/Schemes/Indcpad.v) | 18–64, 134–136 | 50 |
-| Simulator interfaces, vector conversions, and location wrapper | [IndcpadSimulator.v](theories/Security/IndcpadSimulator.v) | 35–98, 320–321 | 66 |
-| KL divergence definition | [Core.v](theories/Probability/KL/Core.v) | 19–20 | 2 |
-| Theorem parameters, reduction/bound wrappers, and main theorem | [Final.v](theories/Security/NoiseFloodingSecurity/Final.v) | 41–47, 522–533, 1953–1956 | 23 |
+| Scheme labels and package wrapper | [ApproxFHE.v](theories/Schemes/ApproxFHE.v) | 20–24, 53–99 | 52 |
+| Vector norm, zero, subtraction, and distance | [IntVec.v](theories/Schemes/Utils/IntVec.v) | 10–14, 48–49, 88–89 | 9 |
+| Safe table indexing (`nth_valid`) | [ListExtras.v](theories/LibExtras/MathcompExtras/ListExtras.v) | 7–13 | 7 |
+| SSProve vector type (`chVec`) | [ChoiceVector.v](theories/LibExtras/SSProveExtras/ChoiceVector.v) | 16–20 | 5 |
+| IND-CPA labels, locations, and interfaces | [Indcpa.v](theories/Schemes/Indcpa.v) | 17–52 | 36 |
+| IND-CPAD labels, locations, and interfaces | [Indcpad.v](theories/Schemes/Indcpad.v) | 19–65, 135–137 | 50 |
+| Simulator interfaces, vector conversions, and location wrapper | [IndcpadSimulator.v](theories/Security/IndcpadSimulator.v) | 36–99, 321–322 | 66 |
+| KL divergence definition | [Core.v](theories/Probability/KL/Core.v) | 20–21 | 2 |
+| Theorem parameters, reduction/bound wrappers, and main theorem | [Final.v](theories/Security/NoiseFloodingSecurity/Final.v) | 42–48, 523–534, 1954–1957 | 23 |
 | Game and simulator module aliases | [GaussianBasics.v](theories/Security/NoiseFloodingSecurity/GaussianBasics.v) | 256–257 | 2 |
-| Noise-flooding security result interface | [Prelude.v](theories/Security/NoiseFloodingSecurity/Prelude.v) | 46–52 | 7 |
+| Noise-flooding security result interface | [Prelude.v](theories/Security/NoiseFloodingSecurity/Prelude.v) | 47–53 | 7 |
 | **Total misc. helpers** | | | **259** |
 <!-- END GENERATED SPECIFICATION AUDIT -->
 
 ## Setup
 
-This repository is intended for users who already have some Rocq/opam
-experience.  The submission snapshot has been checked with Rocq 9.0.1,
-MathComp Analysis 1.16.0, MathComp algebra tactics 1.2.7, and the SSProve
-development version at commit
-`c6d7d4bc3a0a671c92899aa49dfcfb065d1bdbbd`.
+This repository uses Rocq 9.0.1, MathComp 2.6.0, MathComp Analysis and
+experimental reals 1.18.0, and SSProve's `main` branch. The repository-local
+[`mending.opam`](mending.opam) records the direct dependency versions and the
+SSProve branch pin. MathComp 2.6 supplies the ring tactic; the separate
+`coq-mathcomp-algebra-tactics` package is no longer needed.
+The sources explicitly retain SSReflect's previous rewrite subgoal order
+with `Set SsrOldRewriteGoalsOrder.` while using the new library APIs.
 
-The repository-local [`mending.opam`](mending.opam) records those versions and
-pins the exact SSProve commit.  From a fresh opam switch, install the
-dependencies and check the complete artifact with:
+From a fresh opam switch, install the dependencies and check the complete
+artifact with:
 
 ```bash
 opam repo add rocq-released https://rocq-prover.org/opam/released
 opam update
 opam pin add . --no-action
-opam install mending
+opam install mending --jobs=4
 ```
 
 For example, a completely fresh switch can be created first with
 `opam switch create mending 5.4.1`, followed by
-`eval "$(opam env --switch=mending)"`.  On memory-constrained machines,
-`opam install mending --jobs=4` avoids opam using every visible CPU.
-The released SSProve package still uses the transitional name `coq-ssprove`;
-the pinned development package used here is named `rocq-ssprove`.
+`eval "$(opam env --switch=mending)"`. Four parallel jobs limit memory use.
+The development package is named `rocq-ssprove`.
 
-## Dependency Upgrade Blocker
+Use the `rocq-released` and `default` package repositories. If the switch also
+selects `rocq-extra-dev`, run `opam repository remove rocq-extra-dev` in that
+switch before upgrading, so other dependencies resolve to released packages.
 
-The dependency upgrade is deferred during CSF 2027 camera-ready preparation.
-Keep the checked upstream stack pinned in `mending.opam`; do not use an
-unmerged pull-request snapshot or a local package repository for the artifact.
+To upgrade an existing switch that still pins the old SSProve commit, repin
+it explicitly before installing the updated artifact:
 
-MathComp Analysis 1.18.0 includes our merged proof of `interchange_psum`
-([math-comp/analysis#2007](https://github.com/math-comp/analysis/pull/2007)).
-Adopting it requires MathComp 2.6 and a compatible SSProve dependency stack.
-As checked on October 9, 2026, the relevant
-[SSProve compatibility PR #124](https://github.com/SSProve/ssprove/pull/124)
-is still unmerged, and its word/Extructures dependency bounds also need updating.
-This blocks moving the artifact to the newer public stack. The current
-Analysis 1.16.0 stack still exposes the inherited admitted summation assumption;
-our local proof alone does not remove it from SSProve's semantics.
+```bash
+opam update
+opam pin add rocq-ssprove git+https://github.com/SSProve/ssprove.git#main --no-action
+opam pin add . --no-action
+opam install mending --jobs=4
+```
 
-Revisit the upgrade when compatible upstream support is available. If the
-camera-ready deadline makes that impractical, the authors may choose to
-maintain a documented SSProve fork instead; that decision and work are deferred.
-After any upgrade, rebuild the complete artifact and rerun
-`Print Assumptions is_secure` before changing the paper's trusted-base claims.
+## Upstream Dependencies
 
-Contributor context: preserve the public, named-author paper configuration and
-keep dependency and trusted-base descriptions synchronized across both
-repositories. The manuscript submodule has its own history. During camera-ready
-preparation, provide commands for long dependency rebuilds so the user can run
-them outside the agent session. No dependency rebuild is needed for this deferral.
+[SSProve PR #124](https://github.com/SSProve/ssprove/pull/124) was merged on
+October 20, 2026, enabling the released MathComp 2.6 / Analysis 1.18.0 stack.
+The compatible released dependencies include Extructures 0.6.0 and word 3.5.
+Analysis 1.18.0 includes our summation proofs from
+[math-comp/analysis#2007](https://github.com/math-comp/analysis/pull/2007),
+including `interchange_psum`; SSProve's semantics now uses that proved theorem.
+The artifact also uses the proved upstream `psumB`. Local summation proofs
+and duplicate distribution/monad compatibility wrappers have been removed in
+favor of upstream results.
+
+SSProve tracks `main`, so its branch pin can advance when refreshed with
+`opam update`. For reproducibility, the revision used for this upgrade is
+`9a37fe0ab79d041f8d835e6cf18e37614b16a791`. To select that snapshot after
+pinning this repository, run:
+
+```bash
+opam pin add rocq-ssprove git+https://github.com/SSProve/ssprove.git#9a37fe0ab79d041f8d835e6cf18e37614b16a791 --no-action
+opam install mending --jobs=4
+```
+
+After advancing dependencies, rebuild the complete artifact and rerun
+`Print Assumptions is_secure` before updating the paper's trusted-base claims.
+Keep dependency and trusted-base descriptions synchronized with the manuscript
+submodule, preserving its public, named-author configuration.
 
 ## Usage
 
@@ -157,6 +169,9 @@ Generate the Rocq makefile and build the development:
 rocq makefile -f _RocqProject -o Makefile.rocq
 make -f Makefile.rocq -j4
 ```
+
+After changing dependencies, run `make -f Makefile.rocq clean` before the
+build to discard compiled files from the previous stack.
 
 To inspect the theorem assumptions in their definition context, open
 [`theories/Security/NoiseFloodingSecurity/Final.v`](theories/Security/NoiseFloodingSecurity/Final.v)
@@ -170,10 +185,6 @@ Print Assumptions is_secure.
 Then process the file in a Rocq editor or rebuild it to display the audit.
 Keeping the command inside the functor avoids introducing a setup-dependent
 probe module merely to give the instantiated theorem a name.
-
-In a fresh switch on the authors' machine, a clean build of the complete
-artifact took about six minutes using four parallel jobs.  This is a
-reproduction aid, not a performance claim.
 
 ## Repository Map
 
@@ -223,27 +234,27 @@ Probability and analysis:
 
 ## Assumption Audit
 
-Running `Print Assumptions is_secure` inside `NoiseFloodingSecure` is expected
-to mention:
+The complete artifact was rebuilt and audited on October 28, 2026 with the
+SSProve revision recorded above. Running `Print Assumptions is_secure` inside
+`NoiseFloodingSecure` reports:
 
-* foundational real-number and classical axioms from the underlying libraries;
-* the current SSProve/MathComp real-summation residue
-  `realsum.__admitted__interchange_psum`;
+* MathComp's propositional extensionality, dependent functional extensionality,
+  and constructive indefinite description;
+* SSProve's abstract real type `R`;
 * abstract scheme and correctness assumptions, including
   `deterministic_dec_correct`;
 * the assumed IND-CPA security theorem for the underlying scheme;
-* the abstract metric/chart assumptions from `ApproxFheMetric`.
+* the abstract metric/chart assumptions from `ApproxFheMetric`;
+* positivity of the Gaussian width multiplier.
 
-The `interchange_psum` entry is inherited through the installed
-SSProve/MathComp program semantics.  This repository also proves that statement
-as `interchange_psum_proved` in
-`theories/LibExtras/MathcompExtras/RealSumExtras.v`.
-
-Reviewers can check the local replacement directly with:
+The upgraded dependency stack proves `realsum.interchange_psum`; the former
+`realsum.__admitted__interchange_psum` is only a deprecated parsing alias.
+The rebuilt top-level audit contains no `__admitted__` entries. The upstream
+summation theorem can also be inspected directly:
 
 ```coq
-From Mending.LibExtras.MathcompExtras Require Import RealSumExtras.
-Print Assumptions interchange_psum_proved.
+From mathcomp Require Import realsum.
+Print Assumptions interchange_psum.
 ```
 
 ## Metric and Correctness Interface

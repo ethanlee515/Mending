@@ -3,8 +3,8 @@
 From Stdlib Require Import Unicode.Utf8.
 From extructures Require Import ord fset fmap.
 Set Warnings "-ambiguous-paths,-notation-overridden,-notation-incompatible-format".
-From mathcomp Require Import all_boot all_order all_algebra.
-From mathcomp Require Import reals distr ssrZ realseq realsum lra.
+From mathcomp Require Import boot order algebra.
+From mathcomp Require Import reals distr ssrZ realseq realsum arithmetic_tactic.
 Set Warnings "ambiguous-paths,notation-overridden,notation-incompatible-format".
 From SSProve.Relational Require Import OrderEnrichedCategory.
 From SSProve.Crypt Require Import ChoiceAsOrd Couplings StateTransformingLaxMorph.
@@ -19,6 +19,7 @@ From Mending.Probability Require Import Ae ConditionalCoordinate DletTuple
 From Mending.Probability.KL Require Import Core Pyth.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras RealSumExtras
   TupleExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Import PackageNotation.
 Import pkg_heap.
@@ -239,7 +240,7 @@ rewrite (eq_psum
       dweight ML - dweight (\dlet_(y <- ML) KL y).
     rewrite (eq_psum
       (F2 := fun y => ML y - ML y * dweight (KL y))).
-      rewrite (@psum_sub_bounded_nonneg R _ ML
+      rewrite (@psumB R _ ML
         (fun y => ML y * dweight (KL y))).
       - rewrite pr_predT dweight_dlet.
         by [].
@@ -333,7 +334,7 @@ have Hchoice :
   move=> [y Hy] /=.
   have [P [Q HW]] := Hcont y Hy.
   by exists (P, Q).
-have [K HK] := schoice _ _ _ Hchoice.
+have [K HK] := @boolp.choice _ _ _ Hchoice.
 by exists K.
 Qed.
 
@@ -1369,7 +1370,7 @@ rewrite -(eq_in_dlet (mu := P0)
   (f := fun omega => completedSemanticBindKernel KL mid (final omega))
   (g := fun omega => dmargin (fun omega2 => tnth omega2 ord_max)
           (completedPythTraceKernelL mid K omega))).
-  rewrite -(dlet_dmargin_final P0
+  rewrite -(dlet_dmargin P0 final
     (completedSemanticBindKernel KL mid) z).
   rewrite -(eq_in_dlet
     (mu := complete_output_heap ML)
@@ -1414,7 +1415,7 @@ rewrite -(eq_in_dlet (mu := Q0)
   (f := fun omega => completedSemanticBindKernel KR mid (final omega))
   (g := fun omega => dmargin (fun omega2 => tnth omega2 ord_max)
           (completedPythTraceKernelR mid K omega))).
-  rewrite -(dlet_dmargin_final Q0
+  rewrite -(dlet_dmargin Q0 final
     (completedSemanticBindKernel KR mid) z).
   rewrite -(eq_in_dlet
     (mu := complete_output_heap MR)

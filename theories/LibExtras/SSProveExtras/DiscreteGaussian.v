@@ -2,7 +2,7 @@
 
 From Stdlib Require Import Utf8.
 Set Warnings "-notation-overridden,-ambiguous-paths".
-From mathcomp Require Import all_boot all_order all_algebra.
+From mathcomp Require Import boot order algebra.
 Set Warnings "notation-overridden,ambiguous-paths".
 From mathcomp Require Import distr.
 From SSProve Require Import Axioms choice_type Package.
@@ -17,6 +17,7 @@ From mathcomp Require Import reals realsum.
 From Mending.Probability.KL Require Import Core.
 From Mending.Probability.DiscreteGaussians Require Import DiscreteGaussianKL.
 From Mending.LibExtras.MathcompExtras Require Import DistrExtras.
+Set SsrOldRewriteGoalsOrder.
 
 Definition ssp_dg (m : 'int) (s : R) : distr R 'int :=
   dmargin (U := 'int) Z_of_int (discrete_gaussian (int_of_Z m) s).
