@@ -45,7 +45,7 @@ final IND-CPAD-to-IND-CPA inequality.
 ## Specification Audit Size
 
 The formal-interface selection in [Appendix E](Pythagorean-RHL/appendix-formal-interface-excerpts.tex)
-contains **724 physical Rocq source lines**, including **259 lines of miscellaneous
+contains **732 physical Rocq source lines**, including **259 lines of miscellaneous
 helpers**. The first table matches the slide summary; the second breaks down
 its helper row with exact source ranges. Blank and comment lines count;
 typeset wrapping does not. The second table’s total is already included in
@@ -66,14 +66,14 @@ python3 Pythagorean-RHL/scripts/count-interface-excerpts.py --detailed
 <!-- BEGIN GENERATED SPECIFICATION AUDIT -->
 | Specification | Source lines |
 |---|---:|
-| Scheme / charts / correctness | 83 |
+| Scheme / charts / correctness | 91 |
 | Gaussian / sampler bridge | 56 |
 | Security games | 175 |
 | Flooded construction | 45 |
 | Concrete reduction | 95 |
 | Loss / reduction validity | 11 |
 | Misc. helpers | 259 |
-| **Total** | **724** |
+| **Total** | **732** |
 
 39 non-overlapping excerpts across 16 source files.
 
@@ -253,11 +253,28 @@ The theorem-facing chart interface is the origin-centered one:
 ```text
 I_a(a) = 0
 metric a b = ivec_dist 0 (I_a(b))
-I_b^{-1}(x) = I_a^{-1}(x + I_a(b))
+J_a(0) = a
+metric a (J_a(v)) <= max_norm v
+J_b(v) = J_a(v + I_a(b))
 ```
 
 This is the abstract version of the modular-representative story used for
-lattice plaintext spaces.
+lattice plaintext spaces. Here `J_a` is `inverse_isometry a`. The laws imply
+`J_a(I_a(b)) = b`, proved by `inverse_isometry_isometry`; the reverse round
+trip is not required, since integer vectors can wrap in a finite message
+space. The zero-displacement and displacement-bound laws specify flooding's
+meaning; the security comparison uses centering, distance, and translation.
+
+`NoiseFlooding.decrypt` samples independent centered discrete Gaussians and
+pushes the resulting vector through `J_a`, where `a` is base decryption's
+output. `GaussianBasics.v` proves this exact output law in
+`noise_flooding_decrypt_some_centered`, and expresses the simulator's output
+as a shifted Gaussian in the same chart in `simulator_decrypt_noise_one_chart`.
+These equalities feed the one-call Pythagorean comparison and the adaptive
+compiler hop (the paper's `H2 -> H3`). `Tail.v` supplies auxiliary scalar
+Gaussian tail bounds that may support future concrete correctness analyses;
+the security hop uses KL bounds on the full distributions and does not depend
+on those tail bounds.
 
 The abstract scheme keeps decryption distribution-valued:
 

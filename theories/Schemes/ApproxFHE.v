@@ -100,8 +100,7 @@ Module Type ApproxFheScheme.
 End ApproxFheScheme.
 
 (* To talk about correctness and noise flooding, we need a message metric plus
-   chart maps into integer vectors.  Route-specific chart-center and finite
-   encoding evidence is carried by the security lemmas that use it. *)
+   chart maps into integer vectors. *)
 Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
   Parameter metric : message → message → nat.
   Parameter dim : nat.
@@ -115,10 +114,29 @@ Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
   Axiom metric_chartE :
     forall (center m : message),
     metric center m = ivec_dist ivec_zero (isometry center m).
+  (* Zero noise preserves the center, and decoding cannot amplify noise.
+     These laws specify flooding's meaning; the security comparison only uses
+     centering, the distance law, and translation between charts. *)
+  Axiom inverse_isometry_center0 :
+    forall (center : message), inverse_isometry center ivec_zero = center.
+  Axiom inverse_isometry_bound :
+    forall (center : message) (v : dim.-tuple int),
+    (metric center (inverse_isometry center v) <= max_norm v)%N.
   Axiom inverse_isometry_shift :
     forall (centerL centerR : message) (v : dim.-tuple int),
     inverse_isometry centerR v =
     inverse_isometry centerL (ivec_add v (isometry centerL centerR)).
+  (* Encoding a message and decoding it recovers that message.  The opposite
+     round trip need not hold: integer coordinates can wrap in finite spaces. *)
+  Lemma inverse_isometry_isometry (center m : message) :
+    inverse_isometry center (isometry center m) = m.
+  Proof.
+    have H := inverse_isometry_shift center m ivec_zero.
+    have Hzero : ivec_add ivec_zero (isometry center m) = isometry center m.
+      apply: eq_from_tnth=> i.
+      by rewrite /ivec_add /ivec_zero !tnth_mktuple GRing.add0r.
+    by rewrite inverse_isometry_center0 Hzero in H.
+  Qed.
   Definition centered_tuple_gaussian (stdev : R) :
       distr R (dim.-tuple int) :=
     nfold_distr dim (centered_discrete_gaussian stdev).
