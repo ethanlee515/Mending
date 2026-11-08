@@ -116,8 +116,8 @@ Module Type ApproxFheMetric(Import Scheme: ApproxFheScheme).
     forall (center m : message),
     metric center m = ivec_dist ivec_zero (isometry center m).
   (* Zero noise preserves the center, and decoding cannot amplify noise.
-     These laws specify flooding's meaning; the security comparison only uses
-     centering, the distance law, and translation between charts. *)
+     These assumptions specify flooding's meaning; the security comparison only uses
+     centering, the distance identity, and translation between charts. *)
   Axiom inverse_isometry_center0 :
     forall (center : message), inverse_isometry center ivec_zero = center.
   Axiom inverse_isometry_bound :
