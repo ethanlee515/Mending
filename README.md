@@ -97,10 +97,11 @@ Miscellaneous helpers (source ranges are inclusive, relative to `theories/`):
 
 ## Setup
 
-This repository uses Rocq 9.0.1, MathComp 2.6.0, MathComp Analysis and
-experimental reals 1.18.0, and SSProve's `main` branch. The repository-local
-[`mending.opam`](mending.opam) records the direct dependency versions and the
-SSProve branch pin. MathComp 2.6 supplies the ring tactic; the separate
+The `csf2027` branch pins Rocq 9.0.1, MathComp 2.6.0, MathComp Analysis and
+experimental reals 1.18.0, and SSProve revision
+`9a37fe0ab79d041f8d835e6cf18e37614b16a791`. The repository-local
+[`mending.opam`](mending.opam) records the exact direct dependency versions and
+SSProve commit pin. MathComp 2.6 supplies the ring tactic; the separate
 `coq-mathcomp-algebra-tactics` package is no longer needed.
 The sources explicitly retain SSReflect's previous rewrite subgoal order
 with `Set SsrOldRewriteGoalsOrder.` while using the new library APIs.
@@ -124,12 +125,12 @@ Use the `rocq-released` and `default` package repositories. If the switch also
 selects `rocq-extra-dev`, run `opam repository remove rocq-extra-dev` in that
 switch before upgrading, so other dependencies resolve to released packages.
 
-To upgrade an existing switch that still pins the old SSProve commit, repin
-it explicitly before installing the updated artifact:
+To use an existing switch with a different SSProve pin, repin it explicitly
+before installing the artifact:
 
 ```bash
 opam update
-opam pin add rocq-ssprove git+https://github.com/SSProve/ssprove.git#main --no-action
+opam pin add rocq-ssprove git+https://github.com/SSProve/ssprove.git#9a37fe0ab79d041f8d835e6cf18e37614b16a791 --no-action
 opam pin add . --no-action
 opam install mending --jobs=4
 ```
@@ -146,15 +147,8 @@ The artifact also uses the proved upstream `psumB`. Local summation proofs
 and duplicate distribution/monad compatibility wrappers have been removed in
 favor of upstream results.
 
-SSProve tracks `main`, so its branch pin can advance when refreshed with
-`opam update`. For reproducibility, the revision used for this upgrade is
-`9a37fe0ab79d041f8d835e6cf18e37614b16a791`. To select that snapshot after
-pinning this repository, run:
-
-```bash
-opam pin add rocq-ssprove git+https://github.com/SSProve/ssprove.git#9a37fe0ab79d041f8d835e6cf18e37614b16a791 --no-action
-opam install mending --jobs=4
-```
+The SSProve commit pin keeps the `csf2027` setup fixed when `opam update`
+refreshes upstream repositories.
 
 After advancing dependencies, rebuild the complete artifact and rerun
 `Print Assumptions is_secure` before updating the paper's trusted-base claims.
